@@ -26,7 +26,7 @@ export function TodayView({
   );
 
   return (
-    <section className="view" aria-labelledby="today-title">
+    <section className="view today-view" aria-labelledby="today-title">
       <header className="view-header">
         <div>
           <p className="section-label">当前主题</p>

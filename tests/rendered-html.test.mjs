@@ -92,3 +92,39 @@ test("backup, restore, persistence, and Markdown actions remain wired", async ()
   assert.match(recordsView, /恢复备份/);
   assert.match(recordsView, /accept="application\/json,\.json"/);
 });
+
+test("static HTML and the first client render share one deterministic state before daily rollover", async () => {
+  const workbench = await readFile(
+    new URL("../app/components/LearningWorkbench.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workbench, /const HYDRATION_DATE = new Date\("2026-07-30T08:00:00Z"\)/);
+  assert.match(workbench, /createDefaultState\(HYDRATION_DATE\)/);
+  assert.match(workbench, /rolloverDailyState\(stored \?\? createDefaultState\(\)\)/);
+  assert.match(workbench, /if \(!hydrated\) \{/);
+  assert.match(workbench, /aria-busy="true"/);
+  assert.match(workbench, /正在加载本地学习数据/);
+});
+
+test("the production interface follows the selected dark control-room design contract", async () => {
+  const styles = await readFile(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(styles, /color-scheme:\s*dark/);
+  assert.match(styles, /--control-bg:\s*#080b12/i);
+  assert.match(styles, /--control-panel:\s*#111827/i);
+  assert.match(styles, /--control-accent:\s*#8ea7ff/i);
+  assert.match(styles, /--control-success:\s*#61d8c9/i);
+  assert.match(styles, /--control-warning:\s*#f4b963/i);
+  assert.match(styles, /\.question-sheet::before[\s\S]*content:\s*"Q"/);
+  assert.match(styles, /@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)/);
+  assert.match(styles, /@media\s*\(prefers-reduced-transparency:\s*reduce\)/);
+  assert.match(styles, /@media\s*\(prefers-contrast:\s*more\)/);
+  assert.match(styles, /:active[\s\S]*transform:\s*scale\(0\.97\)/);
+  assert.doesNotMatch(styles, /transition:\s*all\b/);
+  assert.doesNotMatch(styles, /\bease-in\b/);
+  assert.doesNotMatch(styles, /scale\(0\)/);
+});

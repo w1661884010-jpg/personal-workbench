@@ -61,6 +61,8 @@ const navItems: Array<{ id: ViewId; label: string; icon: IconName }> = [
   { id: "deferred", label: "以后再学", icon: "clock" },
 ];
 
+const HYDRATION_DATE = new Date("2026-07-30T08:00:00Z");
+
 function createRecordDraft(
   state: UserState,
   topicId: TopicId,
@@ -101,7 +103,9 @@ function saveStatusLabel(status: SaveStatus) {
 }
 
 export function LearningWorkbench() {
-  const [state, setState] = useState<UserState>(() => createDefaultState());
+  const [state, setState] = useState<UserState>(() =>
+    createDefaultState(HYDRATION_DATE),
+  );
   const [activeView, setActiveView] = useState<ViewId>("today");
   const [hydrated, setHydrated] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -150,14 +154,12 @@ export function LearningWorkbench() {
 
   useEffect(() => {
     const stored = loadState();
-    const readyState = stored ? rolloverDailyState(stored) : null;
+    const readyState = rolloverDailyState(stored ?? createDefaultState());
     const timer = globalThis.setTimeout(() => {
-      if (readyState) {
-        setState(readyState);
-        setSelectedTopicId(readyState.currentTopicId);
-        setDraft(createRecordDraft(readyState, readyState.currentTopicId));
-        setSaveStatus("saved");
-      }
+      setState(readyState);
+      setSelectedTopicId(readyState.currentTopicId);
+      setDraft(createRecordDraft(readyState, readyState.currentTopicId));
+      setSaveStatus("saved");
       setHydrated(true);
     }, 0);
     return () => globalThis.clearTimeout(timer);
@@ -268,7 +270,7 @@ export function LearningWorkbench() {
           id: `today-${topic.id}-${task.id}`,
           title: task.title,
           completed: false,
-          target: task.targetSignalPathId
+          target: "targetSignalPathId" in task && task.targetSignalPathId
             ? { kind: "signalPath" as const, id: task.targetSignalPathId }
             : { kind: "topic" as const, id: topic.id },
         })),
@@ -647,10 +649,23 @@ export function LearningWorkbench() {
     state,
   ]);
 
+  if (!hydrated) {
+    return (
+      <main className="workspace" aria-busy="true">
+        <p className="view-conclusion">正在加载本地学习数据…</p>
+      </main>
+    );
+  }
+
   return (
     <div className="workbench">
       <aside className="sidebar">
-        <div className="brand">自动化基础学习台</div>
+        <div className="brand">
+          <span className="brand-icon" aria-hidden="true">
+            <Icon name="chip" size={24} />
+          </span>
+          <span>自动化基础学习台</span>
+        </div>
         <nav className="side-nav" aria-label="一级导航">
           {navItems.map((item) => (
             <button
