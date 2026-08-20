@@ -26,7 +26,10 @@ export type IconName =
   | "trash"
   | "info"
   | "plus"
-  | "close";
+  | "close"
+  | "search"
+  | "menu"
+  | "edit";
 
 export function Icon({
   name,
@@ -171,6 +174,19 @@ export function Icon({
     ),
     plus: <path d="M12 5v14M5 12h14" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
+    search: (
+      <>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m16.5 16.5 4 4" />
+      </>
+    ),
+    menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+    edit: (
+      <>
+        <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" />
+        <path d="m13.8 7.7 2.5 2.5" />
+      </>
+    ),
   };
 
   return <svg {...common}>{paths[name]}</svg>;

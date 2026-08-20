@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const siteTitle = "自动化基础学习台";
+const siteTitle = "电路自习室｜本学期电子类课程个人学习站点";
 const siteDescription =
-  "本地优先的 F28335/CCS 学习执行台，用今日问题、最多三项任务和掌握证据推进基础学习。";
+  "本地优先的数字电子技术、模拟电子技术与信号与系统个人学习站点，用任务、知识卡、错题、掌握状态和到期复习形成学习闭环。";
 const fallbackOrigin = new URL("http://localhost:3000");
 const safeHostCharacters = /^[a-z0-9.:[\]-]+$/i;
 const cloudflareRay = /^[a-f0-9]{16,32}(?:-[a-z]{3})?$/i;
@@ -114,7 +114,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1200,
           height: 630,
-          alt: "自动化基础学习台界面预览",
+          alt: "电路自习室电子类课程个人学习站点界面预览",
         },
       ],
     },
