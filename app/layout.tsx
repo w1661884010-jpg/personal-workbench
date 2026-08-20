@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 
@@ -9,6 +9,11 @@ const fallbackOrigin = new URL("http://localhost:3000");
 const safeHostCharacters = /^[a-z0-9.:[\]-]+$/i;
 const cloudflareRay = /^[a-f0-9]{16,32}(?:-[a-z]{3})?$/i;
 const ipAddressCharacters = /^[a-f0-9:.]+$/i;
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#07141f",
+};
 
 function firstHeaderValue(value: string | null) {
   return value?.split(",")[0]?.trim() || null;

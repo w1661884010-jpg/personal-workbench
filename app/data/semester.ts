@@ -5,7 +5,7 @@ export const courses = [
     id: "digital",
     title: "数字电子技术",
     shortTitle: "数字电路",
-    color: "#157a74",
+    color: "#47c9bb",
     role: "把采样后的离散信息转换为可靠的逻辑判断、状态记忆与输出控制。",
     route: ["读懂 0/1 表示", "化简逻辑表达式", "搭建组合逻辑", "理解状态存储", "分析时序", "设计计数与寄存"],
     chapters: [
@@ -141,7 +141,7 @@ export const courses = [
     id: "analog",
     title: "模拟电子技术",
     shortTitle: "模拟电路",
-    color: "#236d9a",
+    color: "#5aa7d8",
     role: "在真实传感信号进入采样器前完成偏置、放大、滤波和阻抗匹配。",
     route: ["判断二极管状态", "理解三极管控制", "设置静态工作点", "分析放大电路", "建立小信号模型", "使用运放", "引入反馈", "检查频率响应"],
     chapters: [
@@ -319,7 +319,7 @@ export const courses = [
     id: "signals",
     title: "信号与系统",
     shortTitle: "信号系统",
-    color: "#4d65b5",
+    color: "#8b9cff",
     role: "描述信号随时间与频率如何变化，并用系统模型预测调理、采样和处理后的响应。",
     route: ["描述信号", "判断系统性质", "建立 LTI 模型", "计算卷积", "展开周期信号", "分析频谱", "求解系统响应", "理解采样"],
     chapters: [

@@ -18,6 +18,8 @@ test("the home entry mounts the semester learning workbench with Chinese metadat
   assert.match(layout, /openGraph:/);
   assert.match(layout, /twitter:/);
   assert.match(layout, /new URL\("\/og\.png", metadataBase\)/);
+  assert.match(layout, /colorScheme:\s*"dark"/);
+  assert.match(layout, /themeColor:\s*"#07141f"/);
 });
 test("the current home view preserves the five-surface semester learning contract", async () => {
   const [workbench, dashboard, shell] = await Promise.all([
@@ -67,18 +69,20 @@ test("static HTML and the first client render share deterministic semester data 
   assert.match(workbench, /正在读取本地学习记录/);
 });
 
-test("the production interface follows the selected light engineering-notebook contract", async () => {
+test("the production interface follows the selected dark engineering-notebook contract", async () => {
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(styles, /color-scheme:\s*light/);
-  assert.match(styles, /--paper-bg:\s*#f3f7f6/i);
-  assert.match(styles, /--ink:\s*#142b3b/i);
-  assert.match(styles, /--teal:\s*#158579/i);
-  assert.match(styles, /--orange:\s*#d9772f/i);
+  assert.match(styles, /color-scheme:\s*dark/);
+  assert.match(styles, /--paper-bg:\s*#07141f/i);
+  assert.match(styles, /--paper:\s*#0d2230/i);
+  assert.match(styles, /--ink:\s*#e8f2f4/i);
+  assert.match(styles, /--teal:\s*#27b8a6/i);
+  assert.match(styles, /--orange:\s*#ff934d/i);
   assert.match(styles, /\.app-sidebar\s*\{[^}]*position:\s*fixed/s);
   assert.match(styles, /@media\s*\(max-width:\s*760px\)/);
   assert.match(styles, /\.mobile-nav\s*\{[^}]*position:\s*fixed/s);
   assert.match(styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   assert.match(styles, /@media\s*\(prefers-contrast:\s*more\)/);
   assert.doesNotMatch(styles, /transition:\s*all\b/);
-  assert.doesNotMatch(styles, /color-scheme:\s*dark/);
+  assert.doesNotMatch(styles, /color-scheme:\s*light/);
+  assert.doesNotMatch(styles, /linear-gradient\(/);
 });
