@@ -36,3 +36,10 @@
 - 模拟工作台：5 V 电源与 1 kΩ 负载求得 5 V、5 mA；瞬态示波器显示求解样本；加入二极管后停止求解并清空旧波形。
 - 390px 移动端：首页、课程页、横向章节目录、章节长文和工作台均适配；修复后文档无横向溢出。
 - 浏览器控制台 error/warn 为 0。
+
+## 发布与迁移检查点
+
+- GitHub 私有仓库 `w1661884010-jpg/personal-workbench` 已建立，主分支保存最终源代码。
+- Sites 项目 `appgprj_6a86c36ad44c8191becb7b5965a2c237` 已以 `personal-workbench` 发布，生产页面、课程总览和章节路由验收通过。
+- 原项目 `appgprj_6a660bd10df08191932aecfe0b14a0de` 已不在所有者活动站点列表中，按项目 ID 查询返回不存在；当前接口不能进一步区分归档或移除，未用删除替代归档。
+- 当前 Vinext 产物是 SSR/RSC 与 Worker，不包含 GitHub Pages 要求的静态 `index.html`；因此未把不可用的 Pages 地址报告为已上线。
