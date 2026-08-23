@@ -1,126 +1,62 @@
-import { courseById, courses, topicById } from "../../data/semester";
-import {
-  formatStudyDate,
-  getChapterProgress,
-  getCourseProgress,
-  getTopicLocation,
-  getWeakTopics,
-  masteryLabels,
-  type SemesterState,
-} from "../../lib/semester-model";
+import type { CourseDefinition, LearningState, WorkbenchKind } from "../../lib/course-model";
+import { getChapterStatus, getCourseProgress, getCurrentChapter } from "../../lib/course-model";
 import { Icon } from "../Icons";
 
 interface CourseOverviewViewProps {
-  state: SemesterState;
-  courseId: string;
-  onSelectCourse: (courseId: string) => void;
-  onOpenTopic: (topicId: string) => void;
+  course: CourseDefinition;
+  state: LearningState;
+  onOpenChapter: (course: CourseDefinition, chapterId: string) => void;
+  onOpenWorkbench: (kind: Exclude<WorkbenchKind, "notebook">) => void;
 }
-export function CourseOverviewView({ state, courseId, onSelectCourse, onOpenTopic }: CourseOverviewViewProps) {
-  const course = courseById[courseId] ?? courses[0];
-  const currentTopicId = state.currentTopicByCourse[course.id];
-  const current = getTopicLocation(currentTopicId) ?? getTopicLocation(course.chapters[0].topic.id)!;
-  const logs = state.learningLogs.filter((log) => log.courseId === course.id).slice(0, 4);
-  const weakTopics = getWeakTopics(state, course.id, 3);
-  const courseReviews = state.reviews.filter((review) => getTopicLocation(review.topicId)?.course.id === course.id).slice(0, 3);
 
+const statusLabel = { not_started: "未学习", in_progress: "学习中", completed: "已完成" } as const;
+const sourceLabel = { verified_local: "本地资料已核对", supplemental_local: "本地补充资料", insufficient: "资料不足" } as const;
+
+export function CourseOverviewView({ course, state, onOpenChapter, onOpenWorkbench }: CourseOverviewViewProps) {
+  const current = getCurrentChapter(state, course);
+  const progress = getCourseProgress(state, course);
+  const coreCount = course.chapters.reduce((sum, chapter) => sum + chapter.sections.filter((section) => section.importance === "core").length, 0);
+  const optionalCount = course.chapters.reduce((sum, chapter) => sum + chapter.sections.filter((section) => section.importance === "optional").length, 0);
   return (
     <div className="course-page page-enter">
       <header className="page-heading course-page-heading">
-        <div>
-          <h1>{course.title}</h1>
-          <p>{course.role}</p>
-        </div>
-        <div className="course-tabs" aria-label="切换课程">
-          {courses.map((item) => (
-            <button key={item.id} type="button" className={item.id === course.id ? "is-active" : ""} onClick={() => onSelectCourse(item.id)}>{item.shortTitle}</button>
-          ))}
-        </div>
+        <div><span className="eyebrow">{course.textbook}</span><h1>{course.title}</h1><p>{course.role}</p></div>
+        {course.id !== "signals" ? <button className="secondary-button" type="button" onClick={() => onOpenWorkbench(course.id as "digital" | "analog")}><Icon name={course.id === "digital" ? "chip" : "wave"} size={18} />打开{course.shortTitle}工作台</button> : null}
       </header>
-
       <div className="course-overview-grid">
         <aside className="chapter-directory">
-          <div className="section-title"><h2>章节目录</h2><span>{course.chapters.length} 章</span></div>
-          <p className="current-note">当前章节：<strong>{current.chapter.title}</strong></p>
+          <div className="section-title"><h2>教材章节</h2><span>{progress.total} 章计入进度</span></div>
+          <p className="current-note">当前章节：<strong>{current.number} {current.title}</strong></p>
           <nav aria-label={`${course.title}章节目录`}>
-            {course.chapters.map((chapter, index) => {
-              const progress = getChapterProgress(state, chapter.id);
-              return (
-                <button
-                  type="button"
-                  key={chapter.id}
-                  className={chapter.id === current.chapter.id ? "chapter-link is-current" : "chapter-link"}
-                  onClick={() => onOpenTopic(chapter.topic.id)}
-                >
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <span><strong>{chapter.title}</strong><small>{masteryLabels[state.mastery[chapter.topic.id]]}</small></span>
-                  <em>{progress}%</em>
-                </button>
-              );
+            {course.chapters.map((chapter) => {
+              const status = getChapterStatus(state, chapter.id);
+              return <button type="button" key={chapter.id} className={chapter.id === current.id ? "chapter-link is-current" : "chapter-link"} onClick={() => onOpenChapter(course, chapter.id)}>
+                <span>{chapter.number}</span><span><strong>{chapter.title}</strong><small>{chapter.counted ? statusLabel[status] : "导学 · 不计进度"}</small></span><em className={`status-dot status-${status}`} />
+              </button>;
             })}
           </nav>
         </aside>
-
-        <section className="course-route-panel">
+        <main className="course-route-panel">
           <div className="course-summary-line">
-            <div><span>课程完成度</span><strong>{getCourseProgress(state, course.id)}%</strong></div>
-            <div className="progress-track"><span style={{ width: `${getCourseProgress(state, course.id)}%`, background: course.color }} /></div>
-            <p>当前重点：{current.topic.problem}</p>
+            <div><span>按章节完成度</span><strong>{progress.percent}%</strong></div>
+            <div className="progress-track"><span style={{ width: `${progress.percent}%`, background: course.accent }} /></div>
+            <p>{progress.completed} / {progress.total} 个计入进度的章节已通过检验并标记完成。</p>
           </div>
-
           <section className="route-section">
-            <div className="section-title"><h2>课程学习路线</h2><span>从基础表示到可验证应用</span></div>
+            <div className="section-title"><h2>教材学习路线</h2><span>可自由切换，状态独立保存</span></div>
             <ol className="route-list">
-              {course.chapters.map((chapter, index) => (
-                <li key={chapter.id} className={chapter.id === current.chapter.id ? "is-current" : ""}>
-                  <span className="route-index">{index + 1}</span>
-                  <button type="button" onClick={() => onOpenTopic(chapter.topic.id)}>
-                    <strong>{chapter.title}</strong>
-                    <span>{course.route[index]}</span>
-                  </button>
-                  <span className="route-status">{masteryLabels[state.mastery[chapter.topic.id]]}</span>
-                </li>
-              ))}
+              {course.chapters.map((chapter) => <li key={chapter.id} className={chapter.id === current.id ? "is-current" : ""}>
+                <span className="route-index">{chapter.number}</span>
+                <button type="button" onClick={() => onOpenChapter(course, chapter.id)}><strong>{chapter.title}</strong><span>{chapter.objectives[0]}</span></button>
+                <span className="route-status">{statusLabel[getChapterStatus(state, chapter.id)]}</span>
+              </li>)}
             </ol>
           </section>
-
-          <section className="recent-logs">
-            <div className="section-title"><h2>最近学习记录</h2><span>自动保留最近 30 条</span></div>
-            {logs.length ? logs.map((log) => (
-              <button type="button" key={log.id} onClick={() => onOpenTopic(log.topicId)}>
-                <time>{new Date(log.createdAt).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}</time>
-                <span><strong>{topicById[log.topicId]?.title}</strong><small>{log.action}</small></span>
-                <Icon name="arrow" size={16} />
-              </button>
-            )) : <p>完成本课程的知识卡后，学习记录会显示在这里。</p>}
-          </section>
-        </section>
-
+        </main>
         <aside className="course-assist">
-          <section>
-            <div className="section-title"><h2>薄弱知识点</h2><Icon name="warning" size={19} /></div>
-            <div className="weak-list">
-              {weakTopics.map((topic) => (
-                <button type="button" key={topic.id} onClick={() => onOpenTopic(topic.id)}>
-                  <span className={`mastery-dot level-${state.mastery[topic.id]}`} />
-                  <span><strong>{topic.title}</strong><small>{masteryLabels[state.mastery[topic.id]]} · {topic.tags.slice(0, 2).join(" / ")}</small></span>
-                  <Icon name="arrow" size={15} />
-                </button>
-              ))}
-            </div>
-          </section>
-          <section>
-            <div className="section-title"><h2>待复习内容</h2><Icon name="clock" size={19} /></div>
-            <div className="compact-review-list">
-              {courseReviews.map((review) => (
-                <button type="button" key={review.id} onClick={() => onOpenTopic(review.topicId)}>
-                  <strong>{topicById[review.topicId]?.title}</strong>
-                  <span>{formatStudyDate(review.dueDate)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-          <blockquote>判断是否掌握：能否不看答案，从题意画出第一张图，并说出为什么这样画。</blockquote>
+          <section><div className="section-title"><h2>内容依据</h2><Icon name="book" size={19} /></div><p>{course.sourceNote}</p></section>
+          <section><div className="section-title"><h2>80 / 20 划分</h2><Icon name="route" size={19} /></div><p><strong>{coreCount}</strong> 项主线必学，<strong>{optionalCount}</strong> 项选择学习。划分按后续依赖和实验价值，不按篇幅。</p></section>
+          <section><div className="section-title"><h2>资料状态</h2><Icon name="info" size={19} /></div><ul className="source-legend">{Object.entries(sourceLabel).map(([key, label]) => <li key={key}><span className={`source-dot source-${key}`} />{label}</li>)}</ul></section>
         </aside>
       </div>
     </div>

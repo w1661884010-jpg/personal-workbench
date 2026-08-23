@@ -1,6 +1,6 @@
 import type { Course } from "../lib/semester-model";
 
-export const courses = [
+export const courses: readonly Course[] = [
   {
     id: "digital",
     title: "数字电子技术",
@@ -493,7 +493,7 @@ export const courses = [
       },
     ],
   },
-] as const satisfies readonly Course[];
+];
 
 export const allTopics = courses.flatMap((course) =>
   course.chapters.map((chapter) => chapter.topic),

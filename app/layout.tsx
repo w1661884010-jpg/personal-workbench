@@ -4,7 +4,7 @@ import "./globals.css";
 
 const siteTitle = "电路自习室｜本学期电子类课程个人学习站点";
 const siteDescription =
-  "本地优先的数字电子技术、模拟电子技术与信号与系统个人学习站点，用任务、知识卡、错题、掌握状态和到期复习形成学习闭环。";
+  "本地优先的信号与系统、数字电子技术和模拟电子技术个人学习站点，按教材章节学习、检验并在自由电路工作台中验证。";
 const fallbackOrigin = new URL("http://localhost:3000");
 const safeHostCharacters = /^[a-z0-9.:[\]-]+$/i;
 const cloudflareRay = /^[a-f0-9]{16,32}(?:-[a-z]{3})?$/i;
