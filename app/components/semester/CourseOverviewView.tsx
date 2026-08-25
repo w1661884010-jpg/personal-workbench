@@ -54,7 +54,7 @@ export function CourseOverviewView({ course, state, onOpenChapter, onOpenWorkben
           </section>
         </main>
         <aside className="course-assist">
-          <section><div className="section-title"><h2>内容依据</h2><Icon name="book" size={19} /></div><p>{course.sourceNote}</p></section>
+          {course.sourceNote ? <section><div className="section-title"><h2>内容依据</h2><Icon name="book" size={19} /></div><p>{course.sourceNote}</p></section> : null}
           <section><div className="section-title"><h2>80 / 20 划分</h2><Icon name="route" size={19} /></div><p><strong>{coreCount}</strong> 项主线必学，<strong>{optionalCount}</strong> 项选择学习。划分按后续依赖和实验价值，不按篇幅。</p></section>
           <section><div className="section-title"><h2>资料状态</h2><Icon name="info" size={19} /></div><ul className="source-legend">{Object.entries(sourceLabel).map(([key, label]) => <li key={key}><span className={`source-dot source-${key}`} />{label}</li>)}</ul></section>
         </aside>

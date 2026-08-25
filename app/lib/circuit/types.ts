@@ -35,6 +35,7 @@ export type AnalogComponentKind =
 
 export type CircuitComponentKind = DigitalComponentKind | AnalogComponentKind;
 export type ComponentParameter = string | number | boolean;
+export type ComponentRotation = 0 | 90 | 180 | 270;
 
 export interface CircuitPoint {
   x: number;
@@ -52,6 +53,8 @@ export interface CircuitComponent {
   position: CircuitPoint;
   parameters: Record<string, ComponentParameter>;
   label?: string;
+  rotation?: ComponentRotation;
+  flipped?: boolean;
 }
 
 export interface CircuitEndpoint {
