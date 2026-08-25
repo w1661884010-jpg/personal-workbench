@@ -53,4 +53,4 @@
 - [x] Run focused tests, full tests, lint, production build and `git diff --check`.
 - [x] Verify real mouse double-click, toolbar actions, Backspace deletion, original wire style and node states in a desktop browser.
 - [x] Verify the workbench remains usable at a mobile viewport and the console has no errors or warnings.
-- [ ] Create one semantic commit and publish the validated build to the existing site.
+- [x] Create one semantic commit and publish the validated build to the existing site.
