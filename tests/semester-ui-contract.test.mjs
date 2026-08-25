@@ -19,7 +19,7 @@ test("V2 navigation exposes the three courses, two workbenches, records, and con
   assert.match(workbench, /sandbox\/\$\{kind\}/);
 });
 
-test("the home page contains only the three chapter-progress course entries", async () => {
+test("the home page keeps three chapter-progress entries and adds two real workbench shortcuts", async () => {
   const dashboard = await component("DashboardView.tsx");
   assert.match(dashboard, /courses\.map/);
   assert.match(dashboard, /getCurrentChapter/);
@@ -27,6 +27,9 @@ test("the home page contains only the three chapter-progress course entries", as
   assert.match(dashboard, /当前章节/);
   assert.match(dashboard, /章已完成/);
   assert.match(dashboard, /只有完成章节检验后/);
+  assert.match(dashboard, /onOpenWorkbench/);
+  assert.match(dashboard, /数字电路工作台/);
+  assert.match(dashboard, /模拟电路工作台/);
   assert.doesNotMatch(dashboard, /今日|明天|本周|周次|打卡|连续学习|todayTasks|currentWeek|studyMinutes/);
 });
 
@@ -75,6 +78,12 @@ test("the circuit workbench calls graph, persistence, and real simulation engine
   for (const operation of ["solveAnalogDc", "simulateAnalogTransient"]) assert.match(implementation, new RegExp(operation));
   for (const label of ["保存电路", "载入", "复制电路", "清空画布", "删除", "实验目标", "返回教材章节"]) assert.match(shell, new RegExp(label));
   assert.match(shell, /onPointerDown|onDragStart|draggable/);
+  assert.match(shell, /onDoubleClick/);
+  assert.match(shell, /双击元件保持选中/);
+  for (const label of ["旋转 90°", "水平翻转", "缩小", "放大", "重置缩放"]) assert.match(shell, new RegExp(label));
+  for (const helper of ["findAvailablePosition", "separateOverlappingComponents", "createWirePath"]) assert.match(shell, new RegExp(helper));
+  assert.match(shell, /is-connected/);
+  assert.match(shell, /条连线/);
   assert.match(shell, /onClick|onChange/);
   assert.doesNotMatch(shell, /预设动画|静态仿真图/);
 });

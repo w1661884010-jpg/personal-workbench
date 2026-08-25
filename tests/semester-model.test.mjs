@@ -41,7 +41,7 @@ test("every chapter has the seven learning stages, an 80/20 split, and explicit 
   const ids = new Set();
   for (const course of courses) {
     assert.ok(course.textbook.length > 5, `${course.id}: textbook`);
-    assert.ok(course.sourceNote.length > 20, `${course.id}: source note`);
+    assert.doesNotMatch(course.textbook, /章节顺序依据|本地未找到|第 0-10 章顺序/, `${course.id}: textbook label`);
     for (const chapter of course.chapters) {
       for (const key of ["objectives", "prerequisites", "sections", "examples", "experiments", "check", "summary"]) {
         assert.ok(Array.isArray(chapter[key]) && chapter[key].length > 0, `${chapter.id}: ${key}`);
@@ -53,7 +53,8 @@ test("every chapter has the seven learning stages, an 80/20 split, and explicit 
       assert.ok(chapter.check.length >= 2, `${chapter.id}: at least two check questions`);
       for (const section of chapter.sections) {
         assert.ok(allowedSources.has(section.sourceStatus), `${section.id}: section source status`);
-        assert.ok(section.content.length > 15, `${section.id}: content`);
+        if (section.sourceStatus === "insufficient") assert.equal(section.content, "", `${section.id}: insufficient content stays blank`);
+        else assert.ok(section.content.length > 15, `${section.id}: content`);
         assert.equal(ids.has(section.id), false, `${section.id}: duplicate id`);
         ids.add(section.id);
       }
@@ -68,7 +69,7 @@ test("every chapter has the seven learning stages, an 80/20 split, and explicit 
       }
       if (chapter.sourceStatus === "insufficient") {
         assert.ok(chapter.sections.some((section) => section.sourceStatus === "insufficient"), `${chapter.id}: insufficient section`);
-        assert.match(chapter.sections.map((section) => section.content).join(" "), /资料不足|缺少|待补|未覆盖|不提供|不写|不足以/);
+        assert.ok(chapter.sections.filter((section) => section.sourceStatus === "insufficient").every((section) => section.content === ""));
       }
     }
   }

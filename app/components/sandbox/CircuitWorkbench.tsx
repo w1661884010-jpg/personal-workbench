@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import type { ChapterExperiment, CourseDefinition } from "../../lib/course-model";
 import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../../lib/circuit/analog-simulator";
 import { clearCircuitLibrary, deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../../lib/circuit/circuit-storage";
 import { evaluateDigitalCircuit, generateTruthTable, sampleDigitalCircuit, type DigitalRuntime, type DigitalSimulationResult, type DigitalTraceSample, type TruthTableRow } from "../../lib/circuit/digital-simulator";
-import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, updateComponentParameters } from "../../lib/circuit/graph";
+import { createWirePath, findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../../lib/circuit/geometry";
+import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, transformComponent, updateComponentParameters } from "../../lib/circuit/graph";
 import { componentPorts, terminalKey, type AnalogComponentKind, type CircuitComponent, type CircuitComponentKind, type CircuitDocument, type CircuitEndpoint, type CircuitKind, type DigitalComponentKind, type LogicValue } from "../../lib/circuit/types";
 import "./workbench.css";
 
@@ -44,6 +45,11 @@ const analogPalette: readonly { kind: AnalogComponentKind; label: string }[] = [
 const componentLabels = Object.fromEntries([...digitalPalette, ...analogPalette].map((item) => [item.kind, item.label])) as Record<CircuitComponentKind, string>;
 const unsupportedAnalogKinds = new Set<CircuitComponentKind>(["diode", "bjt", "opamp"]);
 const stableTimestamp = "2026-08-24T00:00:00.000Z";
+const canvasWidth = 1200;
+const canvasHeight = 720;
+const minimumZoom = 0.5;
+const maximumZoom = 2;
+const zoomStep = 0.1;
 
 function emptyCircuit(kind: CircuitKind): CircuitDocument {
   return createCircuit(kind, `draft-${kind}`, kind === "digital" ? "未命名数字电路" : "未命名模拟电路", stableTimestamp);
@@ -51,25 +57,6 @@ function emptyCircuit(kind: CircuitKind): CircuitDocument {
 
 function freshId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function componentSize(component: CircuitComponent) {
-  const ports = componentPorts[component.kind];
-  const leftCount = ports.filter((port) => port.direction !== "output").length;
-  const rightCount = ports.filter((port) => port.direction === "output").length;
-  return { width: 124, height: Math.max(66, Math.max(leftCount, rightCount) * 22 + 24) };
-}
-
-function portPosition(component: CircuitComponent, portId: string) {
-  const ports = componentPorts[component.kind];
-  const port = ports.find((candidate) => candidate.id === portId)!;
-  const { width, height } = componentSize(component);
-  const sidePorts = port.direction === "output" ? ports.filter((candidate) => candidate.direction === "output") : ports.filter((candidate) => candidate.direction !== "output");
-  const index = sidePorts.findIndex((candidate) => candidate.id === portId);
-  return {
-    x: component.position.x + (port.direction === "output" ? width / 2 : -width / 2),
-    y: component.position.y - height / 2 + ((index + 1) * height) / (sidePorts.length + 1),
-  };
 }
 
 function formatNumber(value: number) {
@@ -128,6 +115,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   const [timeStepSeconds, setTimeStepSeconds] = useState(0.01);
   const [selectedExperimentId, setSelectedExperimentId] = useState(initialExperimentId ?? "");
   const [dragging, setDragging] = useState<{ componentId: string; offsetX: number; offsetY: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
   const svgRef = useRef<SVGSVGElement>(null);
   const circuitRef = useRef(circuit);
   const digitalRuntimeRef = useRef<DigitalRuntime | undefined>(undefined);
@@ -139,6 +127,19 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   const selectedExperiment = experiments.find((item) => item.experiment.id === selectedExperimentId) ?? experiments[0] ?? null;
   const palette = kind === "digital" ? digitalPalette : analogPalette;
   const selectedComponent = selectedComponentId ? circuit.components[selectedComponentId] ?? null : null;
+  const connectedTerminals = useMemo(() => {
+    const terminals = new Set<string>();
+    for (const connection of Object.values(circuit.connections)) {
+      terminals.add(terminalKey(connection.from.componentId, connection.from.portId));
+      terminals.add(terminalKey(connection.to.componentId, connection.to.portId));
+    }
+    return terminals;
+  }, [circuit.connections]);
+  const viewBox = useMemo(() => {
+    const width = canvasWidth / zoom;
+    const height = canvasHeight / zoom;
+    return { x: (canvasWidth - width) / 2, y: (canvasHeight - height) / 2, width, height };
+  }, [zoom]);
   const netlist = useMemo(() => buildNetlist(circuit), [circuit]);
   const analogTraceNets = useMemo(() => {
     const selected = probeTerminals.map((terminal) => netlist.terminalToNet[terminal]).filter(Boolean);
@@ -218,15 +219,18 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   function canvasPoint(clientX: number, clientY: number) {
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return { x: 120, y: 100 };
-    return { x: ((clientX - bounds.left) / bounds.width) * 1200, y: ((clientY - bounds.top) / bounds.height) * 720 };
+    return {
+      x: viewBox.x + ((clientX - bounds.left) / bounds.width) * viewBox.width,
+      y: viewBox.y + ((clientY - bounds.top) / bounds.height) * viewBox.height,
+    };
   }
 
   function placeComponent(componentKind: CircuitComponentKind, point?: { x: number; y: number }) {
     const count = Object.keys(circuit.components).length;
-    const position = point ?? { x: 120 + (count % 6) * 170, y: 100 + Math.floor(count / 6) * 120 };
+    const desiredPosition = point ?? { x: 120 + (count % 6) * 170, y: 100 + Math.floor(count / 6) * 120 };
     try {
-      const component = createComponent(freshId(componentKind), componentKind, position, {}, componentLabels[componentKind]);
-      setCircuit((current) => addComponent(current, component));
+      const component = createComponent(freshId(componentKind), componentKind, desiredPosition, {}, componentLabels[componentKind]);
+      setCircuit((current) => addComponent(current, { ...component, position: findAvailablePosition(current, component, desiredPosition) }));
       setSelectedComponentId(component.id);
     } catch (error) {
       onNotify(error instanceof Error ? error.message : "无法放置元件。", "error");
@@ -249,6 +253,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     }
     try {
       setCircuit((current) => connect(current, { id: freshId("wire"), from: pendingEndpoint, to: endpoint }));
+      onNotify(`已连接 ${pendingEndpoint.componentId}.${pendingEndpoint.portId} → ${endpoint.componentId}.${endpoint.portId}。`);
       setPendingEndpoint(null);
     } catch (error) {
       onNotify(error instanceof Error ? error.message : "连线失败。", "error");
@@ -260,13 +265,50 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     const point = canvasPoint(event.clientX, event.clientY);
     svgRef.current?.setPointerCapture(event.pointerId);
     setDragging({ componentId: component.id, offsetX: point.x - component.position.x, offsetY: point.y - component.position.y });
-    setSelectedComponentId(component.id);
   }
 
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
     if (!dragging) return;
     const point = canvasPoint(event.clientX, event.clientY);
-    setCircuit((current) => moveComponent(current, dragging.componentId, { x: Math.max(70, Math.min(1130, point.x - dragging.offsetX)), y: Math.max(45, Math.min(675, point.y - dragging.offsetY)) }));
+    const desired = { x: point.x - dragging.offsetX, y: point.y - dragging.offsetY };
+    setCircuit((current) => {
+      const component = current.components[dragging.componentId];
+      if (!component) return current;
+      return moveComponent(current, dragging.componentId, findAvailablePosition(current, component, desired));
+    });
+  }
+
+  function rotateSelected() {
+    if (!selectedComponentId) return;
+    setCircuit((current) => {
+      const component = current.components[selectedComponentId];
+      if (!component) return current;
+      const rotation = (((component.rotation ?? 0) + 90) % 360) as 0 | 90 | 180 | 270;
+      const transformed = transformComponent(current, component.id, { rotation });
+      const nextComponent = transformed.components[component.id];
+      return moveComponent(transformed, component.id, findAvailablePosition(transformed, nextComponent, nextComponent.position));
+    });
+  }
+
+  function flipSelected() {
+    if (!selectedComponentId) return;
+    setCircuit((current) => {
+      const component = current.components[selectedComponentId];
+      if (!component) return current;
+      const transformed = transformComponent(current, component.id, { flipped: !(component.flipped ?? false) });
+      const nextComponent = transformed.components[component.id];
+      return moveComponent(transformed, component.id, findAvailablePosition(transformed, nextComponent, nextComponent.position));
+    });
+  }
+
+  function changeZoom(delta: number) {
+    setZoom((current) => Math.max(minimumZoom, Math.min(maximumZoom, Number((current + delta).toFixed(2)))));
+  }
+
+  function handleCanvasWheel(event: ReactWheelEvent<SVGSVGElement>) {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    changeZoom(event.deltaY > 0 ? -zoomStep : zoomStep);
   }
 
   function updateSelected(name: string, value: string | number | boolean) {
@@ -289,7 +331,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     try {
       const loaded = loadCircuit(selectedSavedId);
       if (!loaded || loaded.kind !== kind) throw new Error("没有找到可载入的同类电路。");
-      setCircuit(loaded);
+      setCircuit(separateOverlappingComponents(loaded));
       setSelectedComponentId(null);
       setProbeTerminals([]);
       resetSimulation();
@@ -433,29 +475,40 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
         <section className="cw-canvas-panel">
           <div className="cw-canvas-toolbar">
             <div role="group" aria-label="画布工具"><button type="button" className={interactionMode === "connect" ? "is-active" : ""} onClick={() => { setInteractionMode("connect"); setPendingEndpoint(null); }}>连线模式</button><button type="button" className={interactionMode === "probe" ? "is-active" : ""} onClick={() => { setInteractionMode("probe"); setPendingEndpoint(null); }}>探针模式</button></div>
-            <span>{pendingEndpoint ? `选择第二端点：${pendingEndpoint.componentId}.${pendingEndpoint.portId}` : interactionMode === "probe" ? `已选 ${probeTerminals.length} 个探针` : "点击两个端口连线；双击连线删除"}</span>
+            <div className="cw-transform-controls" role="group" aria-label="元件方向"><button type="button" disabled={!selectedComponentId} onClick={rotateSelected}>旋转 90°</button><button type="button" disabled={!selectedComponentId} onClick={flipSelected}>水平翻转</button></div>
+            <span>{pendingEndpoint ? `选择第二端点：${pendingEndpoint.componentId}.${pendingEndpoint.portId}` : interactionMode === "probe" ? `已选 ${probeTerminals.length} 个探针` : `${Object.keys(circuit.connections).length} 条连线 · 点击两个端口连线；双击连线删除`}</span>
+            <div className="cw-zoom-controls" role="group" aria-label="画布缩放"><button type="button" aria-label="缩小" disabled={zoom <= minimumZoom} onClick={() => changeZoom(-zoomStep)}>−</button><button type="button" aria-label="重置缩放" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button><button type="button" aria-label="放大" disabled={zoom >= maximumZoom} onClick={() => changeZoom(zoomStep)}>＋</button></div>
             <button type="button" disabled={!selectedComponentId} onClick={() => { if (selectedComponentId) { setCircuit((current) => removeComponent(current, selectedComponentId)); setProbeTerminals((current) => current.filter((terminal) => !terminal.startsWith(`${selectedComponentId}.`))); setPendingEndpoint((current) => current?.componentId === selectedComponentId ? null : current); setSelectedComponentId(null); } }}>删除所选</button>
           </div>
-          <svg ref={svgRef} className="cw-canvas" viewBox="0 0 1200 720" role="application" aria-label="可自由搭建的电路画布" onPointerMove={handlePointerMove} onPointerUp={(event) => { if (svgRef.current?.hasPointerCapture(event.pointerId)) svgRef.current.releasePointerCapture(event.pointerId); setDragging(null); }} onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<SVGSVGElement>) => { event.preventDefault(); const componentKind = event.dataTransfer.getData("application/x-circuit-component") as CircuitComponentKind; if (componentLabels[componentKind]) placeComponent(componentKind, canvasPoint(event.clientX, event.clientY)); }} onClick={(event) => { if (event.target === event.currentTarget) setSelectedComponentId(null); }}>
+          <p className="cw-canvas-help">双击元件保持选中；拖动会自动避开其他元件。使用缩放按钮，或按住 Ctrl/⌘ 滚动。</p>
+          <svg ref={svgRef} className="cw-canvas" viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`} role="application" aria-label="可自由搭建的电路画布" onWheel={handleCanvasWheel} onPointerMove={handlePointerMove} onPointerUp={(event) => { if (svgRef.current?.hasPointerCapture(event.pointerId)) svgRef.current.releasePointerCapture(event.pointerId); setDragging(null); }} onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<SVGSVGElement>) => { event.preventDefault(); const componentKind = event.dataTransfer.getData("application/x-circuit-component") as CircuitComponentKind; if (componentLabels[componentKind]) placeComponent(componentKind, canvasPoint(event.clientX, event.clientY)); }} onClick={(event) => { if (event.target === event.currentTarget) setSelectedComponentId(null); }}>
             <defs><pattern id={`cw-grid-${kind}`} width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" className="cw-grid-line" /></pattern></defs>
-            <rect width="1200" height="720" fill={`url(#cw-grid-${kind})`} onClick={() => setSelectedComponentId(null)} />
+            <rect width={canvasWidth} height={canvasHeight} fill={`url(#cw-grid-${kind})`} onClick={() => setSelectedComponentId(null)} />
             {Object.values(circuit.connections).map((connection) => {
               const from = circuit.components[connection.from.componentId]; const to = circuit.components[connection.to.componentId];
               if (!from || !to) return null;
-              const a = portPosition(from, connection.from.portId); const b = portPosition(to, connection.to.portId);
-              return <path className="cw-wire" key={connection.id} d={`M ${a.x} ${a.y} C ${(a.x + b.x) / 2} ${a.y}, ${(a.x + b.x) / 2} ${b.y}, ${b.x} ${b.y}`} onDoubleClick={() => setCircuit((current) => disconnect(current, connection.id))}><title>双击删除连线</title></path>;
+              const path = createWirePath(getPortGeometry(from, connection.from.portId), getPortGeometry(to, connection.to.portId));
+              return <g className="cw-wire-group" key={connection.id} onDoubleClick={() => setCircuit((current) => disconnect(current, connection.id))}>
+                <path className="cw-wire-hit" d={path}><title>双击删除连线</title></path>
+                <path className="cw-wire-halo" d={path} />
+                <path className="cw-wire" d={path} />
+              </g>;
             })}
             {Object.values(circuit.components).map((component) => {
-              const { width, height } = componentSize(component);
-              return <g key={component.id} className={selectedComponentId === component.id ? "cw-component is-selected" : "cw-component"} onPointerDown={(event) => startDrag(event, component)}>
+              const { width, height } = getComponentSize(component);
+              const orientation = `${component.rotation ?? 0}°${component.flipped ? " · 镜像" : ""}`;
+              return <g key={component.id} data-component-id={component.id} data-rotation={component.rotation ?? 0} className={selectedComponentId === component.id ? "cw-component is-selected" : "cw-component"} role="button" tabIndex={0} aria-label={`${component.label || component.kind} 元件，双击选中`} onPointerDown={(event) => startDrag(event, component)} onDoubleClick={(event) => { event.stopPropagation(); setSelectedComponentId(component.id); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedComponentId(component.id); } }}>
                 <rect x={component.position.x - width / 2} y={component.position.y - height / 2} width={width} height={height} rx="8" />
                 <text className="cw-component-kind" x={component.position.x} y={component.position.y - 5} textAnchor="middle">{component.kind.toUpperCase()}</text>
                 <text className="cw-component-label" x={component.position.x} y={component.position.y + 15} textAnchor="middle">{component.label || componentLabels[component.kind]}</text>
+                {(component.rotation ?? 0) !== 0 || component.flipped ? <text className="cw-component-orientation" x={component.position.x + width / 2 - 7} y={component.position.y - height / 2 + 12} textAnchor="end">{orientation}</text> : null}
                 {unsupportedAnalogKinds.has(component.kind) ? <text className="cw-component-warning" x={component.position.x} y={component.position.y + 32} textAnchor="middle">UNSUPPORTED</text> : null}
                 {componentPorts[component.kind].map((port) => {
-                  const point = portPosition(component, port.id); const key = terminalKey(component.id, port.id); const active = probeTerminals.includes(key) || (pendingEndpoint && terminalKey(pendingEndpoint.componentId, pendingEndpoint.portId) === key);
-                  return <g data-port="true" className={active ? "cw-port is-active" : "cw-port"} key={port.id} role="button" tabIndex={0} aria-label={`${component.label || component.kind} ${port.id} 端口`} onClick={(event) => { event.stopPropagation(); handlePort({ componentId: component.id, portId: port.id }); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") handlePort({ componentId: component.id, portId: port.id }); }}>
-                    <circle cx={point.x} cy={point.y} r="7" /><text x={point.x + (port.direction === "output" ? -11 : 11)} y={point.y + 4} textAnchor={port.direction === "output" ? "end" : "start"}>{port.id}</text>
+                  const geometry = getPortGeometry(component, port.id); const key = terminalKey(component.id, port.id); const active = probeTerminals.includes(key) || (pendingEndpoint && terminalKey(pendingEndpoint.componentId, pendingEndpoint.portId) === key); const connected = connectedTerminals.has(key);
+                  const labelX = geometry.point.x - geometry.normal.x * 12; const labelY = geometry.point.y - geometry.normal.y * 12 + (geometry.normal.y === 0 ? 4 : geometry.normal.y > 0 ? -2 : 10); const textAnchor = geometry.normal.x > 0 ? "end" : geometry.normal.x < 0 ? "start" : "middle";
+                  return <g data-port="true" className={`cw-port${connected ? " is-connected" : ""}${active ? " is-active" : ""}`} key={port.id} role="button" tabIndex={0} aria-label={`${component.label || component.kind} ${port.id} 端口${connected ? "，已连接" : ""}`} onClick={(event) => { event.stopPropagation(); handlePort({ componentId: component.id, portId: port.id }); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handlePort({ componentId: component.id, portId: port.id }); } }}>
+                    {connected ? <circle className="cw-port-status-ring" cx={geometry.point.x} cy={geometry.point.y} r="11" /> : null}
+                    <circle cx={geometry.point.x} cy={geometry.point.y} r="7" /><text x={labelX} y={labelY} textAnchor={textAnchor}>{port.id}</text>
                   </g>;
                 })}
               </g>;

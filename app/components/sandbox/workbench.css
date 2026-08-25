@@ -34,23 +34,35 @@
 .cw-palette-list button { display: grid; min-height: 58px; padding: 7px 4px; place-items: center; color: var(--ink); font-size: .68rem; }
 .cw-palette-list span { color: var(--teal); font-family: var(--mono); font-size: .58rem; }
 .cw-canvas-panel { overflow: hidden; }
-.cw-canvas-toolbar { display: flex; align-items: center; gap: 12px; padding: 9px 11px; border-bottom: 1px solid var(--line); }
+.cw-canvas-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line); }
 .cw-canvas-toolbar > div { display: flex; gap: 4px; }
 .cw-canvas-toolbar button.is-active { color: #031c1b; background: var(--teal); border-color: var(--teal); }
 .cw-canvas-toolbar > span { flex: 1; color: var(--ink-soft); font-size: .69rem; text-align: center; }
+.cw-transform-controls { padding-left: 4px; border-left: 1px solid var(--line); }
+.cw-zoom-controls button { min-width: 36px; padding-inline: 8px; }
+.cw-zoom-controls button:nth-child(2) { min-width: 58px; color: var(--ink); font-family: var(--mono); }
+.cw-canvas-help { margin: 0; padding: 7px 11px; color: var(--ink-soft); background: #0a1c28; border-bottom: 1px solid var(--line); font-size: .66rem; text-align: center; }
 .cw-canvas { display: block; width: 100%; min-height: 500px; max-height: 68vh; background: #081823; touch-action: none; user-select: none; }
 .cw-grid-line { fill: none; stroke: rgba(145,166,176,.10); stroke-width: 1; }
-.cw-wire { fill: none; stroke: #62d1c3; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: pointer; pointer-events: stroke; }
-.cw-wire:hover { stroke: #ff934d; stroke-width: 5; }
+.cw-wire-hit, .cw-wire-halo, .cw-wire { fill: none; vector-effect: non-scaling-stroke; }
+.cw-wire-hit { stroke: transparent; stroke-width: 18; cursor: pointer; pointer-events: stroke; }
+.cw-wire-halo { stroke: #020b11; stroke-width: 9; pointer-events: none; }
+.cw-wire { stroke: #62d1c3; stroke-width: 3.5; pointer-events: none; }
+.cw-wire-group:hover .cw-wire { stroke: #ff934d; stroke-width: 5; }
 .cw-component { cursor: grab; }
 .cw-component:active { cursor: grabbing; }
+.cw-component:focus-visible > rect { outline: none; stroke: #ffbe91; stroke-width: 4; }
 .cw-component > rect { fill: #102a37; stroke: #46606d; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cw-component.is-selected > rect { fill: #123a3a; stroke: #27b8a6; stroke-width: 3; }
 .cw-component-kind { fill: #e8f2f4; font: 700 14px var(--mono); pointer-events: none; }
 .cw-component-label { fill: #91a6b0; font: 11px var(--sans); pointer-events: none; }
+.cw-component-orientation { fill: #62d1c3; font: 700 8px var(--mono); pointer-events: none; }
 .cw-component-warning { fill: #ff934d; font: 700 8px var(--mono); pointer-events: none; }
 .cw-port circle { fill: #07141f; stroke: #91a6b0; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: crosshair; }
 .cw-port text { fill: #91a6b0; font: 10px var(--mono); pointer-events: none; }
+.cw-port .cw-port-status-ring { fill: rgba(39,184,166,.15); stroke: #27b8a6; stroke-width: 2; pointer-events: none; }
+.cw-port.is-connected > circle:not(.cw-port-status-ring) { fill: #0e574f; stroke: #a7fff4; stroke-width: 3; }
+.cw-port.is-connected text { fill: #d3fffa; font-weight: 700; }
 .cw-port.is-active circle { fill: #ff934d; stroke: #ffbe91; }
 .cw-empty-canvas { fill: #687f8a; font: 16px var(--sans); pointer-events: none; }
 .cw-parameter-editor { display: grid; gap: 10px; margin-top: 14px; }
@@ -125,8 +137,9 @@
   .cw-name-field input, .cw-storage-bar select { width: 100%; }
   .cw-palette-list { display: flex; overflow-x: auto; }
   .cw-palette-list button { min-width: 84px; }
-  .cw-canvas-toolbar { flex-wrap: wrap; }
-  .cw-canvas-toolbar > span { order: 3; min-width: 100%; }
+  .cw-canvas-toolbar > span { order: 5; min-width: 100%; }
+  .cw-transform-controls { padding-left: 0; border-left: 0; }
+  .cw-transform-controls button { padding-inline: 8px; }
   .cw-canvas { min-height: 360px; }
   .cw-inspector { grid-template-columns: 1fr; }
   .cw-inspector .cw-panel-title { grid-column: auto; }
@@ -138,5 +151,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cw-component, .cw-wire { transition: none; }
+  .cw-component, .cw-wire-group { transition: none; }
 }

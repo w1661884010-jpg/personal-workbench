@@ -475,6 +475,16 @@ select { min-height: 36px; padding: 0 30px 0 9px; color: var(--ink); font-size: 
 .course-entry-progress > span:first-child { display: flex; justify-content: space-between; align-items: baseline; }
 .course-entry-progress b { font-family: var(--mono); font-size: 1.2rem; }
 .course-entry-progress small { color: var(--ink-faint); }
+.workbench-shortcuts { display: grid; gap: 14px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.workbench-shortcuts > .section-title { align-items: end; margin: 0; }
+.workbench-shortcuts > .section-title h2 { margin: 0; }
+.workbench-shortcuts > .section-title p { margin: 0; color: var(--ink-faint); font-size: .72rem; }
+.workbench-shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.workbench-shortcut-grid button { display: grid; grid-template-columns: 40px minmax(0, 1fr) 20px; gap: 12px; align-items: center; min-height: 82px; padding: 16px 18px; color: var(--ink); text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: 7px; }
+.workbench-shortcut-grid button:hover { color: var(--teal); border-color: var(--teal); }
+.workbench-shortcut-grid button > svg:first-child { color: var(--teal); }
+.workbench-shortcut-grid button span { display: grid; gap: 5px; }
+.workbench-shortcut-grid button small { color: var(--ink-faint); }
 .status-dot { width: 9px; height: 9px; padding: 0; border-radius: 50%; background: var(--line-strong); }
 .status-dot.status-in_progress { background: var(--orange); }
 .status-dot.status-completed { background: var(--teal); }
@@ -543,6 +553,8 @@ select { min-height: 36px; padding: 0 30px 0 9px; color: var(--ink); font-size: 
   .course-entry { grid-template-columns: 42px minmax(0, 1fr) 18px; gap: 12px; padding: 18px 15px; }
   .course-entry-progress { grid-column: 2 / -1; }
   .course-entry-copy > small { display: none; }
+  .workbench-shortcuts > .section-title { display: grid; gap: 7px; }
+  .workbench-shortcut-grid { grid-template-columns: 1fr; }
   .chapter-study-nav nav { display: flex; overflow-x: auto; }
   .chapter-study-nav nav button { min-width: 185px; }
   .chapter-hero { display: grid; padding: 20px 16px; }

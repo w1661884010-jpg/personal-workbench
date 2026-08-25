@@ -14,6 +14,7 @@ import {
   type CircuitNetlist,
   type CircuitPoint,
   type ComponentParameter,
+  type ComponentRotation,
 } from "./types";
 
 function nowIso(): string {
@@ -62,7 +63,7 @@ export function createComponent(
 ): CircuitComponent {
   if (!id.trim()) throw new Error("元件 id 不能为空。");
   if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) throw new Error("元件坐标无效。");
-  return { id, kind, position: { ...position }, parameters: { ...defaultParameters(kind), ...parameters }, ...(label ? { label } : {}) };
+  return { id, kind, position: { ...position }, parameters: { ...defaultParameters(kind), ...parameters }, ...(label ? { label } : {}), rotation: 0, flipped: false };
 }
 
 function assertCompatible(circuit: CircuitDocument, component: CircuitComponent): void {
@@ -85,6 +86,26 @@ export function moveComponent(circuit: CircuitDocument, componentId: string, pos
   return {
     ...circuit,
     components: { ...circuit.components, [componentId]: { ...component, position: { ...position } } },
+    updatedAt: timestamp,
+  };
+}
+
+export function transformComponent(
+  circuit: CircuitDocument,
+  componentId: string,
+  transform: { rotation?: ComponentRotation; flipped?: boolean },
+  timestamp = nowIso(),
+): CircuitDocument {
+  const component = circuit.components[componentId];
+  if (!component) throw new Error(`找不到元件 ${componentId}。`);
+  const rotation = transform.rotation ?? component.rotation ?? 0;
+  if (![0, 90, 180, 270].includes(rotation)) throw new Error("元件旋转角度必须是 0、90、180 或 270 度。");
+  return {
+    ...circuit,
+    components: {
+      ...circuit.components,
+      [componentId]: { ...component, rotation, flipped: transform.flipped ?? component.flipped ?? false },
+    },
     updatedAt: timestamp,
   };
 }

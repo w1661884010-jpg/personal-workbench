@@ -41,12 +41,14 @@ function validateComponent(value: unknown, circuit: CircuitDocument, key: string
   if (!compatible) throw new Error(`元件 ${key} 与 ${circuit.kind} 电路不兼容。`);
   if (!isObject(value.position) || !Number.isFinite(value.position.x) || !Number.isFinite(value.position.y)) throw new Error(`元件 ${key} 的坐标无效。`);
   if (!isObject(value.parameters)) throw new Error(`元件 ${key} 的参数无效。`);
+  if (value.rotation !== undefined && ![0, 90, 180, 270].includes(value.rotation as number)) throw new Error(`元件 ${key} 的旋转角度无效。`);
+  if (value.flipped !== undefined && typeof value.flipped !== "boolean") throw new Error(`元件 ${key} 的翻转状态无效。`);
   for (const parameter of Object.values(value.parameters)) {
     if (!(typeof parameter === "string" || typeof parameter === "number" || typeof parameter === "boolean") || (typeof parameter === "number" && !Number.isFinite(parameter))) {
       throw new Error(`元件 ${key} 包含无法保存的参数。`);
     }
   }
-  return structuredClone(value as unknown as CircuitComponent);
+  return { ...structuredClone(value as unknown as CircuitComponent), rotation: (value.rotation ?? 0) as CircuitComponent["rotation"], flipped: value.flipped ?? false };
 }
 
 export function validateCircuitDocument(value: unknown): CircuitDocument {

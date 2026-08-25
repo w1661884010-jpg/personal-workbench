@@ -7,11 +7,12 @@ interface DashboardViewProps {
   courses: readonly CourseDefinition[];
   state: LearningState;
   onOpenCourse: (courseId: CourseDefinition["id"]) => void;
+  onOpenWorkbench: (kind: "digital" | "analog") => void;
 }
 
 const statusLabel = { not_started: "未学习", in_progress: "学习中", completed: "已完成" } as const;
 
-export function DashboardView({ courses, state, onOpenCourse }: DashboardViewProps) {
+export function DashboardView({ courses, state, onOpenCourse, onOpenWorkbench }: DashboardViewProps) {
   return (
     <div className="chapter-dashboard page-enter">
       <header className="page-heading">
@@ -40,6 +41,24 @@ export function DashboardView({ courses, state, onOpenCourse }: DashboardViewPro
             </button>
           );
         })}
+      </section>
+      <section className="workbench-shortcuts" aria-labelledby="workbench-shortcuts-title">
+        <div className="section-title">
+          <div><span className="eyebrow">CIRCUIT SANDBOX</span><h2 id="workbench-shortcuts-title">快速进入电路工作台</h2></div>
+          <p>从空白画布开始搭建、连接和验证。</p>
+        </div>
+        <div className="workbench-shortcut-grid">
+          <button type="button" onClick={() => onOpenWorkbench("digital")}>
+            <Icon name="chip" size={22} />
+            <span><strong>数字电路工作台</strong><small>逻辑门、触发器与逻辑分析仪</small></span>
+            <Icon name="arrow" size={18} />
+          </button>
+          <button type="button" onClick={() => onOpenWorkbench("analog")}>
+            <Icon name="wave" size={22} />
+            <span><strong>模拟电路工作台</strong><small>基础元件、表计与示波器</small></span>
+            <Icon name="arrow" size={18} />
+          </button>
+        </div>
       </section>
     </div>
   );
