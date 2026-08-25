@@ -45,11 +45,3 @@ test("placement and legacy loading separate overlapping component bounds", () =>
   assert.equal(geometry.componentsOverlap(separated.components.source, separated.components.bjt), false);
   assert.deepEqual(separated.connections, circuit.connections, "position repair must preserve wires");
 });
-
-test("wire routing exposes lead segments instead of hiding a short connection under bodies", () => {
-  const from = { point: { x: 200, y: 200 }, normal: { x: 1, y: 0 } };
-  const to = { point: { x: 236, y: 210 }, normal: { x: -1, y: 0 } };
-  const path = geometry.createWirePath(from, to);
-  assert.match(path, /^M 200 200 L 218 200/);
-  assert.match(path, /L 218 210 L 236 210$/);
-});

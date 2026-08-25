@@ -44,14 +44,11 @@
 .cw-canvas-help { margin: 0; padding: 7px 11px; color: var(--ink-soft); background: #0a1c28; border-bottom: 1px solid var(--line); font-size: .66rem; text-align: center; }
 .cw-canvas { display: block; width: 100%; min-height: 500px; max-height: 68vh; background: #081823; touch-action: none; user-select: none; }
 .cw-grid-line { fill: none; stroke: rgba(145,166,176,.10); stroke-width: 1; }
-.cw-wire-hit, .cw-wire-halo, .cw-wire { fill: none; vector-effect: non-scaling-stroke; }
-.cw-wire-hit { stroke: transparent; stroke-width: 18; cursor: pointer; pointer-events: stroke; }
-.cw-wire-halo { stroke: #020b11; stroke-width: 9; pointer-events: none; }
-.cw-wire { stroke: #62d1c3; stroke-width: 3.5; pointer-events: none; }
-.cw-wire-group:hover .cw-wire { stroke: #ff934d; stroke-width: 5; }
+.cw-wire { fill: none; stroke: #62d1c3; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: pointer; pointer-events: stroke; }
+.cw-wire:hover { stroke: #ff934d; stroke-width: 5; }
 .cw-component { cursor: grab; }
 .cw-component:active { cursor: grabbing; }
-.cw-component:focus-visible > rect { outline: none; stroke: #ffbe91; stroke-width: 4; }
+.cw-component:focus-visible > rect { outline: none; stroke: #91a6b0; stroke-width: 2; stroke-dasharray: 5 4; }
 .cw-component > rect { fill: #102a37; stroke: #46606d; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .cw-component.is-selected > rect { fill: #123a3a; stroke: #27b8a6; stroke-width: 3; }
 .cw-component-kind { fill: #e8f2f4; font: 700 14px var(--mono); pointer-events: none; }
@@ -151,5 +148,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cw-component, .cw-wire-group { transition: none; }
+  .cw-component { transition: none; }
 }

@@ -9,7 +9,6 @@ const BODY_VERTICAL_PADDING = 24;
 const EDGE_MARGIN = 26;
 const CLEARANCE = 20;
 const SEARCH_STEP = 24;
-const WIRE_LEAD = 18;
 
 type Side = "left" | "right" | "top" | "bottom";
 
@@ -147,29 +146,4 @@ export function separateOverlappingComponents(circuit: CircuitDocument): Circuit
     placed = { ...placed, components: { ...placed.components, [normalized.id]: { ...normalized, position } } };
   }
   return { ...circuit, components: placed.components };
-}
-
-function pointAlong(point: CircuitPoint, normal: CircuitPoint, distance: number): CircuitPoint {
-  return { x: point.x + normal.x * distance, y: point.y + normal.y * distance };
-}
-
-function formatPoint(point: CircuitPoint) {
-  return `${Number(point.x.toFixed(2))} ${Number(point.y.toFixed(2))}`;
-}
-
-export function createWirePath(from: CircuitPortGeometry, to: CircuitPortGeometry): string {
-  const startLead = pointAlong(from.point, from.normal, WIRE_LEAD);
-  const endLead = pointAlong(to.point, to.normal, WIRE_LEAD);
-  const parts = [`M ${formatPoint(from.point)}`, `L ${formatPoint(startLead)}`];
-  if (Math.abs(startLead.x - endLead.x) < 0.01 || Math.abs(startLead.y - endLead.y) < 0.01) {
-    parts.push(`L ${formatPoint(endLead)}`);
-  } else if (Math.abs(startLead.x - endLead.x) >= Math.abs(startLead.y - endLead.y)) {
-    const middleX = (startLead.x + endLead.x) / 2;
-    parts.push(`L ${formatPoint({ x: middleX, y: startLead.y })}`, `L ${formatPoint({ x: middleX, y: endLead.y })}`, `L ${formatPoint(endLead)}`);
-  } else {
-    const middleY = (startLead.y + endLead.y) / 2;
-    parts.push(`L ${formatPoint({ x: startLead.x, y: middleY })}`, `L ${formatPoint({ x: endLead.x, y: middleY })}`, `L ${formatPoint(endLead)}`);
-  }
-  parts.push(`L ${formatPoint(to.point)}`);
-  return parts.join(" ");
 }
