@@ -5,7 +5,7 @@ import type { ChapterExperiment, CourseDefinition } from "../../lib/course-model
 import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../../lib/circuit/analog-simulator";
 import { clearCircuitLibrary, deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../../lib/circuit/circuit-storage";
 import { evaluateDigitalCircuit, generateTruthTable, sampleDigitalCircuit, type DigitalRuntime, type DigitalSimulationResult, type DigitalTraceSample, type TruthTableRow } from "../../lib/circuit/digital-simulator";
-import { createWirePath, findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../../lib/circuit/geometry";
+import { findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../../lib/circuit/geometry";
 import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, transformComponent, updateComponentParameters } from "../../lib/circuit/graph";
 import { componentPorts, terminalKey, type AnalogComponentKind, type CircuitComponent, type CircuitComponentKind, type CircuitDocument, type CircuitEndpoint, type CircuitKind, type DigitalComponentKind, type LogicValue } from "../../lib/circuit/types";
 import "./workbench.css";
@@ -207,6 +207,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     const handleKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if ((event.key !== "Delete" && event.key !== "Backspace") || !selectedComponentId || target?.matches("input,textarea,select")) return;
+      event.preventDefault();
       setCircuit((current) => removeComponent(current, selectedComponentId));
       setProbeTerminals((current) => current.filter((terminal) => !terminal.startsWith(`${selectedComponentId}.`)));
       setPendingEndpoint((current) => current?.componentId === selectedComponentId ? null : current);
@@ -231,7 +232,6 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     try {
       const component = createComponent(freshId(componentKind), componentKind, desiredPosition, {}, componentLabels[componentKind]);
       setCircuit((current) => addComponent(current, { ...component, position: findAvailablePosition(current, component, desiredPosition) }));
-      setSelectedComponentId(component.id);
     } catch (error) {
       onNotify(error instanceof Error ? error.message : "无法放置元件。", "error");
     }
@@ -263,7 +263,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   function startDrag(event: ReactPointerEvent<SVGGElement>, component: CircuitComponent) {
     if ((event.target as Element).closest("[data-port]")) return;
     const point = canvasPoint(event.clientX, event.clientY);
-    svgRef.current?.setPointerCapture(event.pointerId);
+    event.currentTarget.setPointerCapture(event.pointerId);
     setDragging({ componentId: component.id, offsetX: point.x - component.position.x, offsetY: point.y - component.position.y });
   }
 
@@ -481,23 +481,20 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
             <button type="button" disabled={!selectedComponentId} onClick={() => { if (selectedComponentId) { setCircuit((current) => removeComponent(current, selectedComponentId)); setProbeTerminals((current) => current.filter((terminal) => !terminal.startsWith(`${selectedComponentId}.`))); setPendingEndpoint((current) => current?.componentId === selectedComponentId ? null : current); setSelectedComponentId(null); } }}>删除所选</button>
           </div>
           <p className="cw-canvas-help">双击元件保持选中；拖动会自动避开其他元件。使用缩放按钮，或按住 Ctrl/⌘ 滚动。</p>
-          <svg ref={svgRef} className="cw-canvas" viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`} role="application" aria-label="可自由搭建的电路画布" onWheel={handleCanvasWheel} onPointerMove={handlePointerMove} onPointerUp={(event) => { if (svgRef.current?.hasPointerCapture(event.pointerId)) svgRef.current.releasePointerCapture(event.pointerId); setDragging(null); }} onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<SVGSVGElement>) => { event.preventDefault(); const componentKind = event.dataTransfer.getData("application/x-circuit-component") as CircuitComponentKind; if (componentLabels[componentKind]) placeComponent(componentKind, canvasPoint(event.clientX, event.clientY)); }} onClick={(event) => { if (event.target === event.currentTarget) setSelectedComponentId(null); }}>
+          <svg ref={svgRef} className="cw-canvas" viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`} role="application" aria-label="可自由搭建的电路画布" onWheel={handleCanvasWheel} onPointerMove={handlePointerMove} onPointerUp={() => setDragging(null)} onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<SVGSVGElement>) => { event.preventDefault(); const componentKind = event.dataTransfer.getData("application/x-circuit-component") as CircuitComponentKind; if (componentLabels[componentKind]) placeComponent(componentKind, canvasPoint(event.clientX, event.clientY)); }} onClick={(event) => { if (event.target === event.currentTarget) setSelectedComponentId(null); }}>
             <defs><pattern id={`cw-grid-${kind}`} width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" className="cw-grid-line" /></pattern></defs>
             <rect width={canvasWidth} height={canvasHeight} fill={`url(#cw-grid-${kind})`} onClick={() => setSelectedComponentId(null)} />
             {Object.values(circuit.connections).map((connection) => {
               const from = circuit.components[connection.from.componentId]; const to = circuit.components[connection.to.componentId];
               if (!from || !to) return null;
-              const path = createWirePath(getPortGeometry(from, connection.from.portId), getPortGeometry(to, connection.to.portId));
-              return <g className="cw-wire-group" key={connection.id} onDoubleClick={() => setCircuit((current) => disconnect(current, connection.id))}>
-                <path className="cw-wire-hit" d={path}><title>双击删除连线</title></path>
-                <path className="cw-wire-halo" d={path} />
-                <path className="cw-wire" d={path} />
-              </g>;
+              const a = getPortGeometry(from, connection.from.portId).point; const b = getPortGeometry(to, connection.to.portId).point;
+              const middleX = (a.x + b.x) / 2;
+              return <path className="cw-wire" d={`M ${a.x} ${a.y} C ${middleX} ${a.y}, ${middleX} ${b.y}, ${b.x} ${b.y}`} key={connection.id} onDoubleClick={() => setCircuit((current) => disconnect(current, connection.id))}><title>双击删除连线</title></path>;
             })}
             {Object.values(circuit.components).map((component) => {
               const { width, height } = getComponentSize(component);
               const orientation = `${component.rotation ?? 0}°${component.flipped ? " · 镜像" : ""}`;
-              return <g key={component.id} data-component-id={component.id} data-rotation={component.rotation ?? 0} className={selectedComponentId === component.id ? "cw-component is-selected" : "cw-component"} role="button" tabIndex={0} aria-label={`${component.label || component.kind} 元件，双击选中`} onPointerDown={(event) => startDrag(event, component)} onDoubleClick={(event) => { event.stopPropagation(); setSelectedComponentId(component.id); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedComponentId(component.id); } }}>
+              return <g key={component.id} data-component-id={component.id} data-rotation={component.rotation ?? 0} className={selectedComponentId === component.id ? "cw-component is-selected" : "cw-component"} role="button" tabIndex={0} aria-pressed={selectedComponentId === component.id} aria-label={`${component.label || component.kind} 元件，双击选中${selectedComponentId === component.id ? "，已选中" : ""}`} onPointerDown={(event) => startDrag(event, component)} onDoubleClick={(event) => { event.stopPropagation(); setSelectedComponentId(component.id); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedComponentId(component.id); } }}>
                 <rect x={component.position.x - width / 2} y={component.position.y - height / 2} width={width} height={height} rx="8" />
                 <text className="cw-component-kind" x={component.position.x} y={component.position.y - 5} textAnchor="middle">{component.kind.toUpperCase()}</text>
                 <text className="cw-component-label" x={component.position.x} y={component.position.y + 15} textAnchor="middle">{component.label || componentLabels[component.kind]}</text>

@@ -81,11 +81,38 @@ test("the circuit workbench calls graph, persistence, and real simulation engine
   assert.match(shell, /onDoubleClick/);
   assert.match(shell, /双击元件保持选中/);
   for (const label of ["旋转 90°", "水平翻转", "缩小", "放大", "重置缩放"]) assert.match(shell, new RegExp(label));
-  for (const helper of ["findAvailablePosition", "separateOverlappingComponents", "createWirePath"]) assert.match(shell, new RegExp(helper));
+  for (const helper of ["findAvailablePosition", "separateOverlappingComponents"]) assert.match(shell, new RegExp(helper));
   assert.match(shell, /is-connected/);
   assert.match(shell, /条连线/);
   assert.match(shell, /onClick|onChange/);
   assert.doesNotMatch(shell, /预设动画|静态仿真图/);
+});
+
+test("real pointer double-click creates the only sticky component selection", async () => {
+  const shell = await readFile(new URL("../app/components/sandbox/CircuitWorkbench.tsx", import.meta.url), "utf8");
+  const placeComponent = shell.slice(shell.indexOf("function placeComponent"), shell.indexOf("function handlePort"));
+  const startDrag = shell.slice(shell.indexOf("function startDrag"), shell.indexOf("function handlePointerMove"));
+  assert.doesNotMatch(placeComponent, /setSelectedComponentId/,
+    "placing or single-clicking a component must not imitate a locked selection");
+  assert.match(startDrag, /event\.currentTarget\.setPointerCapture\(event\.pointerId\)/,
+    "the component must own pointer capture so the browser keeps double-click targeted to it");
+  assert.doesNotMatch(startDrag, /svgRef\.current\?\.setPointerCapture/);
+  assert.match(shell, /aria-pressed=\{selectedComponentId === component\.id\}/);
+  assert.match(shell, /event\.preventDefault\(\);\s*setCircuit\(\(current\) => removeComponent\(current, selectedComponentId\)\)/,
+    "Backspace and Delete must not navigate away before deleting the selected component");
+});
+
+test("wires keep the original single curve while terminal state remains readable", async () => {
+  const [shell, styles] = await Promise.all([
+    readFile(new URL("../app/components/sandbox/CircuitWorkbench.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/sandbox/workbench.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(shell, /<path className="cw-wire" d=\{`M \$\{a\.x\} \$\{a\.y\} C /);
+  assert.doesNotMatch(shell, /createWirePath|cw-wire-group|cw-wire-hit|cw-wire-halo/);
+  assert.match(styles, /\.cw-wire\s*\{[^}]*stroke:\s*#62d1c3;[^}]*pointer-events:\s*stroke;/s);
+  assert.doesNotMatch(styles, /cw-wire-group|cw-wire-hit|cw-wire-halo/);
+  assert.match(shell, /cw-port-status-ring/);
+  assert.match(shell, /is-connected/);
 });
 
 test("global search and JSON safeguards remain real interactions", async () => {
