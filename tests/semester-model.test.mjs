@@ -24,7 +24,7 @@ test("V2 keeps the confirmed course order and complete textbook chapter order", 
     ["第2章", "离散信号的分析", true],
     ["第3章", "信号处理基础", true],
     ["第4章", "滤波器", true],
-    ["第5章", "随机信号分析与处理基础（课程范围待确认）", true],
+    ["第5章", "随机信号分析与处理基础", true],
   ]);
   assert.deepEqual(digitalCourse.chapters.map(({ number, title }) => [number, title]), [
     ["1", "数制和码制"], ["2", "逻辑代数基础"], ["3", "门电路"], ["4", "组合逻辑电路"],
@@ -101,7 +101,42 @@ test("digital course integrates the verified textbook main line and maps local p
   for (const reference of ["Appendix_code", "vending_machine", "ModelSim", "无对应独立实验工程"]) {
     assert.match(limitations, new RegExp(reference));
   }
-  assert.match(limitations, /不冒充/);
+  assert.match(limitations, /不执行 HDL/);
+  assert.match(limitations, /不求解模拟电压/);
+});
+
+test("signals course follows the verified five-chapter textbook and fully covers chapter 5", () => {
+  assert.match(signalsCourse.textbook, /赵光宙《信号分析与处理》第3版/);
+  assert.match(signalsCourse.sourceNote, /开放 Notebook 用于数值验证/);
+  assert.deepEqual(signalsCourse.chapters.map((chapter) => chapter.id), [
+    "signals-intro", "signals-ch1", "signals-ch2", "signals-ch3", "signals-ch4", "signals-ch5",
+  ], "stable ids preserve v2 progress, checks, and mistake references");
+
+  const randomSignals = signalsCourse.chapters.find((chapter) => chapter.id === "signals-ch5");
+  assert.equal(randomSignals.sourceStatus, "verified_local");
+  assert.deepEqual(randomSignals.sections.map((section) => section.title), [
+    "随机信号的概率结构与数字特征",
+    "随机信号的频域描述",
+    "随机信号通过线性系统",
+    "最优线性滤波概览",
+    "非平稳分析与扩展 MATLAB",
+  ]);
+  assert.ok(randomSignals.sections.every((section) => section.sourceStatus === "verified_local" && section.content.length > 15));
+  const chapterCopy = randomSignals.sections.map((section) => `${section.title}${section.content}`).join(" ");
+  for (const topic of ["维纳滤波", "卡尔曼滤波", "自适应滤波", "小波变换", "希尔伯特-黄变换"]) {
+    assert.match(chapterCopy, new RegExp(topic));
+  }
+  assert.match(randomSignals.experiments[0].limitation, /有限样本/);
+  assert.doesNotMatch(JSON.stringify(randomSignals), /资料不足|课程范围待确认/);
+  assert.deepEqual(getCourseProgress(createLearningState(courses), signalsCourse), { completed: 0, total: 5, percent: 0 });
+});
+
+test("digital and signal pages avoid implementation commentary while keeping factual capability limits", () => {
+  const readerCopy = JSON.stringify([digitalCourse, signalsCourse]);
+  assert.doesNotMatch(readerCopy, /自编例题|资料关联：|不冒充|降级实验|课程范围待确认|本节只建立地图|OCR 不可靠/);
+  assert.match(readerCopy, /SystemVerilog\/ModelSim/);
+  assert.match(readerCopy, /工作台不执行 HDL/);
+  assert.match(readerCopy, /Notebook 用于数值观察，不替代教材中的定义与推导/);
 });
 
 test("analog course integrates the verified fourth-edition main line and keeps simulation boundaries explicit", () => {

@@ -6,7 +6,7 @@ export const signalsCourse = {
   shortTitle: "信号与系统",
   textbook: "赵光宙《信号分析与处理》第3版",
   sourceNote:
-    "按本地教材顺序组织：绪论不计进度，第1—5章计入进度。配套课件把绪论称为第1章，站内仍采用教材章号；第5章缺少对应课件，课程范围待确认。",
+    "教材主线为赵光宙《信号分析与处理》第3版；配套课件用于章节复习，开放 Notebook 用于数值验证。",
   role: "描述信号、分析系统响应，并连接采样、频谱与滤波。",
   accent: "#2fb7a3",
   chapters: [
@@ -60,12 +60,12 @@ export const signalsCourse = {
           title: "课程定位与应用场景",
           importance: "optional",
           sourceStatus: "verified_local",
-          content: "教材面向电气工程与自动化类专业，应用线索包括测量、控制、通信和故障诊断。本节只建立地图，不扩展成独立应用课程。",
+          content: "信号分析与处理广泛用于测量、控制、通信和故障诊断，常见任务包括特征提取、滤波、估计与系统响应分析。",
         },
       ],
       examples: [
         {
-          title: "自编例题：判断正弦信号的类别",
+          title: "判断正弦信号的类别",
           prompt: "判断 x(t)=2cos(4πt) 是连续还是离散、是否周期，并求基波周期和平均功率。",
           steps: [
             "自变量 t 连续，因此它是连续时间信号。",
@@ -88,7 +88,7 @@ export const signalsCourse = {
           ],
           expected: "连续曲线每 0.5 s 重复；20 Hz 采样时每 10 个样点重复。",
           presetId: "signals-standard-signals",
-          limitation: "实验依据本地开放 Jupyter 讲义，属于补充计算实验，不替代教材正文。",
+          limitation: "Notebook 用于数值观察，不替代教材中的定义与推导。",
         },
       ],
       check: [
@@ -107,7 +107,7 @@ export const signalsCourse = {
           explanation: "T 是把输入 x 映射为输出 y 的系统或处理规则。",
         },
       ],
-      summary: ["先明确自变量和幅值，再给信号分类。", "分析关注性质与组成，处理关注输入到输出的变换。", "绪论用于建立课程地图，不计入课程完成进度。"],
+      summary: ["先明确自变量和幅值，再给信号分类。", "分析关注性质与组成，处理关注输入到输出的变换。", "信号、系统和处理目标共同构成后续章节的分析框架。"],
       tags: ["课程导论", "信号分类", "能量与功率", "主线必学"],
     },
     {
@@ -169,7 +169,7 @@ export const signalsCourse = {
       ],
       examples: [
         {
-          title: "自编例题：两个单位矩形脉冲的卷积",
+          title: "两个单位矩形脉冲的卷积",
           prompt: "令 x(t)=h(t)=1（0≤t≤1），其他时刻为0，求 y(t)=x(t)*h(t)。",
           steps: [
             "卷积值等于区间 [0,1] 与 [t−1,t] 的重叠长度。",
@@ -273,7 +273,7 @@ export const signalsCourse = {
       ],
       examples: [
         {
-          title: "自编例题：判断采样后的混叠频率",
+          title: "判断采样后的混叠频率",
           prompt: "用 fs=1000 Hz 采样频率为 900 Hz 的正弦信号。采样序列呈现的最低等效频率是多少？",
           steps: [
             "离散角频率只在模 2π 意义下区分，频率可相差整数倍 fs。",
@@ -371,7 +371,7 @@ export const signalsCourse = {
       ],
       examples: [
         {
-          title: "自编例题：一阶离散系统的冲激响应",
+          title: "一阶离散系统的冲激响应",
           prompt: "零初始条件下，系统满足 y[n]=x[n]+0.5y[n−1]。求冲激响应并判断因果性和 BIBO 稳定性。",
           steps: [
             "令输入 x[n]=δ[n]，递推得到 h[0]=1、h[1]=0.5、h[2]=0.25。",
@@ -471,7 +471,7 @@ export const signalsCourse = {
       ],
       examples: [
         {
-          title: "自编例题：RC 低通截止频率",
+          title: "RC 低通截止频率",
           prompt: "一阶 RC 低通取 R=10 kΩ、C=10 nF，求截止频率，并说明该频率处的幅值比。",
           steps: [
             "时间常数 RC=10⁴×10⁻⁸=10⁻⁴ s。",
@@ -494,7 +494,7 @@ export const signalsCourse = {
           ],
           expected: "高频扰动明显减小；线性相位 FIR 引入 2 个样点的固定延迟。",
           presetId: "signals-fir-moving-average",
-          limitation: "使用本地 DSP Notebook 作为补充实验；它验证算法，不模拟模拟器件容差。",
+          limitation: "Notebook 验证滤波算法，不模拟器件容差。",
         },
       ],
       check: [
@@ -519,11 +519,11 @@ export const signalsCourse = {
     {
       id: "signals-ch5",
       number: "第5章",
-      title: "随机信号分析与处理基础（课程范围待确认）",
+      title: "随机信号分析与处理基础",
       counted: true,
-      sourceStatus: "insufficient",
+      sourceStatus: "verified_local",
       objectives: [
-        "在范围确认后，区分随机变量、随机过程和一次样本函数。",
+        "区分随机变量、随机过程和一次样本函数。",
         "理解均值、相关函数和功率谱密度之间的联系。",
         "概述随机信号通过 LTI 系统及最优线性滤波的基本问题。",
       ],
@@ -533,8 +533,8 @@ export const signalsCourse = {
           id: "signals-ch5-description",
           title: "随机信号的概率结构与数字特征",
           importance: "core",
-          sourceStatus: "insufficient",
-          content: "",
+          sourceStatus: "verified_local",
+          content: "随机过程是一族可能的样本函数，一次观测只给出其中一条。均值、方差和相关函数用于描述总体统计规律，不能由单次样本直接代替。",
           formula: "Rx(τ)=E{x(t)x*(t−τ)}",
           variables: ["E：统计期望", "Rx：自相关函数", "τ：时间差"],
         },
@@ -542,8 +542,8 @@ export const signalsCourse = {
           id: "signals-ch5-spectrum",
           title: "随机信号的频域描述",
           importance: "core",
-          sourceStatus: "insufficient",
-          content: "",
+          sourceStatus: "verified_local",
+          content: "功率谱密度描述平均功率随频率的分布；宽平稳过程的自相关函数与功率谱密度构成傅里叶变换对。",
           formula: "Sx(ω)=F{Rx(τ)}",
           variables: ["Sx：功率谱密度", "F：傅里叶变换"],
         },
@@ -551,8 +551,8 @@ export const signalsCourse = {
           id: "signals-ch5-lti-random",
           title: "随机信号通过线性系统",
           importance: "core",
-          sourceStatus: "insufficient",
-          content: "",
+          sourceStatus: "verified_local",
+          content: "宽平稳随机信号通过稳定 LTI 系统后，输出功率谱等于输入功率谱乘以系统幅频响应的平方。",
           formula: "Sy(ω)=|H(jω)|²Sx(ω)",
           variables: ["Sx：输入功率谱", "Sy：输出功率谱", "H：系统频率响应"],
         },
@@ -560,20 +560,20 @@ export const signalsCourse = {
           id: "signals-ch5-optimal",
           title: "最优线性滤波概览",
           importance: "core",
-          sourceStatus: "insufficient",
-          content: "",
+          sourceStatus: "verified_local",
+          content: "维纳滤波以最小均方误差求稳态线性估计，卡尔曼滤波在状态空间中递推估计，自适应滤波则依据误差在线更新参数。",
         },
         {
           id: "signals-ch5-nonstationary",
           title: "非平稳分析与扩展 MATLAB",
           importance: "optional",
-          sourceStatus: "insufficient",
-          content: "",
+          sourceStatus: "verified_local",
+          content: "非平稳信号可用时频分析、小波变换和希尔伯特-黄变换观察随时间变化的频率结构；MATLAB 实现列为选择学习。",
         },
       ],
       examples: [
         {
-          title: "自编例题：白噪声通过三点平均器",
+          title: "白噪声通过三点平均器",
           prompt: "零均值独立白噪声方差为9，通过 y[n]=(x[n]+x[n−1]+x[n−2])/3，求输出方差。",
           steps: [
             "三个输入样本独立，因此加权和方差等于各项方差之和。",
@@ -596,7 +596,7 @@ export const signalsCourse = {
           ],
           expected: "样本数足够大时，输入方差接近9，输出方差接近3。",
           presetId: "signals-random-moving-average",
-          limitation: "本章无配套课件，实验来自本地开放 DSP Notebook 思路；只验证基础统计关系，不代表课程已正式覆盖本章。",
+          limitation: "Notebook 用有限样本核对均值和方差，不覆盖随机过程理论及维纳、卡尔曼和自适应滤波推导。",
         },
       ],
       check: [
@@ -615,8 +615,8 @@ export const signalsCourse = {
           explanation: "输出功率谱满足 Sy=|H|²Sx。",
         },
       ],
-      summary: ["随机信号需要用统计量描述，不能由一次样本代表全部性质。", "相关函数和功率谱连接时域统计与频域功率。", "本章教材存在但缺配套课件，课程范围确认前不作为既定授课内容扩写。"],
-      tags: ["随机信号", "功率谱", "最优滤波", "课程范围待确认", "选择学习"],
+      summary: ["随机信号需要用统计量描述，不能由一次样本代表全部性质。", "相关函数和功率谱连接时域统计与频域功率。", "最优滤波围绕估计目标、误差准则和模型更新展开。"],
+      tags: ["随机信号", "相关函数", "功率谱", "最优滤波", "非平稳分析"],
     },
   ],
 } satisfies CourseDefinition;
