@@ -34,6 +34,7 @@ test("V2 keeps the confirmed course order and complete textbook chapter order", 
     ["0", "绪论"], ["1", "常用半导体器件"], ["2", "基本放大电路"], ["3", "多级放大电路"],
     ["4", "集成运算放大电路"], ["5", "放大电路的频率响应"], ["6", "放大电路中的反馈"],
     ["7", "信号的运算和处理"], ["8", "波形的发生和信号的转换"], ["9", "功率放大电路"], ["10", "直流电源"],
+    ["11", "模拟电子电路读图"],
   ]);
 });
 test("every chapter has the seven learning stages, an 80/20 split, and explicit source evidence", () => {
@@ -101,6 +102,49 @@ test("digital course integrates the verified textbook main line and maps local p
     assert.match(limitations, new RegExp(reference));
   }
   assert.match(limitations, /不冒充/);
+});
+
+test("analog course integrates the verified fourth-edition main line and keeps simulation boundaries explicit", () => {
+  assert.match(analogCourse.textbook, /童诗白、华成英《模拟电子技术基础》第四版/);
+  assert.match(analogCourse.sourceNote, /第 0—11 章/);
+  assert.match(analogCourse.sourceNote, /HIT 模电笔记/);
+  assert.match(analogCourse.sourceNote, /USTC 模拟电路教程/);
+  assert.match(analogCourse.sourceNote, /没有可独立运行的实验工程/);
+  assert.deepEqual(analogCourse.chapters.map((chapter) => chapter.id), [
+    "analog-00", "analog-01", "analog-02", "analog-03", "analog-04", "analog-05",
+    "analog-06", "analog-07", "analog-08", "analog-09", "analog-10", "analog-11",
+  ], "existing ids stay stable while the verified textbook reading chapter is appended");
+  assert.ok(analogCourse.chapters.every((chapter) => chapter.sourceStatus === "verified_local"));
+  assert.ok(analogCourse.chapters.flatMap((chapter) => chapter.sections).every((section) => section.sourceStatus === "verified_local"));
+  assert.deepEqual(getCourseProgress(createLearningState(courses), analogCourse), { completed: 0, total: 12, percent: 0 });
+  assert.doesNotMatch(analogCourse.chapters.flatMap((chapter) => chapter.tags).join(" "), /资料不足/);
+
+  const frequency = analogCourse.chapters.find((chapter) => chapter.id === "analog-05");
+  assert.deepEqual(frequency.sections.map((section) => section.title), [
+    "频率响应与波特图", "晶体管的高频等效模型", "场效应管的高频等效模型", "单管与多级放大电路的频响", "增益带宽与辅助仿真",
+  ]);
+  assert.match(frequency.sections[0].formula, /20\\log_\{10\}/);
+
+  const waveform = analogCourse.chapters.find((chapter) => chapter.id === "analog-08");
+  assert.deepEqual(waveform.sections.map((section) => section.title), [
+    "正弦波振荡电路", "电压比较器", "非正弦波发生电路", "运放信号转换电路", "Multisim 测试举例",
+  ]);
+
+  const supply = analogCourse.chapters.find((chapter) => chapter.id === "analog-10");
+  assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /桥式整流/);
+  assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /线性稳压/);
+  assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /开关型稳压/);
+
+  const reading = analogCourse.chapters.find((chapter) => chapter.id === "analog-11");
+  assert.deepEqual(reading.sections.map((section) => section.title), [
+    "读图的思路和步骤", "基本电路与分析方法回顾", "低频功率放大与火灾报警案例", "自动增益控制与电容测量案例", "跨级接口复核",
+  ]);
+
+  const experiments = analogCourse.chapters.flatMap((chapter) => chapter.experiments);
+  assert.ok(experiments.every((experiment) => experiment.workbench === "analog"));
+  assert.ok(experiments.every((experiment) => experiment.limitation?.includes("本地没有")));
+  assert.match(experiments.map((experiment) => experiment.limitation).join(" "), /不支持 BJT\/MOSFET/);
+  assert.match(experiments.map((experiment) => experiment.limitation).join(" "), /二极管和稳压器求解模型/);
 });
 
 test("a chapter only contributes to progress after its complete check is submitted", () => {
