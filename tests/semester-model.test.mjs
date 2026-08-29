@@ -75,6 +75,34 @@ test("every chapter has the seven learning stages, an 80/20 split, and explicit 
   }
 });
 
+test("digital course integrates the verified textbook main line and maps local practice honestly", () => {
+  assert.match(digitalCourse.sourceNote, /阎石《数字电子技术基础》第六版/);
+  assert.match(digitalCourse.sourceNote, /SystemVerilog\/ModelSim/);
+  assert.equal(digitalCourse.chapters.length, 8);
+  assert.deepEqual(digitalCourse.chapters.map((chapter) => chapter.id), [
+    "digital-01", "digital-02", "digital-03", "digital-04", "digital-05", "digital-06", "digital-07", "digital-08",
+  ], "stable chapter ids preserve v2 progress, checks, and mistake references");
+  assert.ok(digitalCourse.chapters.every((chapter) => chapter.sourceStatus === "verified_local"));
+
+  const pulse = digitalCourse.chapters.find((chapter) => chapter.id === "digital-07");
+  assert.deepEqual(pulse.sections.map((section) => section.title), [
+    "矩形脉冲参数", "施密特触发电路", "单稳态电路", "多谐振荡电路", "555 定时器及其应用",
+  ]);
+  assert.match(pulse.sections[0].formula, /f=1\/T/);
+  assert.doesNotMatch(pulse.tags.join(" "), /资料不足/);
+
+  const conversion = digitalCourse.chapters.find((chapter) => chapter.id === "digital-08");
+  assert.match(conversion.sections.map((section) => `${section.title}${section.content}`).join(" "), /取样保持/);
+  assert.match(conversion.sections.map((section) => `${section.title}${section.content}`).join(" "), /逐次逼近/);
+  assert.match(conversion.sections.map((section) => `${section.title}${section.content}`).join(" "), /Σ-Δ/);
+
+  const limitations = digitalCourse.chapters.flatMap((chapter) => chapter.experiments.map((experiment) => experiment.limitation ?? "")).join(" ");
+  for (const reference of ["Appendix_code", "vending_machine", "ModelSim", "无对应独立实验工程"]) {
+    assert.match(limitations, new RegExp(reference));
+  }
+  assert.match(limitations, /不冒充/);
+});
+
 test("a chapter only contributes to progress after its complete check is submitted", () => {
   const now = new Date("2026-08-24T00:00:00.000Z");
   const chapter = digitalCourse.chapters[0];
