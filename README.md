@@ -102,6 +102,20 @@ npm run build
 npm run start
 ```
 
+构建 GitHub Pages 静态版本：
+
+```powershell
+npm run build:pages
+```
+
+静态产物输出到 `dist-pages`，资源基路径固定为 `/personal-workbench/`。推送到 GitHub `main` 后，`.github/workflows/pages.yml` 会运行测试、lint 和静态构建，再部署该目录。
+
+## 在线地址
+
+- Sites：<https://personal-workbench.w1661884010.chatgpt.site/>
+- GitHub 仓库：<https://github.com/w1661884010-jpg/personal-workbench>
+- GitHub Pages：<https://w1661884010-jpg.github.io/personal-workbench/>
+
 ## 测试与质量检查
 
 运行全部自动化测试：
@@ -115,6 +129,7 @@ npm test
 ```powershell
 npm run lint
 npm run build
+npm run build:pages
 ```
 
 现有测试覆盖章节进度与检验门槛、V1/V2 到 V3 的保守迁移、数字逻辑求值、模拟线性 DC/RC 瞬态、非线性器件拒绝求解，以及电路的保存、载入、复制和删除。

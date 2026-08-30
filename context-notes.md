@@ -218,3 +218,25 @@
 - `npm run lint` 退出码为 0；Vinext/Vite 生产构建完成，根页面再次返回 HTTP 200。
 - `git diff --check` 退出码为 0；换行提示是仓库既有 Windows 转换策略，不是空白错误。
 - 原有未跟踪 `tmp/` 保持不变，不纳入提交或部署包；官方 PPTX 和提取索引均位于仓库外。
+
+## 2026-08-30 GitHub 与 Pages 同步决策
+
+- 用户要求立即同步；范围解释为本地已提交代码、GitHub 私有仓库 `w1661884010-jpg/personal-workbench` 的 `main` 和项目 GitHub Pages。
+- 当前本地 `HEAD` 为 `8655838`，比 GitHub `main` 的 `fd08757` 领先 1 个提交；远端尚未配置 Pages，预期网址返回 404。
+- 当前 Sites 构建是 Vinext + Cloudflare 服务端产物，不能直接把 `dist/client` 当成完整静态站点发布。GitHub Pages 改用单独的纯 Vite 客户端入口，复用 `LearningWorkbench` 及其直接依赖。
+- Pages 配置固定 `base: /personal-workbench/`，避免项目 Pages 子路径下的 JS、CSS、favicon 和社交图资源失效。
+- GitHub 仓库必须保持 private；若 Pages API 因套餐限制拒绝私有仓库发布，停止在权限边界处并报告，不将仓库改为 public。
+- 原有 `tmp/` 是未跟踪资料处理目录，本次继续排除，不进行顺带清理。
+
+### 成功标准
+
+- 本地与 GitHub `main` 指向同一已验证提交，且提交中不含 `tmp/`。
+- Pages 工作流运行测试、lint 和静态构建后成功部署。
+- 公开 GitHub Pages 网址返回 HTTP 200，并保留暗色界面、课程路由和 localStorage 功能。
+
+### 本地验证检查点
+
+- Pages 专项契约测试 2/2 通过；完整 `npm test` 为 65/65 通过，0 失败、0 跳过。
+- `npm run lint`、`npm run build:pages` 与 `npm run build` 均退出 0。
+- 首次使用 `pages/` 作为静态入口时，Vinext 把 `pages/main.tsx` 识别为额外路由 `/main`；已依据完整构建输出改为 `github-pages/`，复测后 Sites 只保留根路由。
+- 本地 Pages 预览的首页、JS 和 CSS 均返回 HTTP 200，标题为“电路自习室｜本学期电子类课程个人学习站点”，资源路径均带 `/personal-workbench/` 前缀。

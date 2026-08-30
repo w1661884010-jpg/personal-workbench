@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "node scripts/vinext.mjs dev",
     "build": "node scripts/vinext.mjs build",
+    "build:pages": "vite build --config vite.pages.config.ts",
     "start": "node scripts/vinext.mjs start",
     "test": "node --test",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
