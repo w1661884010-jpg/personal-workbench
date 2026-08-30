@@ -39,7 +39,7 @@ export const digitalCourse = {
       prerequisites: ["第 1 章二值表示", "集合与代数式的基本操作"],
       sections: [
         { id: "digital-02-s1", title: "基本与复合逻辑", importance: "core", sourceStatus: "verified_local", content: "与、或、非是基本运算；与非、或非、异或和同或由基本运算组合得到。" },
-        { id: "digital-02-s2", title: "基本公式与定理", importance: "core", sourceStatus: "verified_local", content: "交换、结合、分配、吸收和德摩根关系用于等价变换；反演与对偶必须保持运算规则一致。" },
+        { id: "digital-02-s2", title: "基本公式与定理", importance: "core", sourceStatus: "verified_local", content: "交换、结合、分配、吸收和德摩根关系用于等价变换。化简时每一步都必须保持真值不变；反演需同时互换与/或以及 0/1，对偶只替换运算和常量而不反演变量。", formula: "德摩根：¬(A·B)=¬A+¬B，¬(A+B)=¬A·¬B", variables: ["A、B：逻辑变量", "¬：非，·：与，+：或"] },
         { id: "digital-02-s3", title: "逻辑函数表示", importance: "core", sourceStatus: "verified_local", content: "真值表、逻辑表达式和逻辑图描述同一输入输出关系；最小项与最大项构成标准形式。" },
         { id: "digital-02-s4", title: "卡诺图与无关项", importance: "core", sourceStatus: "verified_local", content: "按相邻项合并消去变量；无关项可按有利于化简的方式取 0 或 1，但不能改变约束内行为。" },
         { id: "digital-02-s5", title: "Q-M 法与多输出化简", importance: "optional", sourceStatus: "supplemental_local", content: "Q-M 法适合变量较多时的系统化简，多输出化简还需识别可共享的公共项。" },
@@ -81,7 +81,7 @@ export const digitalCourse = {
         { id: "digital-04-s1", title: "分析与设计流程", importance: "core", sourceStatus: "verified_local", content: "组合电路输出只由当前输入决定；分析从电路到逻辑式和真值表，设计按需求、真值表、化简、实现推进。" },
         { id: "digital-04-s2", title: "编码器与译码器", importance: "core", sourceStatus: "verified_local", content: "编码器把有效输入转换为代码；译码器执行相反映射，并可实现最小项输出。" },
         { id: "digital-04-s3", title: "数据选择与比较", importance: "core", sourceStatus: "verified_local", content: "数据选择器按选择端转发一路输入；数值比较器产生大于、等于、小于关系。" },
-        { id: "digital-04-s4", title: "算术电路", importance: "core", sourceStatus: "verified_local", content: "半加器、全加器和并行加法器是主线；每一级进位关系决定整体功能和延迟。" },
+        { id: "digital-04-s4", title: "算术电路", importance: "core", sourceStatus: "verified_local", content: "半加器处理两个一位数，全加器还接收低位进位。多位加法器逐级连接全加器；功能核对要同时检查和位与进位，速度分析则要关注进位传播路径。", formula: "S=A⊕B⊕C_in；C_out=A·B+C_in·(A⊕B)", variables: ["A、B：本位加数", "C_in：低位输入进位", "S：本位和", "C_out：高位输出进位"] },
         { id: "digital-04-s5", title: "层次设计与竞争冒险", importance: "optional", sourceStatus: "supplemental_local", content: "PLD、HDL、模块化和竞争冒险适合在掌握基础组合模块后继续学习。" },
       ],
       examples: [{ title: "一位全加器", prompt: "A=1、B=1、Cin=0 时求和 S 与进位 Cout。", steps: ["三个输入中有两个为 1", "奇偶关系给出 S=0", "至少两个输入为 1，产生进位"], answer: "S=0，Cout=1。" }],
@@ -99,7 +99,7 @@ export const digitalCourse = {
       prerequisites: ["第 3 章门电路", "基本时序波形阅读"],
       sections: [
         { id: "digital-05-s1", title: "SR 锁存器", importance: "core", sourceStatus: "verified_local", content: "交叉耦合门形成反馈并保存状态；使用时必须识别置位、复位、保持和禁用输入组合。" },
-        { id: "digital-05-s2", title: "触发器", importance: "core", sourceStatus: "verified_local", content: "D、JK、T 触发器用规定的时钟条件更新状态；功能表和特性方程共同描述行为。" },
+        { id: "digital-05-s2", title: "触发器", importance: "core", sourceStatus: "verified_local", content: "D、JK、T 触发器只在规定的有效时钟条件下更新状态。分析时先确认触发沿和异步置位/复位，再把有效沿到来前的输入、现态代入特性方程求次态。", formula: "D：Q^+=D；JK：Q^+=J·¬Q+¬K·Q；T：Q^+=T⊕Q", variables: ["Q：有效沿前现态", "Q^+：有效沿后次态", "D、J、K、T：触发器输入"] },
         { id: "digital-05-s3", title: "寄存器", importance: "core", sourceStatus: "verified_local", content: "多个触发器按统一时钟保存多位数据；并行和移位方式决定数据进入、传递和输出。" },
         { id: "digital-05-s4", title: "RAM 与 ROM", importance: "core", sourceStatus: "verified_local", content: "随机存储器按地址读写，SRAM 与 DRAM 的单元结构和刷新要求不同；只读存储器用于保存固定或可编程内容。" },
         { id: "digital-05-s5", title: "容量扩展与逻辑函数实现", importance: "optional", sourceStatus: "verified_local", content: "教材进一步讨论存储器的字扩展、位扩展以及用存储器实现组合逻辑函数，适合在基本读写关系之后选择学习。" },
@@ -118,7 +118,7 @@ export const digitalCourse = {
       objectives: ["根据状态表、状态图和方程分析时序电路", "设计基础计数器与移位寄存器", "用逻辑分析仪核对状态转移"],
       prerequisites: ["第 4 章组合逻辑", "第 5 章触发器"],
       sections: [
-        { id: "digital-06-s1", title: "状态描述与分析", importance: "core", sourceStatus: "verified_local", content: "时序电路输出与当前输入和已有状态有关；从驱动方程、输出方程和时钟条件推导状态转换表、状态图、状态机流程图与时序图。" },
+        { id: "digital-06-s1", title: "状态描述与分析", importance: "core", sourceStatus: "verified_local", content: "时序电路输出与当前输入和已有状态有关。分析时依次写出触发器驱动方程、次态方程和输出方程，再列状态表、画状态图并按时钟条件核对时序图，不能跳过不可达状态检查。", formula: "Q^+=F(Q,X)；Y=G(Q,X)（Mealy）或 Y=G(Q)（Moore）", variables: ["Q：现态向量", "X：输入向量", "Q^+：次态向量", "Y：输出向量"] },
         { id: "digital-06-s2", title: "移位寄存器与计数器", importance: "core", sourceStatus: "verified_local", content: "移位寄存器按时钟移动数据；计数器按规定状态序列循环，分析时要区分同步、异步结构和有效模值。" },
         { id: "digital-06-s3", title: "顺序脉冲与序列信号", importance: "core", sourceStatus: "verified_local", content: "顺序脉冲发生器依次产生节拍信号，序列信号发生器按状态输出规定码序；两者都可用状态转移统一分析。" },
         { id: "digital-06-s4", title: "同步时序电路设计", importance: "core", sourceStatus: "verified_local", content: "设计从逻辑要求出发，经历状态定义、状态化简与编码、触发器选择、方程求取和自启动检查，再落到电路实现。" },
@@ -160,7 +160,7 @@ export const digitalCourse = {
       sections: [
         { id: "digital-08-s1", title: "D/A 电路结构与原理", importance: "core", sourceStatus: "verified_local", content: "D/A 用各位数字码控制支路电流或电压并按二进制权重叠加；教材主线包括权电阻、倒 T 形电阻、权电流和开关树结构。" },
         { id: "digital-08-s2", title: "D/A 精度与速度", importance: "core", sourceStatus: "verified_local", content: "分辨率、转换误差和建立时间分别说明可分辨的码阶、实际特性对理想特性的偏差以及输出进入规定误差带所需时间。" },
-        { id: "digital-08-s3", title: "A/D 基本过程与取样保持", importance: "core", sourceStatus: "verified_local", content: "A/D 依次完成取样、保持、量化和编码；取样-保持电路在转换期间维持输入近似不变，量化把连续幅值映射为有限代码。" },
+        { id: "digital-08-s3", title: "A/D 基本过程与取样保持", importance: "core", sourceStatus: "verified_local", content: "A/D 依次完成取样、保持、量化和编码。取样频率先满足带限信号的采样条件，保持电路再在转换期间维持输入近似不变；n 位量化把满量程划分为 2ⁿ 个代码区间。", formula: "f_s≥2f_max；Δ=FS/2^n", variables: ["f_s：采样频率", "f_max：输入最高有效频率", "FS：满量程范围", "Δ：理想量化间隔", "n：转换位数"] },
         { id: "digital-08-s4", title: "常用 A/D 转换器", importance: "core", sourceStatus: "verified_local", content: "并联比较型速度快但比较器数量多；逐次逼近型逐位试探；双积分型先对输入积分再用基准反向积分，适合重视抗干扰和精度的测量。" },
         { id: "digital-08-s5", title: "流水线、Σ-Δ 与 V-F 型", importance: "optional", sourceStatus: "verified_local", content: "教材把流水线、Σ-Δ 和 V-F 型列为扩展结构；学习重点是分级转换、过采样噪声整形以及电压到频率再计数的基本思路。" },
       ],

@@ -35,7 +35,7 @@ export const analogCourse = {
       prerequisites: ["电流方向与电压极性", "基本材料与电荷概念"],
       sections: [
         { id: "analog-01-s1", title: "半导体与 PN 结", importance: "core", sourceStatus: "verified_local", content: "本征半导体中的自由电子和空穴成对产生；掺杂形成 N 型、P 型半导体。PN 结的扩散与漂移达到动态平衡后形成内电场，并表现出单向导电性。" },
-        { id: "analog-01-s2", title: "二极管特性与模型", importance: "core", sourceStatus: "verified_local", content: "按工作条件在理想、恒压降和小信号模型间选择；模型精度必须与题目目标相匹配。" },
+        { id: "analog-01-s2", title: "二极管特性与模型", importance: "core", sourceStatus: "verified_local", content: "二极管伏安特性是非线性的。分析前先根据极性判断可能的工作区，再按题目精度选择理想、恒压降、折线或小信号模型；求得结果后还要回查最初的导通假设。", formula: "I_D=I_S(e^(u_D/U_T)−1)", variables: ["I_D：二极管电流", "I_S：反向饱和电流", "u_D：二极管端电压", "U_T：温度电压当量"] },
         { id: "analog-01-s3", title: "二极管参数与稳压管", importance: "core", sourceStatus: "verified_local", content: "二极管选用需核对最大整流电流、最高反向工作电压、反向电流和最高工作频率；稳压管必须在规定反向电流范围内工作，并串联限流电阻。" },
         { id: "analog-01-s4", title: "晶体三极管", importance: "core", sourceStatus: "verified_local", content: "BJT 由发射区、基区和集电区构成。分析共射电路时先根据两个 PN 结的偏置判断截止、放大或饱和，再使用相应的电流关系和外电路约束。" },
         { id: "analog-01-s5", title: "PN 结电容、温度与辅助分析", importance: "optional", sourceStatus: "verified_local", content: "势垒电容和扩散电容使 PN 结在高频下偏离理想单向导电模型；温度还会影响反向电流、导通电压和晶体管参数。" },
@@ -57,7 +57,7 @@ export const analogCourse = {
         { id: "analog-02-s1", title: "放大与性能指标", importance: "core", sourceStatus: "verified_local", content: "放大的对象是变化量，本质是用输入信号控制电源能量；不失真是放大的前提。电压、电流和功率增益以及输入、输出电阻描述二端口放大电路的基本性能。" },
         { id: "analog-02-s2", title: "静态工作点", importance: "core", sourceStatus: "verified_local", content: "无输入信号时的直流电压电流构成 Q 点；合适偏置使器件在目标工作区内保留信号摆幅。" },
         { id: "analog-02-s3", title: "直流与交流通路", importance: "core", sourceStatus: "verified_local", content: "直流通路用于偏置，交流通路用于小信号；电容和电源在两种通路中的等效处理不同。" },
-        { id: "analog-02-s4", title: "小信号模型与三种组态", importance: "core", sourceStatus: "verified_local", content: "在 Q 点附近线性化器件，再计算共射、共集、共基电路的增益和端口特性。" },
+        { id: "analog-02-s4", title: "小信号模型与三种组态", importance: "core", sourceStatus: "verified_local", content: "小信号分析只描述 Q 点附近的增量关系。先把直流电源置为交流地、把耦合和旁路电容按频段等效，再代入晶体管小信号模型；共射侧重电压增益，共集侧重缓冲，共基侧重高频和低输入电阻。", formula: "A_v≈−g_m(R_C∥R_L)；r_π=β/g_m", variables: ["A_v：共射电压增益", "g_m：跨导", "R_C、R_L：集电极与负载电阻", "r_π：基极输入小信号电阻", "β：电流放大系数"] },
         { id: "analog-02-s5", title: "场效应管与派生放大电路", importance: "optional", sourceStatus: "verified_local", content: "教材在基本共射、共集、共基之后继续讨论场效应管放大电路、复合管、共射—共基和共集—共基等派生结构，适合作为三种基本接法后的扩展。" },
       ],
       examples: [{ title: "分压偏置 Q 点", prompt: "简化模型中 VCC=10 V，RC=2 kΩ，静态 IC=2 mA，求集电极静态电压。", steps: ["RC 压降为 IC·RC", "2 mA×2 kΩ=4 V", "集电极电压为 VCC-4 V"], answer: "VCQ=6 V。" }],
@@ -117,7 +117,7 @@ export const analogCourse = {
         { id: "analog-06-s1", title: "反馈基本概念", importance: "core", sourceStatus: "verified_local", content: "反馈把输出的一部分送回输入；按极性分正负反馈，按信号性质分直流和交流反馈。" },
         { id: "analog-06-s2", title: "反馈判断", importance: "core", sourceStatus: "verified_local", content: "判断反馈时依次检查反馈通路、直流或交流性质、正负极性、输出取样量和输入比较方式，避免只凭反馈支路位置命名。" },
         { id: "analog-06-s3", title: "四种负反馈组态", importance: "core", sourceStatus: "verified_local", content: "输入端比较方式决定串联或并联，输出端取样量决定电压或电流反馈。" },
-        { id: "analog-06-s4", title: "闭环增益与性能", importance: "core", sourceStatus: "verified_local", content: "负反馈以环路增益换取闭环稳定性，并改变输入输出电阻、失真和带宽。", formula: "A_f=\\frac{A}{1+AF}", variables: ["A：基本放大电路增益", "F：反馈系数", "AF：环路增益"] },
+        { id: "analog-06-s4", title: "闭环增益与性能", importance: "core", sourceStatus: "verified_local", content: "负反馈以环路增益换取闭环稳定性，并降低参数变化和非线性失真对输出的影响。深度负反馈时闭环增益主要由反馈网络决定；输入、输出电阻如何变化则取决于串联/并联和电压/电流组态。", formula: "A_f=A/(1+AF)；深度负反馈时 A_f≈1/F", variables: ["A：基本放大电路增益", "F：反馈系数", "AF：环路增益", "A_f：闭环增益"] },
         { id: "analog-06-s5", title: "稳定性、频率补偿与其他反馈", importance: "optional", sourceStatus: "verified_local", content: "教材在深度负反馈估算之后继续讨论自激振荡、稳定性判断、频率补偿，以及正反馈和电流反馈运放；这些内容作为闭环增益主线后的选择学习。" },
       ],
       examples: [{ title: "闭环增益", prompt: "基本增益 A=100，反馈系数 F=0.09，求负反馈闭环增益。", steps: ["计算 AF=9", "分母 1+AF=10", "A_f=100/10"], answer: "闭环增益 A_f=10。" }],
@@ -134,7 +134,7 @@ export const analogCourse = {
       objectives: ["使用虚短、虚断分析基本运算电路", "说明模拟乘法器及其典型运算用途", "根据通带、截止频率和阶数分析有源滤波器"],
       prerequisites: ["第 3 章运放模型", "第 5 章负反馈", "基本微积分"],
       sections: [
-        { id: "analog-07-s1", title: "理想运放与比例运算", importance: "core", sourceStatus: "verified_local", content: "在线性负反馈条件下，理想运放满足虚短和虚断。反相、同相和差分比例电路的运算关系由输入网络与反馈网络共同决定。" },
+        { id: "analog-07-s1", title: "理想运放与比例运算", importance: "core", sourceStatus: "verified_local", content: "只有运放处于线性区且存在负反馈时，才能使用虚短和虚断。反相电路以反相端为电流求和节点，同相电路由反馈分压确定闭环增益；计算后还要检查输出是否超出电源允许摆幅。", formula: "反相：u_O=−(R_f/R_1)u_I；同相：u_O=(1+R_f/R_1)u_I", variables: ["R_1：输入或接地支路电阻", "R_f：反馈电阻", "u_I、u_O：输入与输出电压"] },
         { id: "analog-07-s2", title: "加减、积分和微分运算", importance: "core", sourceStatus: "verified_local", content: "求和电路把多路输入电流汇入求和节点；积分与微分电路利用电容的电流电压关系实现时间运算。所有结果都要检查输出摆幅与频率范围。" },
         { id: "analog-07-s3", title: "模拟乘法器及其应用", importance: "core", sourceStatus: "verified_local", content: "模拟乘法器的输出与两个输入的乘积成正比；配合运放可实现乘除、平方、开方、调制和解调。" },
         { id: "analog-07-s4", title: "有源滤波电路", importance: "core", sourceStatus: "verified_local", content: "有源滤波器用运放和 R/C 网络实现低通、高通、带通或带阻特性；分析时同时核对通带增益、截止频率、品质因数和阶数。" },
@@ -154,7 +154,7 @@ export const analogCourse = {
       objectives: ["判断正弦振荡电路的起振与稳幅条件", "分析电压比较器和非正弦波发生电路", "说明运放信号转换电路的基本关系"],
       prerequisites: ["第 5 章反馈", "第 6 章运放线性应用", "RC 电路基础"],
       sections: [
-        { id: "analog-08-s1", title: "正弦波振荡电路", importance: "core", sourceStatus: "verified_local", content: "正弦振荡器由放大、正反馈、选频和稳幅环节组成；教材依次讨论 RC、LC 和石英晶体振荡电路，并用环路幅值与相位条件判断起振。" },
+        { id: "analog-08-s1", title: "正弦波振荡电路", importance: "core", sourceStatus: "verified_local", content: "正弦振荡器由放大、正反馈、选频和稳幅环节组成。分析时先确认直流工作条件，再找满足环路相位为 2kπ 的频率，检查起振幅值条件，最后说明非线性稳幅如何把增长过程限制为稳定输出。", formula: "A(jω_0)F(jω_0)=1；|AF|>1（起振），|AF|=1（稳态）", variables: ["A：放大网络传输系数", "F：反馈与选频网络传输系数", "ω_0：振荡角频率"] },
         { id: "analog-08-s2", title: "电压比较器", importance: "core", sourceStatus: "verified_local", content: "单限、滞回、窗口和集成电压比较器把连续输入与阈值比较并输出两种状态；滞回特性可减少阈值附近噪声造成的反复翻转。" },
         { id: "analog-08-s3", title: "非正弦波发生电路", importance: "core", sourceStatus: "verified_local", content: "矩形波、三角波、锯齿波、波形变换和函数发生器利用比较、积分及充放电过程产生或转换波形。" },
         { id: "analog-08-s4", title: "运放信号转换电路", importance: "core", sourceStatus: "verified_local", content: "教材讨论电压—电流、精密整流和电压—频率转换；分析要写出输入量、转换比例、输出范围和极性。" },
@@ -174,7 +174,7 @@ export const analogCourse = {
       objectives: ["区分功率放大与小信号电压放大的主要指标", "比较甲类、乙类和甲乙类工作方式", "计算互补输出级的最大输出功率、效率和功率管极限参数"],
       prerequisites: ["第 2 章基本放大电路", "第 3 章互补输出级", "功率和效率基本概念"],
       sections: [
-        { id: "analog-09-s1", title: "输出功率与效率", importance: "core", sourceStatus: "verified_local", content: "功率放大级面向负载提供较大的电压和电流，评价时重点计算最大不失真输出功率、直流电源功率、效率和器件耗散。" },
+        { id: "analog-09-s1", title: "输出功率与效率", importance: "core", sourceStatus: "verified_local", content: "功率放大级面向负载提供较大的电压和电流。先由最大不失真输出幅值求负载功率，再由电源平均电流求直流功率和效率，同时检查每只功率管的最大电流、反向电压与耗散功率。", formula: "P_o=U_om²/(2R_L)；η=P_o/P_DC", variables: ["U_om：输出正弦电压峰值", "R_L：负载电阻", "P_o：交流输出功率", "P_DC：直流电源提供的功率", "η：效率"] },
         { id: "analog-09-s2", title: "甲类、乙类与甲乙类", importance: "core", sourceStatus: "verified_local", content: "甲类器件在整个周期导通，乙类各器件导通半个周期，甲乙类导通超过半个周期。导通角改变静态功耗、效率和交越失真。" },
         { id: "analog-09-s3", title: "互补输出级", importance: "core", sourceStatus: "verified_local", content: "乙类互补对称 OCL 电路由两个互补器件分别承担正、负半周；实际电路常设置甲乙类偏置减小交越失真，并按负载和电源计算输出功率与效率。" },
         { id: "analog-09-s4", title: "功率管极限参数", importance: "core", sourceStatus: "verified_local", content: "功率管的最大集电极电流、反向击穿电压和最大耗散功率共同限制允许工作范围；还要核对结温、散热和安全工作区。" },
@@ -194,7 +194,7 @@ export const analogCourse = {
       objectives: ["说明直流电源中整流、滤波和稳压各环节的作用", "分析单相整流和电容滤波的基本波形与指标", "比较线性稳压和开关稳压的工作特点"],
       prerequisites: ["第 1 章二极管", "电容充放电", "负载与功率概念"],
       sections: [
-        { id: "analog-10-s1", title: "电源组成与整流", importance: "core", sourceStatus: "verified_local", content: "直流电源通常由变压、整流、滤波和稳压环节组成；单相半波和桥式整流利用二极管单向导电，把交流变为单向脉动电压。" },
+        { id: "analog-10-s1", title: "电源组成与整流", importance: "core", sourceStatus: "verified_local", content: "直流电源通常由变压、整流、滤波和稳压环节组成。分析半波或桥式整流时要逐半周判断二极管导通路径，画出负载波形，再计算平均输出，并按负载电流和反向峰值电压选择器件。", formula: "U_O(AV)≈0.9U_2（理想桥式整流）", variables: ["U_2：变压器副边正弦电压有效值", "U_O(AV)：未滤波整流输出平均值"] },
         { id: "analog-10-s2", title: "滤波电路", importance: "core", sourceStatus: "verified_local", content: "电容滤波利用储能减小负载电压脉动，倍压和其他滤波结构用于特定电压或纹波要求；负载、电容和频率共同决定纹波。" },
         { id: "analog-10-s3", title: "线性稳压电路", importance: "core", sourceStatus: "verified_local", content: "稳压管电路和串联型稳压电路通过基准、比较、调整和反馈稳定输出；三端集成稳压器把主要环节和保护功能集成在器件内部。" },
         { id: "analog-10-s4", title: "开关型稳压电路", importance: "core", sourceStatus: "verified_local", content: "开关稳压器使调整器件在开关状态工作，并通过储能元件和占空比调节输出；相较线性稳压通常效率更高，但纹波和电磁干扰处理更复杂。" },

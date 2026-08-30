@@ -44,13 +44,31 @@ test("chapter study renders the fixed seven-stage workflow and enforces the chec
   }
   assert.match(chapter, /主线必学/);
   assert.match(chapter, /选择学习/);
-  assert.match(chapter, /资料不足/);
+  assert.doesNotMatch(chapter, /本地资料已核对|本地补充资料|资料不足/);
   assert.match(chapter, /onOpenExperiment\(chapter,\s*experiment\.id\)/);
   assert.match(chapter, /disabled=\{!allAnswered\}/);
   assert.match(chapter, /disabled=\{!submitted\s*\|\|/);
   assert.match(chapter, /onSubmitCheck\(chapter,\s*answers\)/);
   assert.match(chapter, /onComplete\(chapter\.id\)/);
   assert.match(chapter, /分数只用于反馈，不设置额外及格线/);
+});
+
+test("course reading pages remove preparation notes and keep chapter numbers on one line", async () => {
+  const [overview, chapter, styles] = await Promise.all([
+    component("CourseOverviewView.tsx"),
+    component("ChapterStudyView.tsx"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  const readerSurface = `${overview}\n${chapter}`;
+  assert.doesNotMatch(readerSurface, /内容依据|资料状态|本地资料已核对|本地补充资料|资料不足/);
+  assert.match(overview, /当前章重点/);
+  assert.match(styles, /\.chapter-link\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+auto;/s);
+  assert.match(styles, /\.chapter-link\s*>\s*span:first-child\s*\{[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.chapter-study-nav nav button\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+auto;/s);
+  assert.match(styles, /\.chapter-study-nav nav button span\s*\{[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.route-list li\s*\{[^}]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\)\s+auto;/s);
+  assert.match(styles, /\.route-index\s*\{[^}]*width:\s*44px;[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.chapter-status\s*\{[^}]*align-self:\s*flex-start;[^}]*flex:\s*0\s+0\s+auto;[^}]*white-space:\s*nowrap;/s);
 });
 
 test("course and chapter actions are wired to immutable V3 model handlers", async () => {

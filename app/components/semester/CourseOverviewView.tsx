@@ -10,7 +10,6 @@ interface CourseOverviewViewProps {
 }
 
 const statusLabel = { not_started: "未学习", in_progress: "学习中", completed: "已完成" } as const;
-const sourceLabel = { verified_local: "本地资料已核对", supplemental_local: "本地补充资料", insufficient: "资料不足" } as const;
 
 export function CourseOverviewView({ course, state, onOpenChapter, onOpenWorkbench }: CourseOverviewViewProps) {
   const current = getCurrentChapter(state, course);
@@ -54,9 +53,8 @@ export function CourseOverviewView({ course, state, onOpenChapter, onOpenWorkben
           </section>
         </main>
         <aside className="course-assist">
-          {course.sourceNote ? <section><div className="section-title"><h2>内容依据</h2><Icon name="book" size={19} /></div><p>{course.sourceNote}</p></section> : null}
-          <section><div className="section-title"><h2>80 / 20 划分</h2><Icon name="route" size={19} /></div><p><strong>{coreCount}</strong> 项主线必学，<strong>{optionalCount}</strong> 项选择学习。划分按后续依赖和实验价值，不按篇幅。</p></section>
-          <section><div className="section-title"><h2>资料状态</h2><Icon name="info" size={19} /></div><ul className="source-legend">{Object.entries(sourceLabel).map(([key, label]) => <li key={key}><span className={`source-dot source-${key}`} />{label}</li>)}</ul></section>
+          <section><div className="section-title"><h2>当前章重点</h2><Icon name="book" size={19} /></div><ul className="course-focus-list">{current.objectives.map((objective) => <li key={objective}>{objective}</li>)}</ul></section>
+          <section><div className="section-title"><h2>内容结构</h2><Icon name="route" size={19} /></div><p><strong>{coreCount}</strong> 项主线必学，<strong>{optionalCount}</strong> 项选择学习；先完成主线，再按需要进入拓展。</p></section>
         </aside>
       </div>
     </div>

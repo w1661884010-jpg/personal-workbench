@@ -139,6 +139,31 @@ test("digital and signal pages avoid implementation commentary while keeping fac
   assert.match(readerCopy, /Notebook 用于数值观察，不替代教材中的定义与推导/);
 });
 
+test("digital and analog main-line chapters expose the equations needed for worked analysis", () => {
+  const formulasBySection = new Map(
+    [digitalCourse, analogCourse].flatMap((course) => course.chapters)
+      .flatMap((chapter) => chapter.sections)
+      .map((section) => [section.id, `${section.formula ?? ""} ${section.variables?.join(" ") ?? ""}`]),
+  );
+  const required = new Map([
+    ["digital-02-s2", /A·B|德摩根/],
+    ["digital-04-s4", /S=A⊕B⊕C/],
+    ["digital-05-s2", /Q\^\+=D/],
+    ["digital-06-s1", /Q\^\+=F\(Q,X\)/],
+    ["digital-08-s3", /f_s≥2f_max/],
+    ["analog-01-s2", /I_D=I_S/],
+    ["analog-02-s4", /A_v≈−g_m/],
+    ["analog-06-s4", /A_f=A\/\(1\+AF\)/],
+    ["analog-07-s1", /u_O=−\(R_f\/R_1\)u_I/],
+    ["analog-08-s1", /A\(jω_0\)F\(jω_0\)=1/],
+    ["analog-09-s1", /P_o=U_om²\/\(2R_L\)/],
+    ["analog-10-s1", /U_O\(AV\)≈0\.9U_2/],
+  ]);
+  for (const [sectionId, pattern] of required) {
+    assert.match(formulasBySection.get(sectionId) ?? "", pattern, `${sectionId}: essential relation`);
+  }
+});
+
 test("analog course follows the sixth-edition official lesson plans and keeps simulation boundaries explicit", () => {
   assert.match(analogCourse.textbook, /童诗白、华成英《模拟电子技术基础》第六版/);
   assert.match(analogCourse.sourceNote, /第 0—9 章/);

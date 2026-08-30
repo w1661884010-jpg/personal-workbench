@@ -149,7 +149,7 @@ export function LearningWorkbench() {
   function openExperiment(chapter: ChapterDefinition, experimentId: string) {
     const experiment = chapter.experiments.find((item) => item.id === experimentId);
     if (!experiment) return;
-    if (experiment.workbench === "notebook") { showToast("验证步骤已展开；该实验使用本地开放 Notebook，网站不会伪装成在线执行。", "warning"); return; }
+    if (experiment.workbench === "notebook") { showToast("实验步骤已在本页列出；计算请使用课程目录中的 Notebook。", "warning"); return; }
     navigate(`sandbox/${experiment.workbench}/${experiment.id}`);
   }
 
