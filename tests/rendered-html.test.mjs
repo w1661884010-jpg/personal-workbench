@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("the home entry mounts the V2 workbench with Chinese dark-site metadata", async () => {
+test("the home entry mounts the V3 workbench with Chinese dark-site metadata", async () => {
   const [page, layout] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
@@ -19,7 +19,7 @@ test("the home entry mounts the V2 workbench with Chinese dark-site metadata", a
   assert.match(layout, /colorScheme:\s*"dark"/);
   assert.match(layout, /themeColor:\s*"#07141f"/);
 });
-test("the first render is deterministic and later restores only V2 or explicitly migrated state", async () => {
+test("the first render is deterministic and later restores only V3 or explicitly migrated state", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
   assert.match(workbench, /createLearningState\(courses,\s*new Date\("2026-08-24T00:00:00\.000Z"\)\)/);
   assert.match(workbench, /nextState\s*=\s*loadLearningState\(\)\s*\?\?\s*createLearningState\(courses\)/);
@@ -30,14 +30,14 @@ test("the first render is deterministic and later restores only V2 or explicitly
   assert.match(workbench, /},\s*220\)/);
 });
 
-test("active V2 home and chapter surfaces do not restore daily, weekly, or time-based progress", async () => {
+test("active V3 home and chapter surfaces do not restore daily, weekly, or time-based progress", async () => {
   const [dashboard, chapter, model] = await Promise.all([
     readFile(new URL("../app/components/semester/DashboardView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/semester/ChapterStudyView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/course-model.ts", import.meta.url), "utf8"),
   ]);
-  const activeV2 = [dashboard, chapter, model].join("\n");
-  assert.doesNotMatch(activeV2, /todayTasks|currentWeek|studyMinutes|streakDays|今日任务|今日主问题|明天第一件事|当前学习周次|连续学习/);
+  const activeV3 = [dashboard, chapter, model].join("\n");
+  assert.doesNotMatch(activeV3, /todayTasks|currentWeek|studyMinutes|streakDays|今日任务|今日主问题|明天第一件事|当前学习周次|连续学习/);
   assert.match(dashboard, /getCourseProgress/);
   assert.match(chapter, /提交章节检验/);
   assert.match(model, /completed\/total|completed,\s*total|completed\s*\/\s*counted\.length/);

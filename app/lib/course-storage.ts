@@ -3,12 +3,14 @@ import {
   createLearningBackup,
   createLearningState,
   isLearningState,
+  migrateV2State,
   validateLearningBackup,
   type CourseId,
   type LearningState,
 } from "./course-model";
 
-export const LEARNING_STORAGE_KEY = "personal-electronics-workbench:state:v2";
+export const LEARNING_STORAGE_KEY = "personal-electronics-workbench:state:v3";
+export const PREVIOUS_STORAGE_KEY = "personal-electronics-workbench:state:v2";
 export const LEGACY_STORAGE_KEY = "semester-electronics-learning-site:state:v1";
 const JSON_MIME_TYPE = "application/json;charset=utf-8";
 
@@ -20,6 +22,10 @@ function browserStorage(): StorageLike | null {
   } catch {
     return null;
   }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function migrateLegacyState(value: unknown, now = new Date()): LearningState | null {
@@ -49,6 +55,12 @@ export function loadLearningState(storage: StorageLike | null = browserStorage()
       const parsed = JSON.parse(current) as unknown;
       return isLearningState(parsed, courses) ? structuredClone(parsed) : null;
     }
+    const previous = storage.getItem(PREVIOUS_STORAGE_KEY);
+    if (previous) {
+      const migrated = migrateV2State(JSON.parse(previous) as unknown, courses);
+      if (migrated) storage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
     const legacy = storage.getItem(LEGACY_STORAGE_KEY);
     return legacy ? migrateLegacyState(JSON.parse(legacy) as unknown) : null;
   } catch {
@@ -72,7 +84,13 @@ export function serializeLearningBackup(state: LearningState, exportedAt = new D
 
 export function restoreLearningBackup(serialized: string): LearningState {
   try {
-    return validateLearningBackup(JSON.parse(serialized.replace(/^\uFEFF/, "")) as unknown, courses);
+    const parsed = JSON.parse(serialized.replace(/^\uFEFF/, "")) as unknown;
+    if (isObject(parsed) && parsed.app === "personal-electronics-workbench" && parsed.schemaVersion === 2) {
+      const migrated = migrateV2State(parsed.state, courses);
+      if (!migrated) throw new Error("v2 学习记录结构损坏，无法迁移到当前课程。");
+      return migrated;
+    }
+    return validateLearningBackup(parsed, courses);
   } catch (error) {
     if (error instanceof SyntaxError) throw new Error("导入文件不是有效的 JSON。", { cause: error });
     throw error;

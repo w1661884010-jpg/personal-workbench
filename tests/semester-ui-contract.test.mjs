@@ -4,7 +4,7 @@ import test from "node:test";
 
 const component = (name) => readFile(new URL(`../app/components/semester/${name}`, import.meta.url), "utf8");
 
-test("V2 navigation exposes the three courses, two workbenches, records, and connections", async () => {
+test("V3 navigation exposes the three courses, two workbenches, records, and connections", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
   const labels = [...workbench.matchAll(/label:\s*"([^"]+)",\s*mobileLabel/g)].map((match) => match[1]);
   assert.deepEqual(labels, [
@@ -53,7 +53,7 @@ test("chapter study renders the fixed seven-stage workflow and enforces the chec
   assert.match(chapter, /分数只用于反馈，不设置额外及格线/);
 });
 
-test("course and chapter actions are wired to immutable V2 model handlers", async () => {
+test("course and chapter actions are wired to immutable V3 model handlers", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
   for (const handler of ["startChapter", "submitChapterCheck", "completeChapter", "upsertMistake", "markMistakeReviewed"]) {
     assert.match(workbench, new RegExp(handler));

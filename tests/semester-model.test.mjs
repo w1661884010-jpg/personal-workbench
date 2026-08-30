@@ -16,7 +16,7 @@ import {
 
 const courses = [signalsCourse, digitalCourse, analogCourse];
 
-test("V2 keeps the confirmed course order and complete textbook chapter order", () => {
+test("V3 keeps the confirmed course order and complete textbook chapter order", () => {
   assert.deepEqual(courses.map((course) => course.title), ["信号与系统", "数字电子技术", "模拟电子技术"]);
   assert.deepEqual(signalsCourse.chapters.map(({ number, title, counted }) => [number, title, counted]), [
     ["绪论", "信号分析与处理概览", false],
@@ -31,10 +31,10 @@ test("V2 keeps the confirmed course order and complete textbook chapter order", 
     ["5", "半导体存储电路"], ["6", "时序逻辑电路"], ["7", "脉冲波形的产生和整形"], ["8", "数-模和模-数转换"],
   ]);
   assert.deepEqual(analogCourse.chapters.map(({ number, title }) => [number, title]), [
-    ["0", "绪论"], ["1", "常用半导体器件"], ["2", "基本放大电路"], ["3", "多级放大电路"],
-    ["4", "集成运算放大电路"], ["5", "放大电路的频率响应"], ["6", "放大电路中的反馈"],
-    ["7", "信号的运算和处理"], ["8", "波形的发生和信号的转换"], ["9", "功率放大电路"], ["10", "直流电源"],
-    ["11", "模拟电子电路读图"],
+    ["0", "绪论"], ["1", "常用半导体器件"], ["2", "基本放大电路"], ["3", "集成运算放大电路"],
+    ["4", "放大电路的频率响应"], ["5", "放大电路中的反馈"], ["6", "信号的运算和处理"],
+    ["7", "波形的发生和信号的转换"], ["8", "功率放大电路"], ["9", "直流电源"],
+    ["10", "模拟电子电路读图"],
   ]);
 });
 test("every chapter has the seven learning stages, an 80/20 split, and explicit source evidence", () => {
@@ -139,20 +139,32 @@ test("digital and signal pages avoid implementation commentary while keeping fac
   assert.match(readerCopy, /Notebook 用于数值观察，不替代教材中的定义与推导/);
 });
 
-test("analog course integrates the verified fourth-edition main line and keeps simulation boundaries explicit", () => {
-  assert.match(analogCourse.textbook, /童诗白、华成英《模拟电子技术基础》第四版/);
-  assert.match(analogCourse.sourceNote, /第 0—11 章/);
+test("analog course follows the sixth-edition official lesson plans and keeps simulation boundaries explicit", () => {
+  assert.match(analogCourse.textbook, /童诗白、华成英《模拟电子技术基础》第六版/);
+  assert.match(analogCourse.sourceNote, /第 0—9 章/);
+  assert.match(analogCourse.sourceNote, /高等教育出版社官方电子教案/);
   assert.match(analogCourse.sourceNote, /HIT 模电笔记/);
   assert.match(analogCourse.sourceNote, /USTC 模拟电路教程/);
-  assert.match(analogCourse.sourceNote, /没有可独立运行的实验工程/);
   assert.deepEqual(analogCourse.chapters.map((chapter) => chapter.id), [
-    "analog-00", "analog-01", "analog-02", "analog-03", "analog-04", "analog-05",
+    "analog-00", "analog-01", "analog-02", "analog-04", "analog-05",
     "analog-06", "analog-07", "analog-08", "analog-09", "analog-10", "analog-11",
-  ], "existing ids stay stable while the verified textbook reading chapter is appended");
-  assert.ok(analogCourse.chapters.every((chapter) => chapter.sourceStatus === "verified_local"));
-  assert.ok(analogCourse.chapters.flatMap((chapter) => chapter.sections).every((section) => section.sourceStatus === "verified_local"));
-  assert.deepEqual(getCourseProgress(createLearningState(courses), analogCourse), { completed: 0, total: 12, percent: 0 });
+  ], "semantic ids stay stable while the former standalone multistage chapter is merged into chapter 3");
+  assert.ok(analogCourse.chapters.slice(0, 10).every((chapter) => chapter.sourceStatus === "verified_local"));
+  assert.equal(analogCourse.chapters.at(-1).sourceStatus, "supplemental_local");
+  assert.ok(analogCourse.chapters.at(-1).sections.every((section) => section.sourceStatus === "supplemental_local"));
+  assert.deepEqual(getCourseProgress(createLearningState(courses), analogCourse), { completed: 0, total: 11, percent: 0 });
   assert.doesNotMatch(analogCourse.chapters.flatMap((chapter) => chapter.tags).join(" "), /资料不足/);
+
+  const semiconductors = analogCourse.chapters.find((chapter) => chapter.id === "analog-01");
+  assert.deepEqual(semiconductors.sections.map((section) => section.title), [
+    "半导体与 PN 结", "二极管特性与模型", "二极管参数与稳压管", "晶体三极管", "PN 结电容、温度与辅助分析",
+  ]);
+
+  const opamp = analogCourse.chapters.find((chapter) => chapter.id === "analog-04");
+  assert.equal(opamp.number, "3");
+  assert.deepEqual(opamp.sections.map((section) => section.title), [
+    "多级放大与耦合", "差分放大与电流源", "集成运放的组成", "性能指标与低频等效电路", "运放种类、选择与使用",
+  ]);
 
   const frequency = analogCourse.chapters.find((chapter) => chapter.id === "analog-05");
   assert.deepEqual(frequency.sections.map((section) => section.title), [
@@ -166,20 +178,26 @@ test("analog course integrates the verified fourth-edition main line and keeps s
   ]);
 
   const supply = analogCourse.chapters.find((chapter) => chapter.id === "analog-10");
+  assert.equal(supply.number, "9");
   assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /桥式整流/);
   assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /线性稳压/);
   assert.match(supply.sections.map((section) => `${section.title}${section.content}`).join(" "), /开关型稳压/);
 
   const reading = analogCourse.chapters.find((chapter) => chapter.id === "analog-11");
+  assert.equal(reading.number, "10");
+  assert.equal(reading.sourceStatus, "supplemental_local");
   assert.deepEqual(reading.sections.map((section) => section.title), [
     "读图的思路和步骤", "基本电路与分析方法回顾", "低频功率放大与火灾报警案例", "自动增益控制与电容测量案例", "跨级接口复核",
   ]);
 
   const experiments = analogCourse.chapters.flatMap((chapter) => chapter.experiments);
   assert.ok(experiments.every((experiment) => experiment.workbench === "analog"));
-  assert.ok(experiments.every((experiment) => experiment.limitation?.includes("本地没有")));
-  assert.match(experiments.map((experiment) => experiment.limitation).join(" "), /不支持 BJT\/MOSFET/);
-  assert.match(experiments.map((experiment) => experiment.limitation).join(" "), /二极管和稳压器求解模型/);
+  const readerCopy = JSON.stringify(analogCourse);
+  assert.doesNotMatch(readerCopy, /自编|资料关联：|不冒充|降级实验|本地没有/);
+  const limitations = experiments.map((experiment) => experiment.limitation).join(" ");
+  assert.match(limitations, /BJT/);
+  assert.match(limitations, /MOSFET/);
+  assert.match(limitations, /二极管和稳压器求解模型/);
 });
 
 test("a chapter only contributes to progress after its complete check is submitted", () => {
@@ -220,11 +238,11 @@ test("course progress counts textbook chapters rather than time or uncounted int
   assert.equal("studyMinutes" in state, false);
 });
 
-test("V2 backups validate exact chapter references and reject foreign schemas", () => {
+test("V3 backups validate exact chapter references and reject foreign schemas", () => {
   const state = createLearningState(courses, new Date("2026-08-24T00:00:00.000Z"));
   const backup = createLearningBackup(state, new Date("2026-08-24T01:00:00.000Z"));
   assert.deepEqual(validateLearningBackup(backup, courses), state);
-  assert.throws(() => validateLearningBackup({ ...backup, app: "foreign-app" }, courses), /不是本学习站点导出的 v2 记录/);
+  assert.throws(() => validateLearningBackup({ ...backup, app: "foreign-app" }, courses), /不是本学习站点导出的 v3 记录/);
   const damaged = structuredClone(backup);
   damaged.state.currentChapterByCourse.digital = "missing-chapter";
   assert.throws(() => validateLearningBackup(damaged, courses), /结构损坏/);

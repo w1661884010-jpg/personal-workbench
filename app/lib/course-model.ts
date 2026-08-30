@@ -86,7 +86,7 @@ export interface MistakeRecord {
 }
 
 export interface LearningState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   activeCourseId: CourseId;
   currentChapterByCourse: Record<CourseId, string>;
   chapterStatus: Record<string, ChapterStatus>;
@@ -96,7 +96,7 @@ export interface LearningState {
 }
 
 export const LEARNING_APP_ID = "personal-electronics-workbench";
-export const LEARNING_SCHEMA_VERSION = 2 as const;
+export const LEARNING_SCHEMA_VERSION = 3 as const;
 
 function dateOffset(date: Date, days: number): string {
   const next = new Date(date);
@@ -106,6 +106,10 @@ function dateOffset(date: Date, days: number): string {
 
 function allChapters(courses: readonly CourseDefinition[]) {
   return courses.flatMap((course) => course.chapters);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function createLearningState(courses: readonly CourseDefinition[], now = new Date()): LearningState {
@@ -258,6 +262,42 @@ export function isLearningState(value: unknown, courses: readonly CourseDefiniti
     && typeof state.updatedAt === "string" && !Number.isNaN(Date.parse(state.updatedAt));
 }
 
+export function migrateV2State(value: unknown, courses: readonly CourseDefinition[], now = new Date()): LearningState | null {
+  const removedChapterId = "analog-03";
+  const mergedChapterId = "analog-04";
+  if (!isObject(value) || value.schemaVersion !== 2) return null;
+  if (!isObject(value.currentChapterByCourse) || !isObject(value.chapterStatus) || !isObject(value.checkSubmissions) || !Array.isArray(value.mistakes)) return null;
+
+  const currentChapterByCourse = { ...value.currentChapterByCourse } as Record<string, unknown>;
+  const chapterStatus = { ...value.chapterStatus } as Record<string, unknown>;
+  const checkSubmissions = { ...value.checkSubmissions } as Record<string, unknown>;
+  const currentMergedChapter = [removedChapterId, mergedChapterId].includes(String(currentChapterByCourse.analog));
+  const hadMergedProgress = currentMergedChapter
+    || [chapterStatus[removedChapterId], chapterStatus[mergedChapterId]].some((status) => status === "in_progress" || status === "completed")
+    || checkSubmissions[removedChapterId] !== undefined
+    || checkSubmissions[mergedChapterId] !== undefined;
+
+  if (currentChapterByCourse.analog === removedChapterId) currentChapterByCourse.analog = mergedChapterId;
+  delete chapterStatus[removedChapterId];
+  delete chapterStatus[mergedChapterId];
+  delete checkSubmissions[removedChapterId];
+  delete checkSubmissions[mergedChapterId];
+  if (hadMergedProgress) chapterStatus[mergedChapterId] = "in_progress";
+
+  const migrated = {
+    ...value,
+    schemaVersion: LEARNING_SCHEMA_VERSION,
+    currentChapterByCourse,
+    chapterStatus,
+    checkSubmissions,
+    mistakes: value.mistakes.map((item) => isObject(item) && item.chapterId === removedChapterId
+      ? { ...item, chapterId: mergedChapterId }
+      : item),
+    updatedAt: now.toISOString(),
+  };
+  return isLearningState(migrated, courses) ? structuredClone(migrated) : null;
+}
+
 export function createLearningBackup(state: LearningState, now = new Date()) {
   return { app: LEARNING_APP_ID, schemaVersion: LEARNING_SCHEMA_VERSION, exportedAt: now.toISOString(), state };
 }
@@ -266,7 +306,7 @@ export function validateLearningBackup(value: unknown, courses: readonly CourseD
   if (!value || typeof value !== "object") throw new Error("文件不是有效的学习记录。");
   const envelope = value as { app?: unknown; schemaVersion?: unknown; state?: unknown };
   if (envelope.app !== LEARNING_APP_ID || envelope.schemaVersion !== LEARNING_SCHEMA_VERSION) {
-    throw new Error("这不是本学习站点导出的 v2 记录。");
+    throw new Error("这不是本学习站点导出的 v3 记录。");
   }
   if (!isLearningState(envelope.state, courses)) throw new Error("学习记录结构损坏或引用了不存在的章节。");
   return structuredClone(envelope.state);

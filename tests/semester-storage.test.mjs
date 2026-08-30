@@ -4,19 +4,48 @@ import test from "node:test";
 import { analogCourse } from "../app/data/courses/analog.ts";
 import { digitalCourse } from "../app/data/courses/digital.ts";
 import { signalsCourse } from "../app/data/courses/signals.ts";
-import { createLearningBackup, createLearningState, validateLearningBackup } from "../app/lib/course-model.ts";
+import { createLearningBackup, createLearningState, isLearningState, migrateV2State, validateLearningBackup } from "../app/lib/course-model.ts";
 
 const courses = [signalsCourse, digitalCourse, analogCourse];
 const storageUrl = new URL("../app/lib/course-storage.ts", import.meta.url);
 
-test("learning persistence uses a dedicated V2 key while retaining a V1 migration key", async () => {
+test("learning persistence uses a V3 key while retaining V2 and V1 migration keys", async () => {
   const source = await readFile(storageUrl, "utf8");
-  assert.match(source, /LEARNING_STORAGE_KEY\s*=\s*"personal-electronics-workbench:state:v2"/);
+  assert.match(source, /LEARNING_STORAGE_KEY\s*=\s*"personal-electronics-workbench:state:v3"/);
+  assert.match(source, /PREVIOUS_STORAGE_KEY\s*=\s*"personal-electronics-workbench:state:v2"/);
   assert.match(source, /LEGACY_STORAGE_KEY\s*=\s*"semester-electronics-learning-site:state:v1"/);
   assert.match(source, /storage\.getItem\(LEARNING_STORAGE_KEY\)/);
+  assert.match(source, /storage\.getItem\(PREVIOUS_STORAGE_KEY\)/);
   assert.match(source, /storage\.getItem\(LEGACY_STORAGE_KEY\)/);
   assert.match(source, /isLearningState\(parsed,\s*courses\)/);
   assert.match(source, /storage\.setItem\(LEARNING_STORAGE_KEY,\s*JSON\.stringify\(state\)\)/);
+});
+
+test("V2 multistage progress migrates into the merged chapter without false completion", () => {
+  const now = new Date("2026-08-30T00:00:00.000Z");
+  const current = createLearningState(courses, now);
+  const v2 = {
+    ...current,
+    schemaVersion: 2,
+    currentChapterByCourse: { ...current.currentChapterByCourse, analog: "analog-03" },
+    chapterStatus: { ...current.chapterStatus, "analog-03": "completed", "analog-04": "completed" },
+    checkSubmissions: {
+      ...current.checkSubmissions,
+      "analog-03": { answers: [0, 1], submittedAt: now.toISOString(), score: 100 },
+      "analog-04": { answers: [1, 0], submittedAt: now.toISOString(), score: 100 },
+    },
+    mistakes: current.mistakes.map((mistake) => mistake.courseId === "analog" ? { ...mistake, chapterId: "analog-03" } : mistake),
+  };
+  const migrated = migrateV2State(v2, courses, new Date("2026-08-30T01:00:00.000Z"));
+  assert.ok(migrated);
+  assert.equal(migrated.schemaVersion, 3);
+  assert.equal(migrated.currentChapterByCourse.analog, "analog-04");
+  assert.equal(migrated.chapterStatus["analog-04"], "in_progress");
+  assert.equal("analog-03" in migrated.chapterStatus, false);
+  assert.equal("analog-03" in migrated.checkSubmissions, false);
+  assert.equal("analog-04" in migrated.checkSubmissions, false);
+  assert.equal(migrated.mistakes.find((mistake) => mistake.courseId === "analog").chapterId, "analog-04");
+  assert.equal(isLearningState(migrated, courses), true);
 });
 
 test("legacy V1 migration starts one mapped chapter but never marks it completed", async () => {
@@ -30,7 +59,7 @@ test("legacy V1 migration starts one mapped chapter but never marks it completed
   assert.doesNotMatch(migration, /checkSubmissions:\s*\{[^}]+\}/s);
 });
 
-test("V2 JSON backup contract is round-trippable and rejects damaged references", async () => {
+test("V3 JSON backup round-trips and V2 backups migrate before validation", async () => {
   const source = await readFile(storageUrl, "utf8");
   assert.match(source, /serializeLearningBackup/);
   assert.match(source, /createLearningBackup\(state,\s*exportedAt\)/);
@@ -46,6 +75,11 @@ test("V2 JSON backup contract is round-trippable and rejects damaged references"
   const damaged = JSON.parse(serialized);
   damaged.state.currentChapterByCourse.analog = "missing";
   assert.throws(() => validateLearningBackup(damaged, courses), /结构损坏/);
+
+  const v2 = { ...state, schemaVersion: 2 };
+  const migrated = migrateV2State(v2, courses);
+  assert.equal(migrated.schemaVersion, 3);
+  assert.equal(isLearningState(migrated, courses), true);
 });
 
 test("browser download and import are real file operations rather than decorative buttons", async () => {
