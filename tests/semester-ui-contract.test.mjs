@@ -35,7 +35,7 @@ test("the home page keeps three chapter-progress entries and adds two real workb
 });
 
 test("chapter study renders the fixed seven-stage workflow and enforces the check gate", async () => {
-  const chapter = await component("ChapterStudyView.tsx");
+  const [chapter, formula] = await Promise.all([component("ChapterStudyView.tsx"), component("MathFormula.tsx")]);
   const labels = ["学习目标", "前置知识", "知识讲解", "典型例题", "动手实验", "章节检验", "复习总结"];
   let previous = -1;
   for (const label of labels) {
@@ -53,11 +53,13 @@ test("chapter study renders the fixed seven-stage workflow and enforces the chec
   assert.match(chapter, /onComplete\(chapter\.id\)/);
   assert.match(chapter, /得分达到 \{CHECK_PASS_SCORE\}% 才能完成本章/);
   assert.match(chapter, /答错题会自动进入错题复盘/);
-  assert.match(chapter, /katex\.renderToString/);
+  assert.match(chapter, /MathFormula/);
+  assert.match(formula, /katex\.renderToString/);
+  assert.match(formula, /aria-label=\{`公式：\$\{expression\}`\}/);
   assert.match(chapter, /<details className="example-answer">/);
 });
 
-test("course reading pages remove preparation notes and keep chapter numbers on one line", async () => {
+test("course overview keeps one directory and previews one chapter without duplicating the route list", async () => {
   const [overview, chapter, styles] = await Promise.all([
     component("CourseOverviewView.tsx"),
     component("ChapterStudyView.tsx"),
@@ -65,14 +67,44 @@ test("course reading pages remove preparation notes and keep chapter numbers on 
   ]);
   const readerSurface = `${overview}\n${chapter}`;
   assert.doesNotMatch(readerSurface, /内容依据|资料状态|本地资料已核对|本地补充资料|资料不足/);
-  assert.match(overview, /当前章重点/);
+  assert.match(overview, /本章重点/);
+  assert.match(overview, /selectedChapterId/);
+  assert.match(overview, /onPreviewChapter/);
+  assert.match(overview, /onContinueChapter/);
+  assert.match(overview, /aria-current=\{isSelected \? "true" : undefined\}/);
+  assert.match(overview, /course-guide-panel/);
+  assert.match(overview, /coreSections\.map/);
+  assert.match(overview, /course-optional-sections/);
+  assert.match(overview, /MathFormula/);
+  assert.match(overview, /步骤验证/);
+  assert.match(overview, /预设可载入并运行/);
+  assert.match(overview, /自由搭建 · 拓扑与手算核对/);
+  assert.match(overview, /submission \? `得分 \$\{submission\.score\}%` : "尚未检验"/);
+  assert.match(overview, /继续学习本章/);
+  assert.match(overview, /开始学习本章/);
+  assert.doesNotMatch(overview, /route-list|教材学习路线/);
   assert.match(styles, /\.chapter-link\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+auto;/s);
-  assert.match(styles, /\.chapter-link\s*>\s*span:first-child\s*\{[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.chapter-link-number\s*\{[^}]*white-space:\s*nowrap;/s);
   assert.match(styles, /\.chapter-study-nav nav button\s*\{[^}]*grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+auto;/s);
   assert.match(styles, /\.chapter-study-nav nav button span\s*\{[^}]*white-space:\s*nowrap;/s);
-  assert.match(styles, /\.route-list li\s*\{[^}]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\)\s+auto;/s);
-  assert.match(styles, /\.route-index\s*\{[^}]*width:\s*44px;[^}]*white-space:\s*nowrap;/s);
+  assert.match(styles, /\.course-overview-grid\s*\{[^}]*grid-template-columns:\s*minmax\(190px,\s*220px\)\s+minmax\(480px,\s*1fr\)\s+minmax\(220px,\s*260px\)/s);
+  assert.match(styles, /\.chapter-directory nav\s*\{[^}]*display:\s*flex;[^}]*overflow-x:\s*auto;/s);
   assert.match(styles, /\.chapter-status\s*\{[^}]*align-self:\s*flex-start;[^}]*flex:\s*0\s+0\s+auto;[^}]*white-space:\s*nowrap;/s);
+});
+
+test("course directory preview stays local until the single continue action is used", async () => {
+  const [overview, workbench] = await Promise.all([
+    component("CourseOverviewView.tsx"),
+    readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(overview, /function previewChapter\(chapterId: string\)[\s\S]*onPreviewChapter\(chapterId\);/);
+  assert.match(overview, /onClick=\{\(\) => previewChapter\(chapter\.id\)\}/);
+  assert.match(overview, /onClick=\{\(\) => onContinueChapter\(selected\.id\)\}/);
+  assert.match(workbench, /const \[selectedChapterId, setSelectedChapterId\] = useState<string \| null>\(null\)/);
+  assert.match(workbench, /const navigate = useCallback\(\(next: string\) => \{\s*setSelectedChapterId\(null\);/);
+  assert.match(workbench, /const listener = \(\) => \{\s*const nextRoute = currentRoute\(\);\s*setSelectedChapterId\(null\);/);
+  assert.match(workbench, /onPreviewChapter=\{setSelectedChapterId\}/);
+  assert.match(workbench, /onContinueChapter=\{\(chapterId\) => openChapter\(course, chapterId\)\}/);
 });
 
 test("course and chapter actions are wired to immutable learning-state handlers", async () => {

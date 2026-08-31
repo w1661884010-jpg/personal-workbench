@@ -68,7 +68,9 @@ export function LearningWorkbench() {
   const [hydrated, setHydrated] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("loading");
   const [toast, setToast] = useState<Toast>(null);
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const toastId = useRef(0);
+  const courseId = route.startsWith("course/") ? route.slice(7) as CourseId : null;
 
   const showToast = useCallback((message: string, tone: ToastTone = "success") => {
     toastId.current += 1;
@@ -76,6 +78,7 @@ export function LearningWorkbench() {
   }, []);
 
   const navigate = useCallback((next: string) => {
+    setSelectedChapterId(null);
     setRoute(next);
     if (globalThis.history && globalThis.location?.hash !== `#${next}`) globalThis.history.pushState({ route: next }, "", `#${next}`);
     globalThis.scrollTo?.({ top: 0, behavior: "smooth" });
@@ -90,6 +93,7 @@ export function LearningWorkbench() {
         if (location) nextState = startChapter(nextState, location.course.id, location.chapter.id);
       }
       setState(nextState);
+      setSelectedChapterId(null);
       setRoute(initialRoute);
       setHydrated(true);
       setSaveStatus("saved");
@@ -100,6 +104,7 @@ export function LearningWorkbench() {
   useEffect(() => {
     const listener = () => {
       const nextRoute = currentRoute();
+      setSelectedChapterId(null);
       setRoute(nextRoute);
       if (nextRoute.startsWith("chapter/")) {
         const location = getChapter(courses, nextRoute.slice(8));
@@ -145,7 +150,7 @@ export function LearningWorkbench() {
     return results.slice(0, 10);
   }, [deferredQuery]);
 
-  function openCourse(courseId: CourseId) { navigate(`course/${courseId}`); }
+  function openCourse(nextCourseId: CourseId) { navigate(`course/${nextCourseId}`); }
   function openChapter(course: CourseDefinition, chapterId: string) { setState((current) => startChapter(current, course.id, chapterId)); navigate(`chapter/${chapterId}`); }
   function openExperiment(chapter: ChapterDefinition, experimentId: string) {
     const experiment = chapter.experiments.find((item) => item.id === experimentId);
@@ -165,11 +170,10 @@ export function LearningWorkbench() {
   function handleExport() { try { showToast(`已导出 ${downloadLearningBackup(state)}`); } catch (error) { showToast(error instanceof Error ? error.message : "导出失败。", "error"); } }
 
   const chapterLocation = route.startsWith("chapter/") ? getChapter(courses, route.slice(8)) : null;
-  const courseId = route.startsWith("course/") ? route.slice(7) as CourseId : null;
   const course = courses.find((item) => item.id === courseId);
   const sandboxMatch = /^sandbox\/(digital|analog)(?:\/(.+))?$/.exec(route);
   let content: React.ReactNode = <DashboardView courses={courses} state={state} onOpenCourse={openCourse} onOpenWorkbench={(kind) => navigate(`sandbox/${kind}`)} />;
-  if (course) content = <CourseOverviewView course={course} state={state} onOpenChapter={openChapter} onOpenWorkbench={(kind) => navigate(`sandbox/${kind}`)} />;
+  if (course) content = <CourseOverviewView course={course} state={state} selectedChapterId={selectedChapterId} onPreviewChapter={setSelectedChapterId} onContinueChapter={(chapterId) => openChapter(course, chapterId)} onOpenWorkbench={(kind) => navigate(`sandbox/${kind}`)} />;
   else if (chapterLocation) content = <ChapterStudyView key={chapterLocation.chapter.id} course={chapterLocation.course} chapter={chapterLocation.chapter} state={state} onBack={() => openCourse(chapterLocation.course.id)} onSelectChapter={(chapterId) => openChapter(chapterLocation.course, chapterId)} onSubmitCheck={(chapter, answers) => {
     try {
       const correct = chapter.check.reduce((total, question, index) => total + Number(question.answer === answers[index]), 0);
