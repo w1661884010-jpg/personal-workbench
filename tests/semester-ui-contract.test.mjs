@@ -30,6 +30,7 @@ test("the home page keeps three chapter-progress entries and adds two real workb
   assert.match(dashboard, /onOpenWorkbench/);
   assert.match(dashboard, /数字电路工作台/);
   assert.match(dashboard, /模拟电路工作台/);
+  assert.ok(dashboard.indexOf('className="workbench-shortcuts"') < dashboard.indexOf('className="course-entry-grid"'), "workbench shortcuts must appear before course entries");
   assert.doesNotMatch(dashboard, /今日|明天|本周|周次|打卡|连续学习|todayTasks|currentWeek|studyMinutes/);
 });
 

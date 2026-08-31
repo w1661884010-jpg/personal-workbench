@@ -483,7 +483,7 @@ select { min-height: 36px; padding: 0 30px 0 9px; color: var(--ink); font-size: 
 .course-entry-progress > span:first-child { display: flex; justify-content: space-between; align-items: baseline; }
 .course-entry-progress b { font-family: var(--mono); font-size: 1.2rem; }
 .course-entry-progress small { color: var(--ink-faint); }
-.workbench-shortcuts { display: grid; gap: 14px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.workbench-shortcuts { display: grid; gap: 14px; margin: 28px 0; padding-top: 24px; border-top: 1px solid var(--line); }
 .workbench-shortcuts > .section-title { align-items: end; margin: 0; }
 .workbench-shortcuts > .section-title h2 { margin: 0; }
 .workbench-shortcuts > .section-title p { margin: 0; color: var(--ink-faint); font-size: .72rem; }
