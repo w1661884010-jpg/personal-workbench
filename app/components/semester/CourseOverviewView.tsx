@@ -55,6 +55,7 @@ export function CourseOverviewView({ course, state, onOpenChapter, onOpenWorkben
         <aside className="course-assist">
           <section><div className="section-title"><h2>当前章重点</h2><Icon name="book" size={19} /></div><ul className="course-focus-list">{current.objectives.map((objective) => <li key={objective}>{objective}</li>)}</ul></section>
           <section><div className="section-title"><h2>内容结构</h2><Icon name="route" size={19} /></div><p><strong>{coreCount}</strong> 项主线必学，<strong>{optionalCount}</strong> 项选择学习；先完成主线，再按需要进入拓展。</p></section>
+          <section><div className="section-title"><h2>教材映射</h2><Icon name="info" size={19} /></div><p>{course.sourceNote}</p></section>
         </aside>
       </div>
     </div>

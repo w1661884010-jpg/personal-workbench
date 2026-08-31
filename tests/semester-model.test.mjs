@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import katex from "katex";
 import { analogCourse } from "../app/data/courses/analog.ts";
 import { digitalCourse } from "../app/data/courses/digital.ts";
 import { signalsCourse } from "../app/data/courses/signals.ts";
 import {
+  CHECK_PASS_SCORE,
   completeChapter,
   createLearningBackup,
   createLearningState,
@@ -16,7 +18,7 @@ import {
 
 const courses = [signalsCourse, digitalCourse, analogCourse];
 
-test("V3 keeps the confirmed course order and complete textbook chapter order", () => {
+test("the current curriculum keeps the confirmed course order and complete textbook chapter order", () => {
   assert.deepEqual(courses.map((course) => course.title), ["信号与系统", "数字电子技术", "模拟电子技术"]);
   assert.deepEqual(signalsCourse.chapters.map(({ number, title, counted }) => [number, title, counted]), [
     ["绪论", "信号分析与处理概览", false],
@@ -37,7 +39,7 @@ test("V3 keeps the confirmed course order and complete textbook chapter order", 
     ["10", "模拟电子电路读图"],
   ]);
 });
-test("every chapter has the seven learning stages, an 80/20 split, and explicit source evidence", () => {
+test("every chapter has seven learning stages, an importance-based main line, and explicit source evidence", () => {
   const allowedSources = new Set(["verified_local", "supplemental_local", "insufficient"]);
   const ids = new Set();
   for (const course of courses) {
@@ -49,8 +51,9 @@ test("every chapter has the seven learning stages, an 80/20 split, and explicit 
       }
       assert.ok(chapter.tags.length > 0, `${chapter.id}: tags`);
       assert.ok(allowedSources.has(chapter.sourceStatus), `${chapter.id}: chapter source status`);
-      assert.equal(chapter.sections.filter((section) => section.importance === "core").length / chapter.sections.length, 0.8, `${chapter.id}: core ratio`);
-      assert.equal(chapter.sections.filter((section) => section.importance === "optional").length / chapter.sections.length, 0.2, `${chapter.id}: optional ratio`);
+      const coreRatio = chapter.sections.filter((section) => section.importance === "core").length / chapter.sections.length;
+      assert.ok(coreRatio >= 0.75 && coreRatio <= 0.9, `${chapter.id}: importance-based core ratio`);
+      assert.ok(chapter.sections.some((section) => section.importance === "optional"), `${chapter.id}: optional extension exists`);
       assert.ok(chapter.check.length >= 2, `${chapter.id}: at least two check questions`);
       for (const section of chapter.sections) {
         assert.ok(allowedSources.has(section.sourceStatus), `${section.id}: section source status`);
@@ -87,9 +90,9 @@ test("digital course integrates the verified textbook main line and maps local p
 
   const pulse = digitalCourse.chapters.find((chapter) => chapter.id === "digital-07");
   assert.deepEqual(pulse.sections.map((section) => section.title), [
-    "矩形脉冲参数", "施密特触发电路", "单稳态电路", "多谐振荡电路", "555 定时器及其应用",
+    "矩形脉冲参数", "施密特触发电路", "单稳态电路", "多谐振荡电路", "555 定时器及其应用", "暂态推导与非理想影响",
   ]);
-  assert.match(pulse.sections[0].formula, /f=1\/T/);
+  assert.match(pulse.sections[0].formula, /\\frac\{1\}\{T\}/);
   assert.doesNotMatch(pulse.tags.join(" "), /资料不足/);
 
   const conversion = digitalCourse.chapters.find((chapter) => chapter.id === "digital-08");
@@ -146,18 +149,18 @@ test("digital and analog main-line chapters expose the equations needed for work
       .map((section) => [section.id, `${section.formula ?? ""} ${section.variables?.join(" ") ?? ""}`]),
   );
   const required = new Map([
-    ["digital-02-s2", /A·B|德摩根/],
-    ["digital-04-s4", /S=A⊕B⊕C/],
-    ["digital-05-s2", /Q\^\+=D/],
+    ["digital-02-s2", /\\overline/],
+    ["digital-04-s4", /\\oplus/],
+    ["digital-05-s2", /Q_D\^\+/],
     ["digital-06-s1", /Q\^\+=F\(Q,X\)/],
-    ["digital-08-s3", /f_s≥2f_max/],
-    ["analog-01-s2", /I_D=I_S/],
-    ["analog-02-s4", /A_v≈−g_m/],
-    ["analog-06-s4", /A_f=A\/\(1\+AF\)/],
-    ["analog-07-s1", /u_O=−\(R_f\/R_1\)u_I/],
-    ["analog-08-s1", /A\(jω_0\)F\(jω_0\)=1/],
-    ["analog-09-s1", /P_o=U_om²\/\(2R_L\)/],
-    ["analog-10-s1", /U_O\(AV\)≈0\.9U_2/],
+    ["digital-08-s3", /f_s\\ge 2f_\{max\}/],
+    ["analog-01-s2", /e\^\{u_D\/U_T\}/],
+    ["analog-02-s4", /g_m/],
+    ["analog-06-s4", /\\frac\{A\}\{1\+AF\}/],
+    ["analog-07-s1", /-\\frac\{R_f\}\{R_1\}/],
+    ["analog-08-s1", /\\angle A/],
+    ["analog-09-s1", /\\frac\{U_\{om\}\^2\}/],
+    ["analog-10-s1", /0\.9U_2/],
   ]);
   for (const [sectionId, pattern] of required) {
     assert.match(formulasBySection.get(sectionId) ?? "", pattern, `${sectionId}: essential relation`);
@@ -182,24 +185,24 @@ test("analog course follows the sixth-edition official lesson plans and keeps si
 
   const semiconductors = analogCourse.chapters.find((chapter) => chapter.id === "analog-01");
   assert.deepEqual(semiconductors.sections.map((section) => section.title), [
-    "半导体与 PN 结", "二极管特性与模型", "二极管参数与稳压管", "晶体三极管", "PN 结电容、温度与辅助分析",
+    "半导体与 PN 结", "二极管特性与模型", "二极管参数与稳压管", "晶体三极管的放大原理、特性与参数", "PN 结电容、温度与辅助分析",
   ]);
 
   const opamp = analogCourse.chapters.find((chapter) => chapter.id === "analog-04");
   assert.equal(opamp.number, "3");
   assert.deepEqual(opamp.sections.map((section) => section.title), [
-    "多级放大与耦合", "差分放大与电流源", "集成运放的组成", "性能指标与低频等效电路", "运放种类、选择与使用",
+    "多级放大与耦合", "差分放大、电流源与有源负载", "集成运放的组成与输出级", "电压传输特性、零漂与性能指标", "运放种类、选择与使用",
   ]);
 
   const frequency = analogCourse.chapters.find((chapter) => chapter.id === "analog-05");
   assert.deepEqual(frequency.sections.map((section) => section.title), [
-    "频率响应与波特图", "晶体管的高频等效模型", "场效应管的高频等效模型", "单管与多级放大电路的频响", "增益带宽与辅助仿真",
+    "频率响应与波特图", "晶体管的高频等效模型", "密勒效应与高频单向化", "单管与多级放大电路的频响", "增益带宽与辅助仿真",
   ]);
   assert.match(frequency.sections[0].formula, /20\\log_\{10\}/);
 
   const waveform = analogCourse.chapters.find((chapter) => chapter.id === "analog-08");
   assert.deepEqual(waveform.sections.map((section) => section.title), [
-    "正弦波振荡电路", "电压比较器", "非正弦波发生电路", "运放信号转换电路", "Multisim 测试举例",
+    "正弦波振荡电路", "LC 与石英晶体振荡", "电压比较器", "非正弦波发生电路", "运放信号转换电路", "Multisim 测试举例",
   ]);
 
   const supply = analogCourse.chapters.find((chapter) => chapter.id === "analog-10");
@@ -234,13 +237,18 @@ test("a chapter only contributes to progress after its complete check is submitt
   assert.equal(getChapterStatus(started, chapter.id), "in_progress");
   assert.deepEqual(getCourseProgress(started, digitalCourse), { completed: 0, total: 8, percent: 0 });
   assert.throws(() => completeChapter(started, chapter.id, now), /完成章节检验后/);
-  assert.throws(() => submitChapterCheck(started, chapter, [-1], now), /回答本章全部检验题/);
+  assert.throws(() => submitChapterCheck(started, digitalCourse.id, chapter, [-1], now), /回答本章全部检验题/);
   const deliberatelyWrong = chapter.check.map((question) => (question.answer + 1) % question.options.length);
-  const submitted = submitChapterCheck(started, chapter, deliberatelyWrong, now);
+  const submitted = submitChapterCheck(started, digitalCourse.id, chapter, deliberatelyWrong, now);
   assert.equal(submitted.checkSubmissions[chapter.id].score, 0);
+  assert.equal(submitted.mistakes.filter((mistake) => mistake.origin === "check" && mistake.chapterId === chapter.id).length, chapter.check.length);
+  assert.ok(submitted.mistakes.filter((mistake) => mistake.origin === "check" && mistake.chapterId === chapter.id).every((mistake) => mistake.nextReviewDate === "2026-08-27"));
   assert.equal(getChapterStatus(submitted, chapter.id), "in_progress");
   assert.deepEqual(getCourseProgress(submitted, digitalCourse), { completed: 0, total: 8, percent: 0 });
-  const completed = completeChapter(submitted, chapter.id, now);
+  assert.throws(() => completeChapter(submitted, chapter.id, now), new RegExp(`${CHECK_PASS_SCORE}%`));
+  const passed = submitChapterCheck(submitted, digitalCourse.id, chapter, chapter.check.map((question) => question.answer), now);
+  assert.ok(passed.mistakes.filter((mistake) => mistake.origin === "check" && mistake.chapterId === chapter.id).every((mistake) => mistake.reviewed));
+  const completed = completeChapter(passed, chapter.id, now);
   assert.equal(getChapterStatus(completed, chapter.id), "completed");
   assert.deepEqual(getCourseProgress(completed, digitalCourse), { completed: 1, total: 8, percent: 13 });
   assert.equal(initial.chapterStatus[chapter.id], undefined, "updates stay immutable");
@@ -252,10 +260,10 @@ test("course progress counts textbook chapters rather than time or uncounted int
   const firstCounted = signalsCourse.chapters.find((chapter) => chapter.counted);
   let state = createLearningState(courses, now);
   assert.deepEqual(getCourseProgress(state, signalsCourse), { completed: 0, total: 5, percent: 0 });
-  state = submitChapterCheck(startChapter(state, signalsCourse.id, intro.id, now), intro, intro.check.map((question) => question.answer), now);
+  state = submitChapterCheck(startChapter(state, signalsCourse.id, intro.id, now), signalsCourse.id, intro, intro.check.map((question) => question.answer), now);
   state = completeChapter(state, intro.id, now);
   assert.deepEqual(getCourseProgress(state, signalsCourse), { completed: 0, total: 5, percent: 0 });
-  state = submitChapterCheck(startChapter(state, signalsCourse.id, firstCounted.id, now), firstCounted, firstCounted.check.map((question) => question.answer), now);
+  state = submitChapterCheck(startChapter(state, signalsCourse.id, firstCounted.id, now), signalsCourse.id, firstCounted, firstCounted.check.map((question) => question.answer), now);
   state = completeChapter(state, firstCounted.id, now);
   assert.deepEqual(getCourseProgress(state, signalsCourse), { completed: 1, total: 5, percent: 20 });
   assert.equal("todayTasks" in state, false);
@@ -263,11 +271,11 @@ test("course progress counts textbook chapters rather than time or uncounted int
   assert.equal("studyMinutes" in state, false);
 });
 
-test("V3 backups validate exact chapter references and reject foreign schemas", () => {
+test("V4 backups validate exact chapter references and reject foreign schemas", () => {
   const state = createLearningState(courses, new Date("2026-08-24T00:00:00.000Z"));
   const backup = createLearningBackup(state, new Date("2026-08-24T01:00:00.000Z"));
   assert.deepEqual(validateLearningBackup(backup, courses), state);
-  assert.throws(() => validateLearningBackup({ ...backup, app: "foreign-app" }, courses), /不是本学习站点导出的 v3 记录/);
+  assert.throws(() => validateLearningBackup({ ...backup, app: "foreign-app" }, courses), /不是本学习站点导出的 v4 记录/);
   const damaged = structuredClone(backup);
   damaged.state.currentChapterByCourse.digital = "missing-chapter";
   assert.throws(() => validateLearningBackup(damaged, courses), /结构损坏/);
@@ -276,4 +284,23 @@ test("V3 backups validate exact chapter references and reject foreign schemas", 
 test("initial mistake records include an actionable next review date", () => {
   const state = createLearningState(courses, new Date("2026-08-24T00:00:00.000Z"));
   assert.deepEqual(state.mistakes.map((mistake) => mistake.nextReviewDate), ["2026-08-25", "2026-08-26", "2026-08-27"]);
+  assert.deepEqual(state.mistakes.map((mistake) => [mistake.courseId, mistake.chapterId, mistake.origin]), [
+    ["signals", "signals-ch1", "example"], ["digital", "digital-02", "example"], ["analog", "analog-02", "example"],
+  ]);
+});
+
+test("all published formulas are valid KaTeX and the audit's high-priority topics are present", () => {
+  for (const course of courses) {
+    for (const chapter of course.chapters) {
+      for (const section of chapter.sections) {
+        if (section.formula) assert.doesNotThrow(() => katex.renderToString(section.formula, { throwOnError: true }), `${section.id}: valid formula`);
+      }
+    }
+  }
+  const signals = JSON.stringify(signalsCourse);
+  for (const topic of ["时移", "频移", "尺度变换", "帕塞瓦尔", "相关定理", "栅栏效应", "双线性变换", "宽平稳", "各态历经"]) assert.match(signals, new RegExp(topic));
+  const digital = JSON.stringify(digitalCourse);
+  for (const topic of ["补码", "溢出", "多输出", "PLD", "555 定时器", "积分/微分非线性", "转换时间"]) assert.match(digital, new RegExp(topic));
+  const analog = JSON.stringify(analogCourse);
+  for (const topic of ["稳定偏置", "负载线", "四种接法", "密勒", "相位裕量", "实用积分器", "石英晶体", "OTL", "Buck"]) assert.match(analog, new RegExp(topic));
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { getCircuitPreset } from "../../data/circuit-presets";
 import type { ChapterExperiment, CourseDefinition } from "../../lib/course-model";
 import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../../lib/circuit/analog-simulator";
 import { clearCircuitLibrary, deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../../lib/circuit/circuit-storage";
@@ -125,6 +126,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     .filter((experiment) => experiment.workbench === kind)
     .map((experiment) => ({ course, chapterId: chapter.id, chapterTitle: chapter.title, experiment })))), [courses, kind]);
   const selectedExperiment = experiments.find((item) => item.experiment.id === selectedExperimentId) ?? experiments[0] ?? null;
+  const selectedPreset = getCircuitPreset(selectedExperiment?.experiment.presetId);
   const palette = kind === "digital" ? digitalPalette : analogPalette;
   const selectedComponent = selectedComponentId ? circuit.components[selectedComponentId] ?? null : null;
   const connectedTerminals = useMemo(() => {
@@ -366,6 +368,36 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     onNotify("画布已清空。", "warning");
   }
 
+  function loadExperimentPreset() {
+    if (!selectedExperiment || !selectedPreset) return;
+    const timestamp = new Date().toISOString();
+    const next: CircuitDocument = {
+      ...selectedPreset,
+      id: freshId(`experiment-${kind}`),
+      name: `${selectedExperiment.experiment.title} · 实验预设`,
+      courseId: selectedExperiment.course.id,
+      chapterId: selectedExperiment.chapterId,
+      experimentId: selectedExperiment.experiment.id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    circuitRef.current = next;
+    setCircuit(next);
+    setSelectedComponentId(null);
+    setPendingEndpoint(null);
+    setProbeTerminals([]);
+    setRunning(false);
+    digitalRuntimeRef.current = undefined;
+    digitalTimeRef.current = 0;
+    setDigitalTraces({});
+    setTruthTable([]);
+    setDcResult(null);
+    setTransientResult(null);
+    setTransientCursor(0);
+    if (kind === "digital") setDigitalResult(evaluateDigitalCircuit(next));
+    onNotify(`已载入“${selectedExperiment.experiment.title}”可运行预设。`);
+  }
+
   function resetSimulation() {
     setRunning(false);
     digitalRuntimeRef.current = undefined;
@@ -452,8 +484,8 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
 
       <section className="cw-experiment-strip">
         <label>实验目标<select value={selectedExperiment?.experiment.id ?? ""} onChange={(event) => setSelectedExperimentId(event.target.value)}>{experiments.map((item) => <option key={item.experiment.id} value={item.experiment.id}>{item.course.shortTitle} · {item.chapterTitle} · {item.experiment.title}</option>)}</select></label>
-        {selectedExperiment ? <div><strong>{selectedExperiment.experiment.goal}</strong><span>预期：{selectedExperiment.experiment.expected}</span><details><summary>查看实验步骤</summary><ol>{selectedExperiment.experiment.steps.map((step) => <li key={step}>{step}</li>)}</ol></details>{selectedExperiment.experiment.limitation ? <em>边界：{selectedExperiment.experiment.limitation}</em> : null}</div> : <p>当前课程资料中没有匹配的工作台实验；仍可从空白画布自由搭建。</p>}
-        {selectedExperiment ? <button type="button" onClick={() => onOpenChapter(selectedExperiment.chapterId)}>返回教材章节</button> : null}
+        {selectedExperiment ? <div><strong>{selectedExperiment.experiment.goal}</strong><span className={selectedPreset ? "cw-capability is-runnable" : "cw-capability is-topology"}>{selectedPreset ? "能力：预设可载入并由当前求解器运行" : "能力：仅支持自由搭建、拓扑核对与手算记录"}</span><span>预期：{selectedExperiment.experiment.expected}</span><details><summary>查看实验步骤</summary><ol>{selectedExperiment.experiment.steps.map((step) => <li key={step}>{step}</li>)}</ol></details>{selectedExperiment.experiment.limitation ? <em>边界：{selectedExperiment.experiment.limitation}</em> : null}</div> : <p>当前课程资料中没有匹配的工作台实验；仍可从空白画布自由搭建。</p>}
+        {selectedExperiment ? <div className="cw-experiment-actions">{selectedPreset ? <button type="button" className="cw-primary" onClick={loadExperimentPreset}>载入实验预设</button> : null}<button type="button" onClick={() => onOpenChapter(selectedExperiment.chapterId)}>返回教材章节</button></div> : null}
       </section>
 
       <div className="cw-storage-bar">

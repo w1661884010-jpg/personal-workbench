@@ -4,7 +4,7 @@ import test from "node:test";
 
 const component = (name) => readFile(new URL(`../app/components/semester/${name}`, import.meta.url), "utf8");
 
-test("V3 navigation exposes the three courses, two workbenches, records, and connections", async () => {
+test("navigation exposes the three courses, two workbenches, records, and connections", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
   const labels = [...workbench.matchAll(/label:\s*"([^"]+)",\s*mobileLabel/g)].map((match) => match[1]);
   assert.deepEqual(labels, [
@@ -47,10 +47,13 @@ test("chapter study renders the fixed seven-stage workflow and enforces the chec
   assert.doesNotMatch(chapter, /本地资料已核对|本地补充资料|资料不足/);
   assert.match(chapter, /onOpenExperiment\(chapter,\s*experiment\.id\)/);
   assert.match(chapter, /disabled=\{!allAnswered\}/);
-  assert.match(chapter, /disabled=\{!submitted\s*\|\|/);
+  assert.match(chapter, /disabled=\{!passed\s*\|\|/);
   assert.match(chapter, /onSubmitCheck\(chapter,\s*answers\)/);
   assert.match(chapter, /onComplete\(chapter\.id\)/);
-  assert.match(chapter, /分数只用于反馈，不设置额外及格线/);
+  assert.match(chapter, /得分达到 \{CHECK_PASS_SCORE\}% 才能完成本章/);
+  assert.match(chapter, /答错题会自动进入错题复盘/);
+  assert.match(chapter, /katex\.renderToString/);
+  assert.match(chapter, /<details className="example-answer">/);
 });
 
 test("course reading pages remove preparation notes and keep chapter numbers on one line", async () => {
@@ -71,7 +74,7 @@ test("course reading pages remove preparation notes and keep chapter numbers on 
   assert.match(styles, /\.chapter-status\s*\{[^}]*align-self:\s*flex-start;[^}]*flex:\s*0\s+0\s+auto;[^}]*white-space:\s*nowrap;/s);
 });
 
-test("course and chapter actions are wired to immutable V3 model handlers", async () => {
+test("course and chapter actions are wired to immutable learning-state handlers", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
   for (const handler of ["startChapter", "submitChapterCheck", "completeChapter", "upsertMistake", "markMistakeReviewed"]) {
     assert.match(workbench, new RegExp(handler));
@@ -94,7 +97,10 @@ test("the circuit workbench calls graph, persistence, and real simulation engine
   for (const operation of ["saveCircuit", "loadCircuit", "copyStoredCircuit", "deleteCircuit"]) assert.match(implementation, new RegExp(operation));
   for (const operation of ["evaluateDigitalCircuit", "generateTruthTable", "sampleDigitalCircuit"]) assert.match(implementation, new RegExp(operation));
   for (const operation of ["solveAnalogDc", "simulateAnalogTransient"]) assert.match(implementation, new RegExp(operation));
-  for (const label of ["保存电路", "载入", "复制电路", "清空画布", "删除", "实验目标", "返回教材章节"]) assert.match(shell, new RegExp(label));
+  for (const label of ["保存电路", "载入", "复制电路", "清空画布", "删除", "实验目标", "载入实验预设", "返回教材章节"]) assert.match(shell, new RegExp(label));
+  assert.match(shell, /getCircuitPreset/);
+  assert.match(shell, /预设可载入并由当前求解器运行/);
+  assert.match(shell, /仅支持自由搭建、拓扑核对与手算记录/);
   assert.match(shell, /onPointerDown|onDragStart|draggable/);
   assert.match(shell, /onDoubleClick/);
   assert.match(shell, /双击元件保持选中/);
@@ -141,6 +147,8 @@ test("global search and JSON safeguards remain real interactions", async () => {
   assert.match(workbench, /course\.chapters/);
   assert.match(workbench, /chapter\.sections/);
   assert.match(workbench, /chapter\.experiments/);
+  assert.match(workbench, /section\.formula/);
+  assert.match(workbench, /section\.variables/);
   assert.match(workbench, /downloadLearningBackup/);
   assert.match(workbench, /restoreLearningBackup/);
   assert.match(workbench, /导入会覆盖当前浏览器中的学习记录/);
@@ -151,10 +159,13 @@ test("global search and JSON safeguards remain real interactions", async () => {
   assert.match(shell, /accept="application\/json,\.json"/);
 });
 
-test("mistake records keep the next review date visible and editable", async () => {
+test("mistake records show origin and keep the next review date visible and editable", async () => {
   const mistakes = await component("ChapterMistakesView.tsx");
   assert.match(mistakes, /下次复习/);
   assert.match(mistakes, /nextReviewDate/);
   assert.match(mistakes, /type="date"/);
   assert.match(mistakes, /标记已复盘/);
+  assert.match(mistakes, /检验自动收录/);
+  assert.match(mistakes, /手动记录/);
+  assert.match(mistakes, /示例/);
 });

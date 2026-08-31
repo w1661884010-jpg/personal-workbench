@@ -22,6 +22,10 @@
 .cw-experiment-strip summary { width: max-content; color: var(--teal-dark); cursor: pointer; }
 .cw-experiment-strip ol { margin: 4px 0 0; padding-left: 18px; }
 .cw-experiment-strip em { margin-top: 3px; color: var(--orange); font-size: .68rem; font-style: normal; }
+.cw-experiment-strip .cw-capability { width: max-content; margin: 4px 0; padding: 2px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: .64rem; font-weight: 800; }
+.cw-capability.is-runnable { color: var(--teal); }
+.cw-capability.is-topology { color: var(--orange); }
+.cw-experiment-actions { display: grid; gap: 6px; }
 .cw-storage-bar { flex-wrap: wrap; padding: 10px 13px; }
 .cw-name-field { grid-template-columns: auto minmax(160px, 240px); align-items: center; }
 .cw-storage-bar select { min-width: 170px; }
@@ -115,7 +119,7 @@
 @media (max-width: 900px) {
   .cw-heading { align-items: flex-start; }
   .cw-experiment-strip { grid-template-columns: 1fr auto; }
-  .cw-experiment-strip > div { grid-column: 1 / -1; grid-row: 2; }
+  .cw-experiment-strip > div:not(.cw-experiment-actions) { grid-column: 1 / -1; grid-row: 2; }
   .cw-main-grid { grid-template-columns: 1fr; }
   .cw-palette { position: static; max-height: none; }
   .cw-palette-list { grid-template-columns: repeat(5, 1fr); }
@@ -127,7 +131,7 @@
   .cw-heading { display: grid; padding: 15px; }
   .cw-run-controls { flex-wrap: wrap; }
   .cw-experiment-strip { grid-template-columns: 1fr; }
-  .cw-experiment-strip > div { grid-column: auto; grid-row: auto; }
+  .cw-experiment-strip > div:not(.cw-experiment-actions) { grid-column: auto; grid-row: auto; }
   .cw-experiment-strip select { width: 100%; max-width: 100%; }
   .cw-storage-bar { align-items: stretch; }
   .cw-name-field { grid-template-columns: 1fr; width: 100%; }

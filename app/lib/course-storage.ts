@@ -4,13 +4,15 @@ import {
   createLearningState,
   isLearningState,
   migrateV2State,
+  migrateV3State,
   validateLearningBackup,
   type CourseId,
   type LearningState,
 } from "./course-model";
 
-export const LEARNING_STORAGE_KEY = "personal-electronics-workbench:state:v3";
-export const PREVIOUS_STORAGE_KEY = "personal-electronics-workbench:state:v2";
+export const LEARNING_STORAGE_KEY = "personal-electronics-workbench:state:v4";
+export const PREVIOUS_STORAGE_KEY = "personal-electronics-workbench:state:v3";
+export const VERSION_TWO_STORAGE_KEY = "personal-electronics-workbench:state:v2";
 export const LEGACY_STORAGE_KEY = "semester-electronics-learning-site:state:v1";
 const JSON_MIME_TYPE = "application/json;charset=utf-8";
 
@@ -57,7 +59,13 @@ export function loadLearningState(storage: StorageLike | null = browserStorage()
     }
     const previous = storage.getItem(PREVIOUS_STORAGE_KEY);
     if (previous) {
-      const migrated = migrateV2State(JSON.parse(previous) as unknown, courses);
+      const migrated = migrateV3State(JSON.parse(previous) as unknown, courses);
+      if (migrated) storage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+    const versionTwo = storage.getItem(VERSION_TWO_STORAGE_KEY);
+    if (versionTwo) {
+      const migrated = migrateV2State(JSON.parse(versionTwo) as unknown, courses);
       if (migrated) storage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(migrated));
       return migrated;
     }
@@ -85,6 +93,11 @@ export function serializeLearningBackup(state: LearningState, exportedAt = new D
 export function restoreLearningBackup(serialized: string): LearningState {
   try {
     const parsed = JSON.parse(serialized.replace(/^\uFEFF/, "")) as unknown;
+    if (isObject(parsed) && parsed.app === "personal-electronics-workbench" && parsed.schemaVersion === 3) {
+      const migrated = migrateV3State(parsed.state, courses);
+      if (!migrated) throw new Error("v3 学习记录结构损坏，无法迁移到当前课程。");
+      return migrated;
+    }
     if (isObject(parsed) && parsed.app === "personal-electronics-workbench" && parsed.schemaVersion === 2) {
       const migrated = migrateV2State(parsed.state, courses);
       if (!migrated) throw new Error("v2 学习记录结构损坏，无法迁移到当前课程。");

@@ -1,3 +1,5 @@
+@import "katex/dist/katex.min.css";
+
 :root {
   color-scheme: dark;
   --paper-bg: #07141f;
@@ -273,8 +275,12 @@ select { min-height: 36px; padding: 0 30px 0 9px; color: var(--ink); font-size: 
 .mistake-table td:nth-child(3) { min-width: 220px; }
 .mistake-table tr:last-child td { border-bottom: 0; }
 .mistake-table tr.is-mastered { color: var(--ink-faint); background: var(--paper-bg); }
+.mistake-title-row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .mistake-title { padding: 0; background: transparent; font-weight: 700; text-align: left; }
 .mistake-title:hover { color: var(--teal-dark); text-decoration: underline; }
+.mistake-origin { display: inline-flex; padding: 2px 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); font-size: .62rem; white-space: nowrap; }
+.mistake-origin.origin-example { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, var(--line)); }
+.mistake-origin.origin-check { color: var(--teal-dark); border-color: color-mix(in srgb, var(--teal) 45%, var(--line)); }
 .mistake-table small { display: block; margin-top: 4px; color: var(--ink-soft); }
 .status-label { display: inline-block; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
 .status-label.pending { color: var(--orange); background: var(--orange-soft); }
@@ -517,11 +523,15 @@ select { min-height: 36px; padding: 0 30px 0 9px; color: var(--ink); font-size: 
 .learning-block header span { padding: 3px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); font-size: .63rem; }
 .learning-block.importance-optional header span { color: var(--orange); }
 .formula-block { display: grid; grid-template-columns: minmax(180px, .7fr) 1fr; gap: 15px; margin-top: 12px; padding: 13px; background: #07131d; border: 1px solid var(--line); border-radius: 5px; }
-.formula-block code { color: #8fe1d6; font-family: var(--mono); white-space: pre-wrap; }
+.math-formula { min-width: 0; overflow-x: auto; color: #8fe1d6; font-family: var(--mono); }
+.math-formula .katex-display { margin: .35rem 0; text-align: left; }
+.math-formula .katex-display > .katex { white-space: normal; }
 .formula-block ul { margin: 0; padding-left: 18px; }
 .worked-example, .experiment-card { margin-top: 12px; padding: 18px; background: var(--paper-soft); border: 1px solid var(--line); border-radius: 6px; }
 .worked-example h3, .experiment-card h3 { margin: 0 0 9px; font-size: .9rem; }
-.worked-example > strong { display: block; padding: 10px; color: var(--teal); background: #08202a; border-radius: 4px; }
+.example-answer { margin-top: 12px; border: 1px solid var(--line); border-radius: 5px; background: #08202a; }
+.example-answer summary { padding: 10px 12px; color: var(--teal); cursor: pointer; font-weight: 700; }
+.example-answer strong { display: block; padding: 0 12px 12px; color: var(--teal); }
 .experiment-card header { display: flex; justify-content: space-between; gap: 16px; }
 .experiment-card header span, .experiment-card header em { color: var(--ink-faint); font-size: .65rem; font-style: normal; }
 .expected-result { padding: 10px; border-left: 2px solid var(--teal); }

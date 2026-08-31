@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { courses } from "../data/courses";
 import {
+  CHECK_PASS_SCORE,
   completeChapter,
   createLearningState,
   getChapter,
@@ -137,7 +138,7 @@ export function LearningWorkbench() {
       for (const chapter of course.chapters) {
         const chapterRoute = `chapter/${chapter.id}`;
         if (`${chapter.number}${chapter.title}${chapter.tags.join(" ")}`.toLocaleLowerCase("zh-CN").includes(normalized)) results.push({ id: chapter.id, kind: "chapter", title: `${chapter.number} ${chapter.title}`, meta: course.title, route: chapterRoute });
-        for (const section of chapter.sections) if (`${section.title}${section.content}`.toLocaleLowerCase("zh-CN").includes(normalized)) results.push({ id: `${chapter.id}-${section.id}`, kind: "section", title: section.title, meta: `${course.title} · ${chapter.title}`, route: chapterRoute });
+        for (const section of chapter.sections) if (`${section.title}${section.content}${section.formula ?? ""}${section.variables?.join(" ") ?? ""}`.toLocaleLowerCase("zh-CN").includes(normalized)) results.push({ id: `${chapter.id}-${section.id}`, kind: "section", title: section.title, meta: `${course.title} · ${chapter.title}`, route: chapterRoute });
         for (const experiment of chapter.experiments) if (`${experiment.title}${experiment.goal}`.toLocaleLowerCase("zh-CN").includes(normalized)) results.push({ id: experiment.id, kind: "experiment", title: experiment.title, meta: `${course.title} · 实验`, route: experiment.workbench === "notebook" ? chapterRoute : `sandbox/${experiment.workbench}/${experiment.id}` });
       }
     }
@@ -169,7 +170,16 @@ export function LearningWorkbench() {
   const sandboxMatch = /^sandbox\/(digital|analog)(?:\/(.+))?$/.exec(route);
   let content: React.ReactNode = <DashboardView courses={courses} state={state} onOpenCourse={openCourse} onOpenWorkbench={(kind) => navigate(`sandbox/${kind}`)} />;
   if (course) content = <CourseOverviewView course={course} state={state} onOpenChapter={openChapter} onOpenWorkbench={(kind) => navigate(`sandbox/${kind}`)} />;
-  else if (chapterLocation) content = <ChapterStudyView key={chapterLocation.chapter.id} course={chapterLocation.course} chapter={chapterLocation.chapter} state={state} onBack={() => openCourse(chapterLocation.course.id)} onSelectChapter={(chapterId) => openChapter(chapterLocation.course, chapterId)} onSubmitCheck={(chapter, answers) => { try { setState((current) => submitChapterCheck(current, chapter, answers)); showToast("章节检验已提交；现在可以标记本章完成。"); } catch (error) { showToast(error instanceof Error ? error.message : "提交失败。", "error"); } }} onComplete={(chapterId) => { try { setState((current) => completeChapter(current, chapterId)); showToast("本章已完成，课程进度已按章节同步。"); } catch (error) { showToast(error instanceof Error ? error.message : "无法完成章节。", "error"); } }} onOpenExperiment={openExperiment} />;
+  else if (chapterLocation) content = <ChapterStudyView key={chapterLocation.chapter.id} course={chapterLocation.course} chapter={chapterLocation.chapter} state={state} onBack={() => openCourse(chapterLocation.course.id)} onSelectChapter={(chapterId) => openChapter(chapterLocation.course, chapterId)} onSubmitCheck={(chapter, answers) => {
+    try {
+      const correct = chapter.check.reduce((total, question, index) => total + Number(question.answer === answers[index]), 0);
+      const score = chapter.check.length ? Math.round((correct / chapter.check.length) * 100) : 100;
+      setState((current) => submitChapterCheck(current, chapterLocation.course.id, chapter, answers));
+      showToast(score >= CHECK_PASS_SCORE ? "章节检验 " + score + "%：已达到完成门槛。" : "章节检验 " + score + "%：未达到 " + CHECK_PASS_SCORE + "%，错题已自动收录。", score >= CHECK_PASS_SCORE ? "success" : "warning");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "提交失败。", "error");
+    }
+  }} onComplete={(chapterId) => { try { setState((current) => completeChapter(current, chapterId)); showToast("本章已完成，课程进度已按章节同步。"); } catch (error) { showToast(error instanceof Error ? error.message : "无法完成章节。", "error"); } }} onOpenExperiment={openExperiment} />;
   else if (sandboxMatch) content = <CircuitWorkbench kind={sandboxMatch[1] as "digital" | "analog"} initialExperimentId={sandboxMatch[2]} courses={courses} onOpenChapter={(chapterId) => { const location = getChapter(courses, chapterId); if (location) openChapter(location.course, chapterId); }} onNotify={showToast} />;
   else if (route === "mistakes") content = <ChapterMistakesView courses={courses} state={state} onSave={(record: MistakeRecord) => { setState((current) => upsertMistake(current, record)); showToast("错题已保存。"); }} onReviewed={(id) => { setState((current) => markMistakeReviewed(current, id)); showToast("已标记为已复盘；课程章节进度不受影响。"); }} onOpenChapter={openChapter} />;
   else if (route === "connections") content = <CourseConnectionsView courses={courses} onOpenCourse={openCourse} />;

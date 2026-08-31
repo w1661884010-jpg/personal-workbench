@@ -3,6 +3,7 @@ export type ChapterStatus = "not_started" | "in_progress" | "completed";
 export type Importance = "core" | "optional";
 export type SourceStatus = "verified_local" | "supplemental_local" | "insufficient";
 export type WorkbenchKind = "digital" | "analog" | "notebook";
+export type MistakeOrigin = "example" | "check" | "manual";
 
 export interface LearningSection {
   id: string;
@@ -82,11 +83,12 @@ export interface MistakeRecord {
   correctApproach: string;
   nextReviewDate?: string;
   reviewed: boolean;
+  origin: MistakeOrigin;
   updatedAt: string;
 }
 
 export interface LearningState {
-  schemaVersion: 3;
+  schemaVersion: 4;
   activeCourseId: CourseId;
   currentChapterByCourse: Record<CourseId, string>;
   chapterStatus: Record<string, ChapterStatus>;
@@ -96,7 +98,8 @@ export interface LearningState {
 }
 
 export const LEARNING_APP_ID = "personal-electronics-workbench";
-export const LEARNING_SCHEMA_VERSION = 3 as const;
+export const LEARNING_SCHEMA_VERSION = 4 as const;
+export const CHECK_PASS_SCORE = 60;
 
 function dateOffset(date: Date, days: number): string {
   const next = new Date(date);
@@ -112,6 +115,21 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function migrateMistakeRecord(value: unknown, chapterOverride?: string) {
+  if (!isObject(value)) return value;
+  const id = typeof value.id === "string" ? value.id : "";
+  const courseId = typeof value.courseId === "string" ? value.courseId : "";
+  const origin = ["example", "check", "manual"].includes(String(value.origin))
+    ? value.origin
+    : id.startsWith("example-mistake-") ? "example" : "manual";
+  const exampleChapter = courseId === "signals" ? "signals-ch1" : courseId === "digital" ? "digital-02" : courseId === "analog" ? "analog-02" : value.chapterId;
+  return {
+    ...value,
+    chapterId: chapterOverride ?? (origin === "example" ? exampleChapter : value.chapterId),
+    origin,
+  };
+}
+
 export function createLearningState(courses: readonly CourseDefinition[], now = new Date()): LearningState {
   const currentChapterByCourse = Object.fromEntries(
     courses.map((course) => [course.id, course.chapters[0].id]),
@@ -123,7 +141,10 @@ export function createLearningState(courses: readonly CourseDefinition[], now = 
     chapterStatus: {},
     checkSubmissions: {},
     mistakes: courses.map((course, index) => {
-      const chapter = course.chapters.find((candidate) => candidate.counted) ?? course.chapters[0];
+      const preferredChapterId = course.id === "signals" ? "signals-ch1" : course.id === "digital" ? "digital-02" : "analog-02";
+      const chapter = course.chapters.find((candidate) => candidate.id === preferredChapterId)
+        ?? course.chapters.find((candidate) => candidate.counted)
+        ?? course.chapters[0];
       return {
         id: `example-mistake-${course.id}`,
         title: index === 0 ? "变换条件与适用范围混淆" : index === 1 ? "只写逻辑式，没有回查真值表" : "静态工作点与交流增益混算",
@@ -133,6 +154,7 @@ export function createLearningState(courses: readonly CourseDefinition[], now = 
         correctApproach: index === 0 ? "先写适用条件，再选择时域、频域或复频域工具。" : index === 1 ? "列出输入组合，用真值表核对原式和化简式。" : "先求静态工作点，再在线性化模型中求交流量。",
         nextReviewDate: dateOffset(now, index + 1),
         reviewed: false,
+        origin: "example",
         updatedAt: now.toISOString(),
       } satisfies MistakeRecord;
     }),
@@ -188,14 +210,50 @@ export function startChapter(
 
 export function submitChapterCheck(
   state: LearningState,
+  courseId: CourseId,
   chapter: ChapterDefinition,
   answers: readonly number[],
   now = new Date(),
 ): LearningState {
   if (answers.length !== chapter.check.length || answers.some((answer) => !Number.isInteger(answer) || answer < 0)) {
-    throw new Error("请先回答本章全部检验题。激活完成按钮不要求达到额外分数线。");
+    throw new Error("请先回答本章全部检验题。");
   }
   const correct = chapter.check.reduce((total, question, index) => total + Number(question.answer === answers[index]), 0);
+  const score = chapter.check.length ? Math.round((correct / chapter.check.length) * 100) : 100;
+  const checkMistakeIds = new Set(chapter.check.map((question) => "check-mistake-" + question.id));
+  const existingMistakes = state.mistakes.map((mistake) => {
+    if (!checkMistakeIds.has(mistake.id) || mistake.origin !== "check") return mistake;
+    const question = chapter.check.find((candidate) => "check-mistake-" + candidate.id === mistake.id);
+    if (!question) return mistake;
+    const questionIndex = chapter.check.indexOf(question);
+    return question.answer === answers[questionIndex]
+      ? { ...mistake, reviewed: true, updatedAt: now.toISOString() }
+      : {
+          ...mistake,
+          reason: "章节检验中选择了“" + question.options[answers[questionIndex]] + "”。",
+          correctApproach: "正确答案是“" + question.options[question.answer] + "”。" + question.explanation,
+          reviewed: false,
+          updatedAt: now.toISOString(),
+        };
+  });
+  const existingIds = new Set(existingMistakes.map((mistake) => mistake.id));
+  const newMistakes = chapter.check.flatMap((question, index) => {
+    if (question.answer === answers[index]) return [];
+    const id = "check-mistake-" + question.id;
+    if (existingIds.has(id)) return [];
+    return [{
+      id,
+      title: question.prompt,
+      courseId,
+      chapterId: chapter.id,
+      reason: "章节检验中选择了“" + question.options[answers[index]] + "”。",
+      correctApproach: "正确答案是“" + question.options[question.answer] + "”。" + question.explanation,
+      nextReviewDate: dateOffset(now, 3),
+      reviewed: false,
+      origin: "check" as const,
+      updatedAt: now.toISOString(),
+    }];
+  });
   return {
     ...state,
     chapterStatus: {
@@ -207,15 +265,18 @@ export function submitChapterCheck(
       [chapter.id]: {
         answers: [...answers],
         submittedAt: now.toISOString(),
-        score: chapter.check.length ? Math.round((correct / chapter.check.length) * 100) : 100,
+        score,
       },
     },
+    mistakes: [...existingMistakes, ...newMistakes],
     updatedAt: now.toISOString(),
   };
 }
 
 export function completeChapter(state: LearningState, chapterId: string, now = new Date()): LearningState {
-  if (!state.checkSubmissions[chapterId]) throw new Error("完成章节检验后，才能把本章标记为已完成。");
+  const submission = state.checkSubmissions[chapterId];
+  if (!submission) throw new Error("完成章节检验后，才能把本章标记为已完成。");
+  if (submission.score < CHECK_PASS_SCORE) throw new Error("章节检验达到 " + CHECK_PASS_SCORE + "% 后，才能把本章标记为已完成。");
   return {
     ...state,
     chapterStatus: { ...state.chapterStatus, [chapterId]: "completed" },
@@ -258,8 +319,21 @@ export function isLearningState(value: unknown, courses: readonly CourseDefiniti
       && getChapter(courses, mistake.chapterId)?.course.id === mistake.courseId
       && [mistake.id, mistake.title, mistake.reason, mistake.correctApproach, mistake.updatedAt].every((field) => typeof field === "string" && field.length > 0)
       && (mistake.nextReviewDate === undefined || (typeof mistake.nextReviewDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(mistake.nextReviewDate) && !Number.isNaN(Date.parse(`${mistake.nextReviewDate}T00:00:00`))))
-      && typeof mistake.reviewed === "boolean")
+      && typeof mistake.reviewed === "boolean"
+      && ["example", "check", "manual"].includes(mistake.origin))
     && typeof state.updatedAt === "string" && !Number.isNaN(Date.parse(state.updatedAt));
+}
+
+export function migrateV3State(value: unknown, courses: readonly CourseDefinition[], now = new Date()): LearningState | null {
+  if (!isObject(value) || value.schemaVersion !== 3) return null;
+  if (!isObject(value.currentChapterByCourse) || !isObject(value.chapterStatus) || !isObject(value.checkSubmissions) || !Array.isArray(value.mistakes)) return null;
+  const migrated = {
+    ...value,
+    schemaVersion: LEARNING_SCHEMA_VERSION,
+    mistakes: value.mistakes.map((item) => migrateMistakeRecord(item)),
+    updatedAt: now.toISOString(),
+  };
+  return isLearningState(migrated, courses) ? structuredClone(migrated) : null;
 }
 
 export function migrateV2State(value: unknown, courses: readonly CourseDefinition[], now = new Date()): LearningState | null {
@@ -290,9 +364,7 @@ export function migrateV2State(value: unknown, courses: readonly CourseDefinitio
     currentChapterByCourse,
     chapterStatus,
     checkSubmissions,
-    mistakes: value.mistakes.map((item) => isObject(item) && item.chapterId === removedChapterId
-      ? { ...item, chapterId: mergedChapterId }
-      : item),
+    mistakes: value.mistakes.map((item) => migrateMistakeRecord(item, isObject(item) && item.chapterId === removedChapterId ? mergedChapterId : undefined)),
     updatedAt: now.toISOString(),
   };
   return isLearningState(migrated, courses) ? structuredClone(migrated) : null;
@@ -306,7 +378,7 @@ export function validateLearningBackup(value: unknown, courses: readonly CourseD
   if (!value || typeof value !== "object") throw new Error("文件不是有效的学习记录。");
   const envelope = value as { app?: unknown; schemaVersion?: unknown; state?: unknown };
   if (envelope.app !== LEARNING_APP_ID || envelope.schemaVersion !== LEARNING_SCHEMA_VERSION) {
-    throw new Error("这不是本学习站点导出的 v3 记录。");
+    throw new Error("这不是本学习站点导出的 v4 记录。");
   }
   if (!isLearningState(envelope.state, courses)) throw new Error("学习记录结构损坏或引用了不存在的章节。");
   return structuredClone(envelope.state);
