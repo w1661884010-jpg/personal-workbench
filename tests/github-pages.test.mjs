@@ -22,6 +22,9 @@ test("GitHub Pages builds the real learning workbench for the repository subpath
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(html, /%BASE_URL%favicon\.svg/);
   assert.match(html, /电路自习室｜本学期电子类课程个人学习站点/);
+  assert.match(html, /name="color-scheme" content="light dark"/);
+  assert.match(html, /localStorage\.getItem\("personal-workbench-theme"\)/);
+  assert.match(html, /document\.documentElement\.dataset\.themePreference = preference/);
 });
 
 test("the main branch workflow validates and deploys only the Pages artifact", async () => {

@@ -18,6 +18,7 @@ import {
   type MistakeRecord,
 } from "../lib/course-model";
 import { downloadLearningBackup, LEARNING_STORAGE_KEY, loadLearningState, readLearningBackupFile, restoreLearningBackup, saveLearningState } from "../lib/course-storage";
+import { isThemePreference, nextThemePreference, resolveTheme, THEME_STORAGE_KEY, type ThemePreference } from "../lib/theme";
 import { CircuitWorkbench } from "./sandbox/CircuitWorkbench";
 import { AppShell, type NavigationItem, type SearchResult } from "./semester/AppShell";
 import { ChapterMistakesView } from "./semester/ChapterMistakesView";
@@ -60,6 +61,13 @@ function navRoute(id: string) {
   return id;
 }
 
+function applyThemePreference(preference: ThemePreference, systemPrefersDark: boolean) {
+  const root = globalThis.document?.documentElement;
+  if (!root) return;
+  root.dataset.theme = resolveTheme(preference, systemPrefersDark);
+  root.dataset.themePreference = preference;
+}
+
 export function LearningWorkbench() {
   const [state, setState] = useState<LearningState>(() => createLearningState(courses, new Date("2026-08-24T00:00:00.000Z")));
   const [route, setRoute] = useState("dashboard");
@@ -69,7 +77,9 @@ export function LearningWorkbench() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("loading");
   const [toast, setToast] = useState<Toast>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [themePreference, setThemePreference] = useState<ThemePreference>("system");
   const toastId = useRef(0);
+  const themePreferenceRef = useRef<ThemePreference>("system");
   const courseId = route.startsWith("course/") ? route.slice(7) as CourseId : null;
 
   const showToast = useCallback((message: string, tone: ToastTone = "success") => {
@@ -99,6 +109,28 @@ export function LearningWorkbench() {
       setSaveStatus("saved");
     }, 0);
     return () => globalThis.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
+    let storedPreference: ThemePreference = "system";
+    try {
+      const stored = globalThis.localStorage?.getItem(THEME_STORAGE_KEY);
+      if (isThemePreference(stored)) storedPreference = stored;
+    } catch {
+      // Storage may be unavailable in privacy-restricted browser contexts.
+    }
+    themePreferenceRef.current = storedPreference;
+    const stateTimer = globalThis.setTimeout(() => setThemePreference(storedPreference), 0);
+    applyThemePreference(storedPreference, mediaQuery.matches);
+    const syncSystemTheme = (event: MediaQueryListEvent) => {
+      if (themePreferenceRef.current === "system") applyThemePreference("system", event.matches);
+    };
+    mediaQuery.addEventListener("change", syncSystemTheme);
+    return () => {
+      globalThis.clearTimeout(stateTimer);
+      mediaQuery.removeEventListener("change", syncSystemTheme);
+    };
   }, []);
 
   useEffect(() => {
@@ -169,6 +201,15 @@ export function LearningWorkbench() {
 
   function handleExport() { try { showToast(`已导出 ${downloadLearningBackup(state)}`); } catch (error) { showToast(error instanceof Error ? error.message : "导出失败。", "error"); } }
 
+  function cycleThemePreference() {
+    const next = nextThemePreference(themePreferenceRef.current);
+    themePreferenceRef.current = next;
+    setThemePreference(next);
+    applyThemePreference(next, globalThis.matchMedia("(prefers-color-scheme: dark)").matches);
+    try { globalThis.localStorage?.setItem(THEME_STORAGE_KEY, next); }
+    catch { showToast("外观已切换，但当前浏览器无法保存该设置。", "warning"); }
+  }
+
   const chapterLocation = route.startsWith("chapter/") ? getChapter(courses, route.slice(8)) : null;
   const course = courses.find((item) => item.id === courseId);
   const sandboxMatch = /^sandbox\/(digital|analog)(?:\/(.+))?$/.exec(route);
@@ -188,5 +229,5 @@ export function LearningWorkbench() {
   else if (route === "mistakes") content = <ChapterMistakesView courses={courses} state={state} onSave={(record: MistakeRecord) => { setState((current) => upsertMistake(current, record)); showToast("错题已保存。"); }} onReviewed={(id) => { setState((current) => markMistakeReviewed(current, id)); showToast("已标记为已复盘；课程章节进度不受影响。"); }} onOpenChapter={openChapter} />;
   else if (route === "connections") content = <CourseConnectionsView courses={courses} onOpenCourse={openCourse} />;
 
-  return <AppShell activeNavigationId={activeNavigationId(route)} navigation={navigation} searchQuery={query} searchResults={searchResults} saveLabel={saveStatus === "loading" ? "正在读取记录" : saveStatus === "saving" ? "正在保存" : saveStatus === "error" ? "保存失败" : "已保存到本机"} onNavigate={(id) => navigate(navRoute(id))} onSearchChange={setQuery} onSearchSelect={(result) => { setQuery(""); if (result.route.startsWith("chapter/")) { const location = getChapter(courses, result.route.slice(8)); if (location) setState((current) => startChapter(current, location.course.id, location.chapter.id)); } navigate(result.route); }} onExport={handleExport} onImport={handleImport}>{!hydrated ? <div className="hydration-note" role="status">正在读取本地学习记录…</div> : null}{content}{toast ? <div className={`toast toast-${toast.tone}`} role="status" key={toast.id}>{toast.message}</div> : null}</AppShell>;
+  return <AppShell activeNavigationId={activeNavigationId(route)} navigation={navigation} searchQuery={query} searchResults={searchResults} saveLabel={saveStatus === "loading" ? "正在读取记录" : saveStatus === "saving" ? "正在保存" : saveStatus === "error" ? "保存失败" : "已保存到本机"} themePreference={themePreference} onNavigate={(id) => navigate(navRoute(id))} onSearchChange={setQuery} onSearchSelect={(result) => { setQuery(""); if (result.route.startsWith("chapter/")) { const location = getChapter(courses, result.route.slice(8)); if (location) setState((current) => startChapter(current, location.course.id, location.chapter.id)); } navigate(result.route); }} onExport={handleExport} onImport={handleImport} onThemePreferenceCycle={cycleThemePreference}>{!hydrated ? <div className="hydration-note" role="status">正在读取本地学习记录…</div> : null}{content}{toast ? <div className={`toast toast-${toast.tone}`} role="status" key={toast.id}>{toast.message}</div> : null}</AppShell>;
 }

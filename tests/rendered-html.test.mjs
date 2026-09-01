@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("the home entry mounts the V3 workbench with Chinese dark-site metadata", async () => {
+test("the home entry mounts the V3 workbench with Chinese adaptive-theme metadata", async () => {
   const [page, layout] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
@@ -12,12 +12,16 @@ test("the home entry mounts the V3 workbench with Chinese dark-site metadata", a
   assert.doesNotMatch(page, /SkeletonPreview|_sites-preview|codex-preview/);
   assert.match(layout, /电路自习室｜本学期电子类课程个人学习站点/);
   assert.match(layout, /按教材章节学习、检验并在自由电路工作台中验证/);
-  assert.match(layout, /<html lang="zh-CN">/);
+  assert.match(layout, /<html lang="zh-CN" suppressHydrationWarning>/);
   assert.match(layout, /openGraph:/);
   assert.match(layout, /twitter:/);
   assert.match(layout, /new URL\("\/og\.png", metadataBase\)/);
-  assert.match(layout, /colorScheme:\s*"dark"/);
-  assert.match(layout, /themeColor:\s*"#181a1e"/);
+  assert.match(layout, /colorScheme:\s*"light dark"/);
+  assert.match(layout, /prefers-color-scheme: light/);
+  assert.match(layout, /color:\s*"#f4f5f7"/);
+  assert.match(layout, /color:\s*"#181a1e"/);
+  assert.match(layout, /themeInitializationScript/);
+  assert.match(layout, /document\.documentElement\.dataset\.themePreference = preference/);
 });
 test("the first render is deterministic and later restores only V3 or explicitly migrated state", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
@@ -52,12 +56,14 @@ test("the production interface keeps the neutral graphite notebook palette and r
     readFile(new URL("../app/data/courses/digital.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/data/courses/analog.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(styles, /color-scheme:\s*dark/);
-  assert.match(styles, /--paper-bg:\s*#181a1e/i);
-  assert.match(styles, /--paper:\s*#22252a/i);
-  assert.match(styles, /--ink:\s*#f0f1f3/i);
-  assert.match(styles, /--teal:\s*#7f8791/i);
-  assert.match(styles, /--orange:\s*#d59a63/i);
+  assert.match(styles, /color-scheme:\s*light dark/);
+  assert.match(styles, /--paper-bg:\s*light-dark\(#f4f5f7,\s*#181a1e\)/i);
+  assert.match(styles, /--paper:\s*light-dark\(#ffffff,\s*#22252a\)/i);
+  assert.match(styles, /--ink:\s*light-dark\(#202328,\s*#f0f1f3\)/i);
+  assert.match(styles, /--teal:\s*light-dark\(#737a84,\s*#7f8791\)/i);
+  assert.match(styles, /--orange:\s*light-dark\(#a45f25,\s*#d59a63\)/i);
+  assert.match(styles, /:root\[data-theme="light"\]\s*\{\s*color-scheme:\s*light/);
+  assert.match(styles, /:root\[data-theme="dark"\]\s*\{\s*color-scheme:\s*dark/);
   assert.doesNotMatch(styles, /#27b8a6|#62d1c3|rgba\(39,\s*184,\s*166/i);
   assert.doesNotMatch(`${workbenchStyles}\n${diagram}`, /#27b8a6|#62d1c3|#a7fff4|#d3fffa/i);
   assert.match(signals, /accent:\s*"#c5c9ce"/i);
@@ -73,7 +79,6 @@ test("the production interface keeps the neutral graphite notebook palette and r
   assert.match(styles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   assert.match(styles, /@media\s*\(prefers-contrast:\s*more\)/);
   assert.doesNotMatch(styles, /transition:\s*all\b/);
-  assert.doesNotMatch(styles, /color-scheme:\s*light/);
   assert.doesNotMatch(styles, /linear-gradient\(/);
 });
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { THEME_STORAGE_KEY } from "./lib/theme";
 import "./globals.css";
 
 const siteTitle = "电路自习室｜本学期电子类课程个人学习站点";
@@ -11,9 +12,23 @@ const cloudflareRay = /^[a-f0-9]{16,32}(?:-[a-z]{3})?$/i;
 const ipAddressCharacters = /^[a-f0-9:.]+$/i;
 
 export const viewport: Viewport = {
-  colorScheme: "dark",
-  themeColor: "#181a1e",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f5f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#181a1e" },
+  ],
 };
+
+const themeInitializationScript = `(() => {
+  let preference = "system";
+  try {
+    const stored = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+    if (stored === "system" || stored === "dark" || stored === "light") preference = stored;
+  } catch {}
+  const systemPrefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = preference === "system" ? (systemPrefersDark ? "dark" : "light") : preference;
+  document.documentElement.dataset.themePreference = preference;
+})();`;
 
 function firstHeaderValue(value: string | null) {
   return value?.split(",")[0]?.trim() || null;
@@ -138,7 +153,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} /></head>
       <body>{children}</body>
     </html>
   );

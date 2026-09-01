@@ -192,6 +192,28 @@ test("global search and JSON safeguards remain real interactions", async () => {
   assert.match(shell, /accept="application\/json,\.json"/);
 });
 
+test("appearance defaults to the system and persists explicit light or dark choices", async () => {
+  const [layout, theme, workbench, shell, styles] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/theme.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8"),
+    component("AppShell.tsx"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(theme, /themePreferences\s*=\s*\["system",\s*"dark",\s*"light"\]/);
+  assert.match(theme, /THEME_STORAGE_KEY\s*=\s*"personal-workbench-theme"/);
+  assert.match(layout, /localStorage\.getItem/);
+  assert.match(layout, /matchMedia\("\(prefers-color-scheme: dark\)"\)/);
+  assert.match(layout, /dangerouslySetInnerHTML=\{\{ __html: themeInitializationScript \}\}/);
+  assert.match(workbench, /themePreferenceRef\s*=\s*useRef<ThemePreference>\("system"\)/);
+  assert.match(workbench, /mediaQuery\.addEventListener\("change",\s*syncSystemTheme\)/);
+  assert.match(workbench, /localStorage\?\.setItem\(THEME_STORAGE_KEY,\s*next\)/);
+  assert.match(shell, /外观模式：\$\{themeLabels\[themePreference\]\}/);
+  assert.match(shell, /onThemePreferenceCycle/);
+  assert.match(styles, /light-dark\(/);
+  assert.match(styles, /--accent-contrast:/);
+});
+
 test("mistake records show origin and keep the next review date visible and editable", async () => {
   const mistakes = await component("ChapterMistakesView.tsx");
   assert.match(mistakes, /下次复习/);

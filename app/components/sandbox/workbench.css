@@ -9,7 +9,7 @@
 .circuit-workbench button, .circuit-workbench input, .circuit-workbench select { min-height: 36px; }
 .circuit-workbench button { padding: 0 11px; color: var(--teal-dark); background: var(--paper-soft); border: 1px solid var(--line-strong); border-radius: 5px; font-size: .74rem; font-weight: 700; }
 .circuit-workbench button:hover { border-color: var(--teal); }
-.circuit-workbench .cw-primary { color: #181a1e; background: var(--teal-dark); border-color: var(--teal-dark); }
+.circuit-workbench .cw-primary { color: var(--accent-contrast); background: var(--teal-dark); border-color: var(--teal-dark); }
 .circuit-workbench .cw-danger { color: var(--orange); border-color: rgba(255,147,77,.55); }
 .circuit-workbench .cw-text-button { padding: 0 5px; color: var(--ink-soft); background: transparent; border-color: transparent; }
 .cw-experiment-strip { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 13px 16px; border-left: 3px solid var(--orange); }
@@ -40,7 +40,7 @@
 .cw-canvas-panel { overflow: hidden; }
 .cw-canvas-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line); }
 .cw-canvas-toolbar > div { display: flex; gap: 4px; }
-.cw-canvas-toolbar button.is-active { color: #181a1e; background: var(--teal-dark); border-color: var(--teal-dark); }
+.cw-canvas-toolbar button.is-active { color: var(--accent-contrast); background: var(--teal-dark); border-color: var(--teal-dark); }
 .cw-canvas-toolbar > span { flex: 1; color: var(--ink-soft); font-size: .69rem; text-align: center; }
 .cw-transform-controls { padding-left: 4px; border-left: 1px solid var(--line); }
 .cw-zoom-controls button { min-width: 36px; padding-inline: 8px; }
@@ -69,7 +69,7 @@
 .cw-parameter-editor { display: grid; gap: 10px; margin-top: 14px; }
 .cw-parameter-editor label { display: grid; gap: 4px; color: var(--ink-soft); font-size: .68rem; font-weight: 700; }
 .cw-switch-control button { color: var(--ink); }
-.cw-switch-control button.is-high { color: #181a1e; background: var(--teal-dark); border-color: var(--teal-dark); }
+.cw-switch-control button.is-high { color: var(--accent-contrast); background: var(--teal-dark); border-color: var(--teal-dark); }
 .cw-unsupported, .cw-model-warning { padding: 9px; color: var(--orange); background: var(--orange-soft); border-left: 3px solid var(--orange); font-size: .69rem; }
 .cw-probe-list, .cw-diagnostics { margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--line); }
 .cw-probe-list h3, .cw-diagnostics h3 { margin: 0 0 8px; font-size: .76rem; }
