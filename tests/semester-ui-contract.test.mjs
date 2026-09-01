@@ -19,8 +19,11 @@ test("navigation exposes the three courses, two workbenches, records, and connec
   assert.match(workbench, /sandbox\/\$\{kind\}/);
 });
 
-test("the home page keeps three chapter-progress entries and adds two real workbench shortcuts", async () => {
-  const dashboard = await component("DashboardView.tsx");
+test("the home page keeps three compact course entries and moves both workbenches into the heading", async () => {
+  const [dashboard, styles] = await Promise.all([
+    component("DashboardView.tsx"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
   assert.match(dashboard, /courses\.map/);
   assert.match(dashboard, /getCurrentChapter/);
   assert.match(dashboard, /getCourseProgress/);
@@ -30,7 +33,14 @@ test("the home page keeps three chapter-progress entries and adds two real workb
   assert.match(dashboard, /onOpenWorkbench/);
   assert.match(dashboard, /数字电路工作台/);
   assert.match(dashboard, /模拟电路工作台/);
-  assert.ok(dashboard.indexOf('className="workbench-shortcuts"') < dashboard.indexOf('className="course-entry-grid"'), "workbench shortcuts must appear before course entries");
+  assert.match(dashboard, /className="page-heading course-dashboard-heading"[\s\S]*className="workbench-heading-actions"/);
+  assert.match(dashboard, /aria-label="进入数字电路工作台"[\s\S]*onOpenWorkbench\("digital"\)/);
+  assert.match(dashboard, /aria-label="进入模拟电路工作台"[\s\S]*onOpenWorkbench\("analog"\)/);
+  assert.doesNotMatch(dashboard, /className="workbench-shortcuts"|快速进入电路工作台|CIRCUIT SANDBOX/);
+  assert.ok(dashboard.indexOf('className="workbench-heading-actions"') < dashboard.indexOf('className="course-entry-grid"'), "compact workbench actions must remain beside the heading before course entries");
+  assert.match(styles, /\.course-entry-grid\s*\{[^}]*gap:\s*10px;/s);
+  assert.match(styles, /\.course-entry\s*\{[^}]*min-height:\s*116px;[^}]*padding:\s*16px\s+20px;/s);
+  assert.match(styles, /\.workbench-heading-actions\s*\{[^}]*display:\s*flex;/s);
   assert.doesNotMatch(dashboard, /今日|明天|本周|周次|打卡|连续学习|todayTasks|currentWeek|studyMinutes/);
 });
 

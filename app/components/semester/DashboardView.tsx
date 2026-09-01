@@ -15,27 +15,21 @@ const statusLabel = { not_started: "未学习", in_progress: "学习中", comple
 export function DashboardView({ courses, state, onOpenCourse, onOpenWorkbench }: DashboardViewProps) {
   return (
     <div className="chapter-dashboard page-enter">
-      <header className="page-heading">
+      <header className="page-heading course-dashboard-heading">
         <div><h1>本学期电子课程</h1><p>按教材章节推进；只有完成章节检验后，章节才计入进度。</p></div>
+        <div className="workbench-heading-actions" aria-label="电路工作台快捷入口">
+          <button type="button" aria-label="进入数字电路工作台" onClick={() => onOpenWorkbench("digital")}>
+            <Icon name="chip" size={18} />
+            <span>数字工作台</span>
+            <Icon name="arrow" size={15} />
+          </button>
+          <button type="button" aria-label="进入模拟电路工作台" onClick={() => onOpenWorkbench("analog")}>
+            <Icon name="wave" size={18} />
+            <span>模拟工作台</span>
+            <Icon name="arrow" size={15} />
+          </button>
+        </div>
       </header>
-      <section className="workbench-shortcuts" aria-labelledby="workbench-shortcuts-title">
-        <div className="section-title">
-          <div><span className="eyebrow">CIRCUIT SANDBOX</span><h2 id="workbench-shortcuts-title">快速进入电路工作台</h2></div>
-          <p>从空白画布开始搭建、连接和验证。</p>
-        </div>
-        <div className="workbench-shortcut-grid">
-          <button type="button" onClick={() => onOpenWorkbench("digital")}>
-            <Icon name="chip" size={22} />
-            <span><strong>数字电路工作台</strong><small>逻辑门、触发器与逻辑分析仪</small></span>
-            <Icon name="arrow" size={18} />
-          </button>
-          <button type="button" onClick={() => onOpenWorkbench("analog")}>
-            <Icon name="wave" size={22} />
-            <span><strong>模拟电路工作台</strong><small>基础元件、表计与示波器</small></span>
-            <Icon name="arrow" size={18} />
-          </button>
-        </div>
-      </section>
       <section className="course-entry-grid" aria-label="三门课程">
         {courses.map((course, index) => {
           const current = getCurrentChapter(state, course);
