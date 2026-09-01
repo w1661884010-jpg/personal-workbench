@@ -7,7 +7,7 @@ export const analogCourse = {
   textbook: "童诗白、华成英《模拟电子技术基础》第六版章序 / 第四版教材参照",
   sourceNote: "第 0—9 章按高等教育出版社官方电子教案校准；第 10 章读图内容由已核对的本地教材资料补充。HIT 模电笔记与 USTC 模拟电路教程用于交叉理解。",
   role: "在连续电信号进入数字系统前完成器件变换、放大、运算、反馈和波形处理。",
-  accent: "#ff9a52",
+  accent: "#7f8791",
   chapters: [
     {
       id: "analog-00", number: "0", title: "绪论", counted: true, sourceStatus: "verified_local",

@@ -17,7 +17,7 @@ test("the home entry mounts the V3 workbench with Chinese dark-site metadata", a
   assert.match(layout, /twitter:/);
   assert.match(layout, /new URL\("\/og\.png", metadataBase\)/);
   assert.match(layout, /colorScheme:\s*"dark"/);
-  assert.match(layout, /themeColor:\s*"#07141f"/);
+  assert.match(layout, /themeColor:\s*"#181a1e"/);
 });
 test("the first render is deterministic and later restores only V3 or explicitly migrated state", async () => {
   const workbench = await readFile(new URL("../app/components/LearningWorkbench.tsx", import.meta.url), "utf8");
@@ -43,14 +43,26 @@ test("active V3 home and chapter surfaces do not restore daily, weekly, or time-
   assert.match(model, /completed\/total|completed,\s*total|completed\s*\/\s*counted\.length/);
 });
 
-test("the production interface keeps the dark engineering-notebook palette and responsive layouts", async () => {
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+test("the production interface keeps the neutral graphite notebook palette and responsive layouts", async () => {
+  const [styles, workbenchStyles, diagram, signals, digital, analog] = await Promise.all([
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/sandbox/workbench.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/semester/StudyDiagram.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/courses/signals.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/courses/digital.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/courses/analog.ts", import.meta.url), "utf8"),
+  ]);
   assert.match(styles, /color-scheme:\s*dark/);
-  assert.match(styles, /--paper-bg:\s*#07141f/i);
-  assert.match(styles, /--paper:\s*#0d2230/i);
-  assert.match(styles, /--ink:\s*#e8f2f4/i);
-  assert.match(styles, /--teal:\s*#27b8a6/i);
-  assert.match(styles, /--orange:\s*#ff934d/i);
+  assert.match(styles, /--paper-bg:\s*#181a1e/i);
+  assert.match(styles, /--paper:\s*#22252a/i);
+  assert.match(styles, /--ink:\s*#f0f1f3/i);
+  assert.match(styles, /--teal:\s*#7f8791/i);
+  assert.match(styles, /--orange:\s*#d59a63/i);
+  assert.doesNotMatch(styles, /#27b8a6|#62d1c3|rgba\(39,\s*184,\s*166/i);
+  assert.doesNotMatch(`${workbenchStyles}\n${diagram}`, /#27b8a6|#62d1c3|#a7fff4|#d3fffa/i);
+  assert.match(signals, /accent:\s*"#c5c9ce"/i);
+  assert.match(digital, /accent:\s*"#9fa6ae"/i);
+  assert.match(analog, /accent:\s*"#7f8791"/i);
   assert.match(styles, /\.app-sidebar\s*\{[^}]*position:\s*fixed/s);
   assert.match(styles, /\.chapter-study\s*\{[^}]*grid-template-columns/s);
   assert.match(styles, /\.course-entry\s*\{[^}]*grid-template-columns/s);

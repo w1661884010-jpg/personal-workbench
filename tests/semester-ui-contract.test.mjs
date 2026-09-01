@@ -166,7 +166,7 @@ test("wires keep the original single curve while terminal state remains readable
   ]);
   assert.match(shell, /<path className="cw-wire" d=\{`M \$\{a\.x\} \$\{a\.y\} C /);
   assert.doesNotMatch(shell, /createWirePath|cw-wire-group|cw-wire-hit|cw-wire-halo/);
-  assert.match(styles, /\.cw-wire\s*\{[^}]*stroke:\s*#62d1c3;[^}]*pointer-events:\s*stroke;/s);
+  assert.match(styles, /\.cw-wire\s*\{[^}]*stroke:\s*#b9bec4;[^}]*pointer-events:\s*stroke;/s);
   assert.doesNotMatch(styles, /cw-wire-group|cw-wire-hit|cw-wire-halo/);
   assert.match(shell, /cw-port-status-ring/);
   assert.match(shell, /is-connected/);

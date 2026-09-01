@@ -7,7 +7,7 @@ export const digitalCourse = {
   textbook: "阎石《数字电子技术基础》第六版",
   sourceNote: "教材主线为阎石《数字电子技术基础》第六版；第 1–6 章配有分章笔记，第 3、4、6 章另有 SystemVerilog/ModelSim 工程。第 7、8 章以教材为准。",
   role: "把二值信息变成可分析、可组合、可记忆并可控制的逻辑系统。",
-  accent: "#36c2b4",
+  accent: "#9fa6ae",
   chapters: [
     {
       id: "digital-01",

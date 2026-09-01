@@ -9,12 +9,12 @@ interface StudyDiagramProps {
 }
 
 const diagramColors = {
-  background: "#102a37",
-  ink: "#e8f2f4",
-  muted: "#91a6b0",
-  line: "#687f8a",
-  teal: "#27b8a6",
-  orange: "#ff934d",
+  background: "#2a2d33",
+  ink: "#f0f1f3",
+  muted: "#a9adb4",
+  line: "#757b84",
+  teal: "#c5c9ce",
+  orange: "#d59a63",
 } as const;
 
 function arrow(context: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {

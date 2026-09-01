@@ -12,7 +12,7 @@ const ipAddressCharacters = /^[a-f0-9:.]+$/i;
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: "#07141f",
+  themeColor: "#181a1e",
 };
 
 function firstHeaderValue(value: string | null) {

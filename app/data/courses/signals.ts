@@ -8,7 +8,7 @@ export const signalsCourse = {
   sourceNote:
     "教材主线为赵光宙《信号分析与处理》第3版；配套课件用于章节复习，开放 Notebook 用于数值验证。",
   role: "描述信号、分析系统响应，并连接采样、频谱与滤波。",
-  accent: "#2fb7a3",
+  accent: "#c5c9ce",
   chapters: [
     {
       id: "signals-intro",
