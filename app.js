@@ -153,19 +153,14 @@
   tip.setAttribute("aria-hidden", "true");
   document.body.appendChild(tip);
 
-  function showTip(button, above) {
+  function showTip(button) {
     var text = button.getAttribute("data-tip");
     if (!text) return;
     tip.textContent = text;
-    tip.classList.toggle("tip-above", !!above);
     tip.classList.add("is-visible");
     var rect = button.getBoundingClientRect();
     var left = Math.min(Math.max(8, rect.left), window.innerWidth - tip.offsetWidth - 10);
-    if (above) {
-      tip.style.top = (rect.top - tip.offsetHeight - 9) + "px";
-    } else {
-      tip.style.top = (rect.bottom + 9) + "px";
-    }
+    tip.style.top = (rect.bottom + 9) + "px";
     tip.style.left = left + "px";
     /* 指向箭头对齐按钮中心 */
     var arrow = Math.min(Math.max(12, rect.left + rect.width / 2 - left), tip.offsetWidth - 12);
@@ -226,9 +221,9 @@
     var target = event.target;
     if (target && target.matches && target.matches(".cw-experiment-strip select")) updateWorkbenchLimit();
   });
-  workbenchLimit.addEventListener("mouseenter", function () { showTip(workbenchLimit, true); });
+  workbenchLimit.addEventListener("mouseenter", function () { showTip(workbenchLimit); });
   workbenchLimit.addEventListener("mouseleave", hideTip);
-  workbenchLimit.addEventListener("focus", function () { showTip(workbenchLimit, true); });
+  workbenchLimit.addEventListener("focus", function () { showTip(workbenchLimit); });
   workbenchLimit.addEventListener("blur", hideTip);
 
   /* 顶栏：下滚收起、上滚恢复；章节栏跟随顶栏移动，顶栏收起后置顶。

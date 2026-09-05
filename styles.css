@@ -182,11 +182,10 @@
   transition: background-color 120ms, color 120ms;
 }
 
-/* 聚焦/悬停：轻微背景反馈即可，不放大暖色高亮 */
 .limit-tip-button:hover,
 .limit-tip-button:focus-visible {
   background: var(--panel-2);
-  color: var(--ink-faint);
+  color: var(--warm);
   outline: none;
 }
 
@@ -751,7 +750,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   transition: opacity 120ms ease-out;
 }
 
-/* 箭头：默认朝上（提示在元素下方）；tip-above 时提示在元素上方，箭头朝下 */
+/* 指向箭头（对齐按钮中心，参考 NotebookLM 设计） */
 .page-tip::after {
   content: "";
   position: absolute;
@@ -760,13 +759,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border: 6px solid transparent;
   border-bottom-color: #38383d;
   border-top: 0;
-}
-
-.page-tip.tip-above::after {
-  top: auto;
-  bottom: -6px;
-  border-top-color: #38383d;
-  border-bottom: 0;
 }
 
 .page-tip.is-visible { opacity: 1; }
