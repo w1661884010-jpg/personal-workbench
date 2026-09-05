@@ -1314,7 +1314,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 @media (min-width: 901px) {
   /* 工作台 = 视口高应用（原 93px 外框 + 48px 分段切换区） */
   .workbench-root .circuit-workbench {
-    height: calc(100vh - 141px);
+    height: calc(100vh - 100px);
     display: grid;
     grid-template-areas:
       "head strip storage"
@@ -1411,6 +1411,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* 电路工作台整体：行距 14 → 10（列距由媒体块中的 column-gap: 0 决定，顶部三区分区竖线无缝） */
 .workbench-root .circuit-workbench { row-gap: 10px; }
+
+/* 顶部切换气泡覆盖在卡片左上（气泡宽 64 + 8 间距）：全部行左侧预留，避免遮内容 */
+.workbench-root .circuit-workbench { padding-left: 72px; }
 
 /* 标题行：只保留主标题（隐藏 eyebrow 与副标题说明） */
 .workbench-root .cw-eyebrow,
