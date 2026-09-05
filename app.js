@@ -741,7 +741,8 @@
     var page = document.createElement("article");
     page.className = "notebook-page";
 
-    /* —— 顶部：紧凑短标题导航（当前实验高亮；完成标记 ✓ 保留） —— */
+    /* —— 顶部：紧凑短标题导航（当前实验高亮；完成标记 ✓ 保留）。
+       导航行放在正文卡片之外，以便贴住窗口边（预留固定边距） —— */
     var topbar = document.createElement("header");
     topbar.className = "practice-topbar";
 
@@ -771,7 +772,7 @@
       tabs.appendChild(tab);
     });
     topbar.appendChild(tabs);
-    page.appendChild(topbar);
+    notebookRoot.appendChild(topbar);
 
     /* —— 两步布局：主导区（目标+沙箱）｜右侧栏（步骤+预期证据） —— */
     var layout = document.createElement("div");
