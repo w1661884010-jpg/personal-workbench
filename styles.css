@@ -156,18 +156,16 @@
   transition: opacity 140ms ease-out;
 }
 
-/* 演练视图：内容区左右 20px 固定边距、底部贴视口（消除全局 80px 背景滚动区） */
-.shell.is-practice .content { padding-left: 20px; padding-right: 20px; padding-bottom: 0; }
-
-/* 导航行：贴住窗口边（左 20 / 右 20），不受正文卡片宽度限制 */
-.notebook-root > .practice-topbar { margin-bottom: 16px; }
+/* 演练视图：内容区左右与底部固定 20px 边距（与卡片内边距节奏一致） */
+.shell.is-practice .content { padding-left: 20px; padding-right: 20px; padding-bottom: 20px; }
 
 .notebook-page {
   display: grid;
   gap: 20px;
+  align-content: start;            /* 行不随卡片高度拉伸（顶部导航不被撑高） */
   width: 100%;
   max-width: none;
-  min-height: calc(100vh - 142px);   /* 撑满视口：实测页面顶偏移 142、底部贴视口，消除底部大片留空 */
+  min-height: calc(100vh - 106px);   /* 撑满视口：顶部偏移 86 + 底部 20（与左右留空一致） */
   padding: 24px;
   border-radius: 12px;
   background: var(--panel);
@@ -344,14 +342,13 @@
 
 .practice-tab {
   display: inline-flex;
-  flex: 1 1 0;            /* 桌面均分填满整行，消除右侧留空；窄屏受内容最小宽限制仍可自身横滚 */
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 34px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--panel-2);
   color: var(--ink-soft);
   font-weight: 700;
@@ -431,17 +428,17 @@
 
 .demo-metric {
   display: grid;
-  gap: 3px;
-  min-width: 130px;
+  gap: 4px;
+  min-width: 170px;
   flex: 0 0 auto;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 13px 16px;
+  border-radius: 10px;
   background: var(--panel);
 }
 
-.demo-metric-label { font-size: .7rem; color: var(--ink-faint); }
+.demo-metric-label { font-size: .72rem; color: var(--ink-faint); }
 
-.demo-metric-value { font-family: var(--mono); font-size: .92rem; font-weight: 750; white-space: normal; }
+.demo-metric-value { font-family: var(--mono); font-size: 1rem; font-weight: 750; white-space: normal; }
 
 @media (max-width: 620px) {
   .notebook-page { gap: 18px; padding: 18px 16px; border-radius: 10px; }

@@ -772,7 +772,7 @@
       tabs.appendChild(tab);
     });
     topbar.appendChild(tabs);
-    notebookRoot.appendChild(topbar);
+    page.appendChild(topbar);
 
     /* —— 两步布局：主导区（目标+沙箱）｜右侧栏（步骤+预期证据） —— */
     var layout = document.createElement("div");
