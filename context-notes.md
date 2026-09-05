@@ -173,3 +173,7 @@
 - Mobile rule changes direction but retains desktop 186px chapter-list width, 48px rail, and collapsed shell columns. Fix responsive overrides only; keep chapter logic and desktop rules intact.
 - Retain existing colors/type; full-width rounded navigation, thin scrollbar and in-flow pager are limited to the existing mobile breakpoint.
 - Browser found align-self:start also retained max-content sizing; overriding to stretch fixed measured overflow (932px down to viewport 375px including scrollbar). Collapsed title needed matching selector specificity. 390/760px navigation and last chapter selection passed, desktop 1440 retained 186px vertical list/fixed pager. No console errors; full suite 38/38. Tested Chromium only.
+# Stable 3010 release
+- User confirmed replacing old 3000 site online. Destination w1661884010-jpg/personal-workbench main; existing Pages workflow currently builds old Vite sources.
+- Local 3010 clean at 0a8cee4; full tests 38/38. Old main ae25963 fetched. Tags preserve both snapshots. Git CLI requires host permission for Windows TLS; gh CLI auth fails, connector is authenticated.
+- Keep source bundle rebuild dependence on sibling old project explicit. Deployment uses tested committed bundles, not unverified rebuilding. No localStorage upload/migration.

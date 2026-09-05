@@ -103,3 +103,7 @@
 - [x] Fix narrow width/collapsed layout and in-flow pager.
 - [x] Browser: 390/760px expanded/collapsed, last chapter selection; 1440px desktop preserved.
 - [x] Full suite 38/38; diff check passed.
+# Stable 3010 GitHub Pages
+- [ ] Publish allowlist and subpath validation.
+- [ ] Tests, historical credential-pattern scan, preserve both histories.
+- [ ] Push and verify deployment/online page.
