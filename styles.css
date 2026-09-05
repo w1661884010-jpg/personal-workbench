@@ -335,13 +335,14 @@
 
 .practice-tab {
   display: inline-flex;
-  flex: 0 0 auto;
+  flex: 1 1 0;            /* 桌面均分填满整行，消除右侧留空；窄屏受内容最小宽限制仍可自身横滚 */
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 34px;
+  min-height: 40px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--panel-2);
   color: var(--ink-soft);
   font-weight: 700;
@@ -411,15 +412,19 @@
 
 .demo-legend-peak::before { content: "◆"; margin-right: 4px; color: var(--accent); }
 
+/* 结果格：按内容自适应宽度（不再等宽拉伸），行内等高，长结果自然换行 */
 .demo-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 10px;
 }
 
 .demo-metric {
   display: grid;
   gap: 3px;
+  min-width: 130px;
+  flex: 0 0 auto;
   padding: 10px 12px;
   border-radius: 8px;
   background: var(--panel);
