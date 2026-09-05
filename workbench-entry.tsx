@@ -15,14 +15,16 @@ export interface MountOptions {
   courses: readonly unknown[];
   onOpenChapter: (chapterId: string) => void;
   onNotify: (message: string, tone?: NotifyTone) => void;
+  /** 已显示类型变化（切换成功落地/失败回滚）时通知 shell，由其同步滑块/aria/activeWorkbench */
+  onKindChange?: (kind: CircuitKind) => void;
 }
 
 const roots: Partial<Record<CircuitKind, Root>> = {};
 const sessionContainers: Partial<Record<CircuitKind, HTMLElement>> = {};
 let activeContainer: HTMLElement | null = null;
 let activeOptions: MountOptions | null = null;
-let activeKind: CircuitKind | null = null;
-let visibleKind: CircuitKind | null = null;
+let activeKind: CircuitKind | null = null;   // 最近一次用户请求的目标（shell 滑块以此为准）
+let visibleKind: CircuitKind | null = null;  // 实际显示中的面板（动画期间保持旧值）
 
 /* 内容切换过渡时长（与原型 styles.css 保持一致）：淡出 80ms → 切换 → 淡入 120ms */
 const FADE_OUT_MS = 80;
@@ -30,14 +32,41 @@ const FADE_IN_MS = 120;
 const READY_POLL_MS = 40;
 const READY_TIMEOUT_MS = 1500;
 
-/* 切换代号：快速连点/卸载时使过期回调失效，只让最后一次选择落地 */
+/* 任务生命周期分离：
+   - layoutTimers：会话挂载/仪器面板桥接等布局任务，只能由 unmount 清理；
+     切换（setKind）不得取消它们，否则首次挂载的桥接轮询会被误杀。
+   - pendingTimers：切换动画编排，新切换到达时取消过期回调。 */
 let switchSeq = 0;
+let layoutTimers: Array<ReturnType<typeof setTimeout>> = [];
 let pendingTimers: Array<ReturnType<typeof setTimeout>> = [];
 let readyPollTimer: ReturnType<typeof setInterval> | null = null;
 let readyTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
 function prefersReducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/* 测试专用故障注入：仅当 URL 携带 cwReadyDelay / cwMountFail 时生效（行为测试用），
+   正常使用无任何影响。cwReadyDelay=毫秒 表示挂载就绪后延迟上报（慢加载），
+   cwMountFail=1 表示每次挂载都模拟失败，cwMountFail=once 表示仅第一次失败
+   （失败后清除参数，供“失败回滚后再次点击可成功重试”验证）。 */
+function testHookReadyDelay(): number {
+  if (typeof location === "undefined") return 0;
+  const raw = new URLSearchParams(location.search).get("cwReadyDelay");
+  const value = raw ? Number(raw) : 0;
+  return value > 0 ? value : 0;
+}
+
+function testHookMountFail(): boolean {
+  if (typeof location === "undefined") return false;
+  const params = new URLSearchParams(location.search);
+  const mode = params.get("cwMountFail");
+  if (!mode) return false;
+  if (mode === "once") {
+    params.delete("cwMountFail");
+    history.replaceState(null, "", location.pathname + (params.size ? "?" + params.toString() : ""));
+  }
+  return true;
 }
 
 function clearReadyWatchers() {
@@ -51,12 +80,15 @@ function clearReadyWatchers() {
   }
 }
 
-function clearPendingTimers() {
-  for (const timer of pendingTimers) clearTimeout(timer);
-  pendingTimers = [];
+function scheduleLayout(fn: () => void, ms: number) {
+  const timer = setTimeout(() => {
+    layoutTimers = layoutTimers.filter((t) => t !== timer);
+    fn();
+  }, ms);
+  layoutTimers.push(timer);
 }
 
-function later(fn: () => void, ms: number) {
+function scheduleSwitch(fn: () => void, ms: number) {
   const timer = setTimeout(() => {
     pendingTimers = pendingTimers.filter((t) => t !== timer);
     fn();
@@ -64,15 +96,43 @@ function later(fn: () => void, ms: number) {
   pendingTimers.push(timer);
 }
 
+function clearLayoutTimers() {
+  for (const timer of layoutTimers) clearTimeout(timer);
+  layoutTimers = [];
+}
+
+function clearPendingTimers() {
+  for (const timer of pendingTimers) clearTimeout(timer);
+  pendingTimers = [];
+}
+
+function emitKindChange(kind: CircuitKind) {
+  activeOptions?.onKindChange?.(kind);
+}
+
 /* 挂载就绪判断：轮询目标会话容器，待 React 提交出 .circuit-workbench 再开始替换。
-   超时视为挂载失败，由调用方保留可用内容并反馈错误。 */
+   超时或注入失败以失败回调结束，由调用方保留可用内容并反馈错误。 */
 function waitForSessionReady(container: HTMLElement, onReady: () => void, onFail: () => void) {
   clearReadyWatchers();
+  const delay = testHookReadyDelay();
   const deadline = Date.now() + READY_TIMEOUT_MS;
   readyPollTimer = setInterval(() => {
+    if (testHookMountFail()) {
+      clearReadyWatchers();
+      onFail();
+      return;
+    }
     if (container.querySelector(".circuit-workbench")) {
       clearReadyWatchers();
-      onReady();
+      if (delay > 0) {
+        /* 慢加载注入：就绪后延迟上报，期间旧内容保持可见 */
+        readyTimeoutTimer = setTimeout(() => {
+          readyTimeoutTimer = null;
+          onReady();
+        }, delay);
+      } else {
+        onReady();
+      }
       return;
     }
     if (Date.now() >= deadline) {
@@ -105,14 +165,15 @@ function restoreInstruments(container: HTMLElement) {
   if (instruments && workbench !== instruments.parentElement) workbench.appendChild(instruments);
 }
 
-/* React createRoot.render 为异步提交：轮询挂载点，待 instruments 出现后桥接 */
+/* React createRoot.render 为异步提交：轮询挂载点，待 instruments 出现后桥接。
+   这是布局任务，走 layoutTimers，切换不会取消它。 */
 function scheduleBridge(container: HTMLElement, attempts = 0) {
   if (attempts > 20) return;
   if (container.querySelector(`.${INSTRUMENTS_CLASS}`)) {
     moveInstrumentsIntoInspector(container);
     return;
   }
-  later(() => scheduleBridge(container, attempts + 1), 40);
+  scheduleLayout(() => scheduleBridge(container, attempts + 1), 40);
 }
 
 function ensureSession(kind: CircuitKind, initialExperimentId?: string) {
@@ -152,11 +213,11 @@ export function mount(container: HTMLElement, options: MountOptions) {
 
 /* 数字/模拟切换：
    - 滑块状态由 shell 立即同步，activeKind 同步立即锁定最后目标；
-   - 内容过渡只改透明度：当前可见会话 80ms 淡出 → 目标就绪后切显隐 → 目标 120ms 淡入；
-     visibleKind 独立跟踪实际显示面板，动画期间保持旧值，避免快速连点时 current 定位错位；
-   - immediate（键盘/reduced-motion/首次显示）走即时路径，不播动画；
-   - 快速连点以最后一次为准（switchSeq 取消过期回调）；
-   - 过渡期间两面板均不可操作（.cw-switching），结束后仅目标可操作。 */
+   - 内容过渡：先等目标挂载就绪（旧内容保持可见，不提前隐藏唯一可用内容），
+     就绪后旧会话 80ms 淡出 → 切显隐 → 目标 120ms 淡入；
+   - visibleKind 独立跟踪实际显示面板；switchSeq 取消过期回调（快速连点以最后一次为准）；
+   - 过渡期间两面板均 inert（不可点击/聚焦/键盘触发），切换控件始终可响应；
+   - immediate（键盘/reduced-motion/首次显示）走即时路径；失败保留旧内容并回滚 shell 状态。 */
 export function setKind(kind: CircuitKind, immediate = false) {
   if (!activeContainer || !activeOptions || activeKind === kind) return;
   const seq = ++switchSeq;
@@ -174,13 +235,16 @@ export function setKind(kind: CircuitKind, immediate = false) {
       const container = sessionContainers[sessionKind];
       if (!container) continue;
       container.hidden = sessionKind !== kind;
+      container.inert = sessionKind !== kind;
       if (sessionKind !== kind) container.style.opacity = "";
       container.classList.remove("cw-switching", "cw-switching-in");
     }
     target.hidden = false;
+    target.inert = false;
     target.classList.remove("cw-switching", "cw-switching-in");
     target.style.opacity = "";
     visibleKind = kind;
+    emitKindChange(kind);
   };
 
   /* 无旧可见内容、目标即当前可见面板、或要求即时：直接落地 */
@@ -189,52 +253,60 @@ export function setKind(kind: CircuitKind, immediate = false) {
     return;
   }
 
-  /* 动画路径：淡出当前，等目标挂载就绪后切换，再淡入目标 */
+  /* 动画路径：先等目标就绪（旧内容保持可见），就绪后淡出当前 → 切换 → 淡入目标 */
   const current = prevVisible;
-  current.classList.add("cw-switching");
-  current.style.opacity = "0";
-  const fadeStart = Date.now();
 
-  const finishSwitch = () => {
+  const startSwitch = () => {
     if (seq !== switchSeq) return;
-    current.hidden = true;
-    current.classList.remove("cw-switching");
-    current.style.opacity = "";
-    target.hidden = false;
-    target.classList.add("cw-switching-in");
-    target.style.opacity = "0";
-    void target.offsetHeight; /* 强制回流：淡入过渡在元素显示后才启动 */
-    target.style.opacity = "1";
-    visibleKind = kind;
-    later(() => {
+    current.classList.add("cw-switching");
+    current.inert = true;
+    current.style.opacity = "0";
+    scheduleSwitch(() => {
       if (seq !== switchSeq) return;
-      target.classList.remove("cw-switching", "cw-switching-in");
-      target.style.opacity = "";
-    }, FADE_IN_MS);
+      current.hidden = true;
+      current.classList.remove("cw-switching");
+      current.style.opacity = "";
+      target.hidden = false;
+      target.classList.add("cw-switching-in");
+      target.inert = true;
+      target.style.opacity = "0";
+      void target.offsetHeight; /* 强制回流：淡入过渡在元素显示后才启动 */
+      target.style.opacity = "1";
+      visibleKind = kind;
+      emitKindChange(kind);
+      scheduleSwitch(() => {
+        if (seq !== switchSeq) return;
+        target.classList.remove("cw-switching", "cw-switching-in");
+        target.inert = false;
+        target.style.opacity = "";
+      }, FADE_IN_MS);
+    }, FADE_OUT_MS);
   };
 
   waitForSessionReady(
     target,
-    () => {
-      const wait = Math.max(0, FADE_OUT_MS - (Date.now() - fadeStart));
-      later(() => { if (seq === switchSeq) finishSwitch(); }, wait);
-    },
+    startSwitch,
     () => {
       if (seq !== switchSeq) return;
-      /* 加载失败：保留可用内容并反馈错误，不切换到空白面板 */
+      /* 加载失败：旧内容从未被隐藏，保留并反馈错误；回滚 bundle 与 shell 状态，
+         滑块/aria 回到已显示类型，再次点击可重试 */
       current.classList.remove("cw-switching");
+      current.inert = false;
       current.style.opacity = "";
       activeKind = visibleKind ?? kind;
+      if (activeKind !== kind) emitKindChange(activeKind);
       activeOptions?.onNotify?.("工作台内容加载失败，已保留当前类型。", "error");
     },
   );
 }
 
 export function unmount() {
-  /* 使一切进行中的切换/挂载观察/延迟回调失效，防止旧回调重显已离开的内容 */
+  /* 使一切进行中的切换/挂载观察/延迟回调失效，防止旧回调重显已离开的内容；
+     布局任务（含尚未完成的仪器桥接）一并清理 */
   switchSeq += 1;
   clearPendingTimers();
   clearReadyWatchers();
+  clearLayoutTimers();
   /* 先还原节点位置：React 按 fiber 父节点移除，移入 inspector 后直接 unmount 会 NotFoundError */
   for (const kind of ["digital", "analog"] as const) {
     const container = sessionContainers[kind];

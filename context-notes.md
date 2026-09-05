@@ -137,3 +137,14 @@
 - 移动端 390×844：scrollWidth=clientWidth=390 无溢出，滑块 184px 正常；桌面 1440×900 与深色模式截图均正常（深色主题下选中底块 #3a4048、轨道 #23262c，文字清晰）。
 - 完整测试 15/15 通过（原 12 + 新增 3 项结构断言），`node --check app.js` 通过；`workbench.bundle.js` 重新构建（249.8kB）。既有 `favicon.ico` 404 未处理（不在本轮范围）。
 - 恢复标签：修改前 `restore-2026-09-05-before-kind-switcher-slider`（1c6cdf9），完成后 `restore-2026-09-05-after-kind-switcher-slider`（提交后创建）。
+## 2026-09-05：滑块与内容过渡核验修正（review 反馈 8c32b85 之后）
+
+- 核验确认三个真实缺陷：(1) `mount()` 中 `setKind()` 的 `clearPendingTimers()` 会取消 `ensureSession()` 排入同一列表的仪器桥接任务（scheduleBridge 40ms 轮询链被掐断，首次挂载布局任务失效）；(2) 切换序列先淡出旧内容再等目标就绪，慢加载/失败时旧内容被提前隐藏 1.5s 空白；(3) 失败分支只回滚 bundle 内部 `activeKind`，shell 的 `activeWorkbench`/滑块/aria 停留在失败目标上。
+- 修复一：任务生命周期分离——`layoutTimers`（挂载/桥接）与 `pendingTimers`（切换动画）两个队列；`setKind` 只清切换队列，`unmount()` 才清理全部（含 ready 观察器）。行为测试断言首次进入两种工作台后 `cw-instruments` 恰好各 1 个且在 `cw-inspector` 内。
+- 修复二：切换顺序反转为“等目标就绪（旧内容保持可见）→ 就绪后淡出 80ms → 切显隐 → 淡入 120ms”。行为测试用 `?cwReadyDelay=900` 注入慢就绪：120ms/550ms 采样数字台 opacity 恒 1、hidden 恒 false，完成后目标 opacity=1；失败时旧内容从未隐藏。
+- 修复三：新增 `MountOptions.onKindChange`，切换落地/失败回滚时通知 shell；`syncKindFromBundle()` 将 `activeWorkbench`/滑块/aria/tabindex 一并回滚（失败路径用即时同步 `syncKindSwitcher(true)`）。故障注入支持 `cwMountFail=once`（失败一次后清除参数），行为测试验证回滚一致且再次点击可成功重试。
+- 修复四：键盘补全 Enter/空格（kindSwitcher keydown 拦截 `preventDefault` + click handler `event.detail===0` 兜底走即时路径）；roving tabindex（激活 0/未激活 -1，`syncKindSwitcher` 同步）；`inert` 代替仅 pointer-events：过渡中旧/新面板 inert（不可点击、聚焦、键盘触发），结束仅目标可操作；切换控件在 workbenchRoot 外不受影响。
+- 行为测试（9 项，node:test + playwright 系统 Chrome channel，隔离 context 不触碰用户 localStorage）：仪器桥接两 kind、慢就绪可见性、失败回滚+重试、25ms 连点 10 次一致性、过渡中离开清理+零运行时错误、Enter/Space/Arrow/Home/End 40ms 即时、emulateMedia reduced-motion 真媒体模拟（thumb/session computed transition 0s/none + 40ms 即时）、inert 隔离+过渡中切换器可响应、探针模式与缩放 120% 往返保留。
+- 测试自身踩坑记录：`[data-kind="..."]` 会先匹配到切换按钮（按钮同样带 data-kind），会话容器必须用 `.prototype-workbench-session[data-kind=...]`；ArrowLeft 在 digital 上夹取停留无切换，行为测试从 analog 出发验证。
+- 手动验收（应用内浏览器 + CLI）：移动 390×844 scrollWidth=clientWidth=390、数字台显示正常；桌面/深色此前已验收未回退。浏览器环境依赖说明：playwright 库从 npx 缓存加载（1.62.1，channel chrome），行为测试前探测 3010 可访问性，否则明确报错。
+- 未覆盖/已知限制：元件拖放放置与连线绘制交互未纳入自动化（需画布级人工交互），会话身份与探针/缩放状态保留已自动化验证；失败反馈 notify 触发仅 at once 注入路径验证；inert 兼容性按 Chromium/现代浏览器（原型目标环境）；真实 OS 级 reduced-motion 由 emulateMedia 媒体模拟覆盖（与 Chromium 真实媒体查询同一 CSSOM 路径）。

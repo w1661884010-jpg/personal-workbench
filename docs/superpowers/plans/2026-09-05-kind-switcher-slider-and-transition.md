@@ -64,7 +64,11 @@
   状态保留（元件/连线/探针/缩放/模式）、桌面+移动布局、键盘、reduced-motion 仿真。
 - 浏览器内验证滑块与内容一致、无半透明残留、无过期回调。
 
-## 完成后
-- 提交逻辑变更 + 创建 `restore-2026-09-05-after-kind-switcher-slider` 标签；不推送远程。
-- 汇报修改内容、测试结果、已知限制、修改前后标签与恢复方法
-  （`docs/restore.md`；Git 恢复仅限项目文件，不含浏览器电路存档与学习进度）。
+## 2026-09-05（第二轮：review 核验修正）
+
+只读核验与行为测试发现上述第一版存在三处缺陷，已修正并追加行为测试（详见 context-notes）：
+1. **布局任务误取消**：mount → setKind 的 `clearPendingTimers()` 取消仪器桥接轮询。修复：分离 `layoutTimers`（挂载/桥接，仅 unmount 清理）与 `pendingTimers`（切换动画，可被新切换取消）。行为测试：首次进入数字台、首次进入模拟台后 `cw-instruments` 各 1 个且位于 `cw-inspector` 内。
+2. **慢加载空白**：原实现先淡出旧内容再等目标就绪。修复：先就绪→淡出 80ms→切换→淡入 120ms；失败保留旧内容 + 反馈错误。行为测试：`?cwReadyDelay=900` 期间旧内容恒可见。
+3. **失败状态不同步**：失败只回滚 bundle 内 activeKind。修复：`onKindChange` 回调统一同步 shell 的 activeWorkbench/滑块/aria/tabindex；`cwMountFail=once` 注入验证回滚一致且重试成功。
+4. 键盘补全 Enter/空格即时、roving tabindex、`inert` 交互隔离；行为测试用 `emulateMedia({reducedMotion:'reduce'})` 真媒体模拟。
+测试：26/26（11 结构 + 9 行为 + 6 既有），桌面/移动验收通过，`restore-2026-09-05-before-kind-switcher-fix`（修复前）与 `restore-2026-09-05-after-kind-switcher-fix`（修复后）标签已建，未推送远程。

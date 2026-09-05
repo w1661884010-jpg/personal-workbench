@@ -73,7 +73,33 @@ test("the content transition is tokenized so rapid switches settle on the last c
   assert.match(entry, /prefersReducedMotion\(\)/);
   assert.match(entry, /waitForSessionReady\(/, "target mount readiness gates the swap, not a fixed guess");
   assert.match(entry, /activeOptions\?\.onNotify\?\.\(["']工作台内容加载失败[\s\S]*"error"\)/, "mount failure keeps content and reports an error");
-  assert.match(entry, /export function unmount\(\)[\s\S]{0,200}switchSeq \+= 1;[\s\S]{0,120}clearPendingTimers\(\);[\s\S]{0,120}clearReadyWatchers\(\);/);
+  assert.match(entry, /export function unmount\(\)[\s\S]{0,240}switchSeq \+= 1;[\s\S]{0,160}clearPendingTimers\(\);[\s\S]{0,160}clearReadyWatchers\(\);[\s\S]{0,160}clearLayoutTimers\(\);/);
+});
+
+test("mount/layout tasks live outside the switch cancellation scope", async () => {
+  const entry = await read("workbench-entry.tsx");
+
+  assert.match(entry, /let layoutTimers: Array<ReturnType<typeof setTimeout>> = \[\];/);
+  assert.match(entry, /function scheduleLayout\(fn: \(\) => void, ms: number\)/);
+  const setKindBlock = entry.slice(entry.indexOf("export function setKind"), entry.indexOf("export function unmount"));
+  assert.doesNotMatch(setKindBlock, /clearLayoutTimers\(\)/, "switching must never cancel layout/bridge tasks");
+  assert.match(entry, /scheduleBridge[\s\S]{0,200}scheduleLayout\(/, "the instruments bridge is scheduled as a layout task");
+});
+
+test("failure and rollback notifies the shell, and keyboard/inert paths are wired", async () => {
+  const [entry, app, html] = await Promise.all([read("workbench-entry.tsx"), read("app.js"), read("index.html")]);
+
+  assert.match(entry, /onKindChange\?: \(kind: CircuitKind\) => void/, "entry exposes the displayed-kind callback");
+  assert.match(entry, /activeKind = visibleKind \?\? kind;[\s\S]{0,80}if \(activeKind !== kind\) emitKindChange\(activeKind\)/, "failure rolls bundle state back and informs the shell");
+  assert.match(entry, /container\.inert = sessionKind !== kind;/, "non-target sessions become inert");
+  assert.match(entry, /target\.inert = false;/, "target panel is interactive when settled");
+  assert.match(app, /onKindChange: syncKindFromBundle/);
+  assert.match(app, /function syncKindFromBundle\(kind\)/);
+  assert.match(app, /setAttribute\(["']tabindex["'], active \? ["']0["'] : ["']-1["']\)/, "roving tabindex on the tabs");
+  assert.match(app, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(app, /event\.detail === 0/, "keyboard-synthesized clicks also switch instantly");
+  assert.match(html, /id="kindTabDigital"[\s\S]{0,180}tabindex="0"/);
+  assert.match(html, /id="kindTabAnalog"[\s\S]{0,180}tabindex="-1"/);
 });
 
 test("keyboard switching is instant and reduced motion disables both transitions", async () => {

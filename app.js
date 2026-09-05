@@ -1560,7 +1560,8 @@
             setView(null);
             jumpToChapter(chapterId);
           },
-          onNotify: notify
+          onNotify: notify,
+          onKindChange: syncKindFromBundle
         });
         pendingExperimentId = "";
       } else if (wbKind === "notebook") {
@@ -1608,6 +1609,16 @@
     syncWorkbenchButton();
   }
 
+  /* bundle 报告已显示类型变化（切换成功落地 / 加载失败回滚）：同步顶栏与滑块。
+     点击路径已先行同步（activeWorkbench === kind 时幂等），此回调只处理回滚等异步差异。 */
+  function syncKindFromBundle(kind) {
+    if (!isCircuitWorkbench(activeWorkbench) || activeWorkbench === kind) return;
+    activeWorkbench = kind;
+    pendingExperimentId = "";
+    syncKindSwitcher(true);
+    syncWorkbenchButton();
+  }
+
   function syncKindSwitcher(instant) {
     if (instant) kindSwitcher.classList.add("is-instant");
     var activeKind = null;
@@ -1616,6 +1627,7 @@
       if (active) activeKind = button.dataset.kind;
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
+      button.setAttribute("tabindex", active ? "0" : "-1");
     });
     kindThumb.style.transform = activeKind === "analog" ? "translateX(100%)" : "translateX(0)";
     if (instant) {
@@ -1626,16 +1638,31 @@
   }
 
   kindSwitchButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
+    button.addEventListener("click", function (event) {
       var kind = button.dataset.kind;
-      if (kind !== activeWorkbench) setView(kind);
+      if (kind === activeWorkbench) return;
+      /* 键盘激活产生的合成 click（detail === 0，如某些环境中的 Enter/空格）也走即时切换 */
+      if (event.detail === 0) {
+        switchWorkbenchKind(kind, true);
+        return;
+      }
+      setView(kind);
     });
   });
 
-  /* 键盘访问：方向键/Home/End 切换，焦点保留在切换项内，即时切换（无内容过渡） */
+  /* 键盘访问：方向键/Home/End 切换并移动焦点；Enter/空格即时切换（不播放滑块或内容动画）；
+     焦点保留在切换项内，不主动跳入画布 */
   var kindOrder = ["digital", "analog"];
   kindSwitcher.addEventListener("keydown", function (event) {
     if (!isCircuitWorkbench(activeWorkbench)) return;
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      var button = event.target.closest ? event.target.closest(".kind-switch-button") : null;
+      if (!button) return;
+      event.preventDefault();
+      var kind = button.dataset.kind;
+      if (kind !== activeWorkbench) switchWorkbenchKind(kind, true);
+      return;
+    }
     var index = kindOrder.indexOf(activeWorkbench);
     var next = null;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") next = kindOrder[Math.min(index + 1, kindOrder.length - 1)];

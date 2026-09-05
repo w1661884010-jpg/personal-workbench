@@ -73,3 +73,12 @@
 - [x] 构建 bundle、运行完整测试与语法检查。
 - [x] Playwright 桌面/移动验收（双向切换、连点10次、首次/动画中返回/再进入、状态保留、键盘、reduced-motion）。
 - [x] 提交逻辑变更并创建优化版恢复标签 `restore-2026-09-05-after-kind-switcher-slider`，汇报结果与限制。
+## 2026-09-05：滑块与内容过渡核验修正（review 反馈）
+
+- [x] 分离布局任务与切换动画任务（layoutTimers 只能 unmount 清理）；仪器桥接不被切换误取消。
+- [x] 切换序列改为“先等目标挂载就绪、旧内容保持可见”，就绪后才淡出（消除慢加载 1.5s 空白）。
+- [x] 失败状态统一同步：onKindChange 回调让 shell 回滚 activeWorkbench/滑块/aria/tabindex；失败后可重试不被短路。
+- [x] 键盘补全 Enter/空格（keydown 拦截 + detail=0 兜底）、roving tabindex、inert 交互隔离。
+- [x] 新增真实浏览器行为测试（9 项，隔离 context + URL 故障注入），结构断言语义修正。
+- [x] docs/restore.md 补齐四个恢复标签与安全恢复步骤（不用 reset --hard 当默认）。
+- [x] 完整测试 26/26、语法与差异检查、桌面/移动验收通过；提交并创建 `restore-2026-09-05-after-kind-switcher-fix`。

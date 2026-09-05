@@ -97,8 +97,8 @@
         <section id="workbenchStage" class="workbench-stage" hidden aria-label="电路工作台">
           <nav id="kindSwitcher" class="kind-switcher" role="tablist" aria-label="工作台类型">
             <span class="kind-thumb" aria-hidden="true"></span>
-            <button type="button" id="kindTabDigital" class="kind-switch-button" role="tab" data-kind="digital" aria-selected="true" aria-controls="workbenchPanelDigital">数字</button>
-            <button type="button" id="kindTabAnalog" class="kind-switch-button" role="tab" data-kind="analog" aria-selected="false" aria-controls="workbenchPanelAnalog">模拟</button>
+            <button type="button" id="kindTabDigital" class="kind-switch-button" role="tab" data-kind="digital" aria-selected="true" tabindex="0" aria-controls="workbenchPanelDigital">数字</button>
+            <button type="button" id="kindTabAnalog" class="kind-switch-button" role="tab" data-kind="analog" aria-selected="false" tabindex="-1" aria-controls="workbenchPanelAnalog">模拟</button>
           </nav>
           <div id="workbenchRoot" class="workbench-root"></div>
         </section>
