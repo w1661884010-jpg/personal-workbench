@@ -178,8 +178,13 @@
   border-radius: 50%;
   background: transparent;
   color: var(--ink-faint);
-  cursor: help;
+  cursor: pointer;        /* 不用 help：避免系统问号光标 */
   transition: none;
+}
+
+/* 聚焦时无任何视觉变化（不做外圈/背景），仅保留可弹出提示的能力 */
+.limit-tip-button:focus-visible {
+  outline: none;
 }
 
 .prototype-workbench-session[hidden] { display: none; }
