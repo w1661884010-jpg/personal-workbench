@@ -119,3 +119,21 @@
 - 浏览器 1440px 验证灰阶圆角及胶囊模式；空画布清空禁用，添加开关后启用，探针 aria-pressed 正确，切换模拟再返回数字保留元件及模式。390px 页面 scrollWidth 为375，无横向溢出。修复后无新增控制台错误（日志保留修复前一条错误）。
 - 经用户“继续推进”后修正两个旧测试的检查范围：无图要求仅约束正文渲染函数，单工作台入口检查按 id 而非共享样式类；保留独立演练 canvas。最终完整测试12/12通过、app.js语法及git diff --check通过。
 - 恢复说明在 docs/restore.md；Git只管理本地文件，不管理浏览器学习进度及电路存档。
+## 2026-09-05：数字/模拟切换滑块与内容淡入淡出
+
+- 用户明确指定：仅修改 3010 副本；先写计划/checklist/context-notes 再编码；不使用新动画库（CSS transform + React 定时编排，零依赖）；先做滑块并检查效果，再接入内容过渡，最后边界与回归。
+- 基线：git `main` 干净；标签 `baseline-3010`、`workbench-ui-v1` 已有；本次新增修改前标签 `restore-2026-09-05-before-kind-switcher-slider`（HEAD `1c6cdf9`）；测试 12/12 通过。
+- 结构确认：`#kindSwitcher` 是 `#workbenchRoot` 外的原生 DOM（非 React），`setView()` 对 circuit→circuit 走 `PrototypeWorkbench.setKind()` 直切分支（不走 150ms 卸载/重挂）；`syncKindSwitcher()`（app.js 1603）同步 `is-active`/`aria-pressed`；`workbench-entry.tsx` 的 `ensureSession` 轮询（40ms×20）等待 instruments 出现后桥接 inspector，可作为挂载就绪判断的既有先例。
+- 决定：滑块指示 `transform: translateX(0|100%)` 由 `syncKindSwitcher` 驱动（CSS 180ms 缓动），点击当前项时 `setView` 已有 `prev===wbKind` 短路，不重播；键盘（ArrowLeft/Right/Home/End）与 `prefers-reduced-motion` 走即时路径（`.is-instant` 帧级取消 thumb 过渡 + entry 的 `immediate` 直切）。
+- 内容过渡只改会话容器 `opacity` 与 `pointer-events`，会话 `hidden` 切换时机由挂载就绪（容器出现 `.circuit-workbench`）决定；`switchSeq` 代号使过期回调失效；`unmount()` 使代号失效并清定时器/观察器。
+- 首次挂载/回教材等边界复用外层 `setView` 的 stage 淡入淡出，entry 的 `mount` 走即时路径避免双重动画。
+- 旧样式 1576-1578（移动端把 switcher 透明化+按钮胶囊）与本轮统一规则互相覆盖，按“清理切换器自身相互覆盖的旧样式”要求删除。
+- 字符串契约测试（node:test 读文件断言）用于结构保护；状态一致性/快速切换/清理行为由 Playwright 真实浏览器验收并如实报告。
+- 实施中先完成滑块并验证（实测 184×44、thumb (4,4) 88×36、等宽 88×36、transition `transform 0.18s cubic-bezier(.22,1,.36,1)`、点击当前项经 setView 短路不重播），再接入内容过渡。
+- 快速连点首测暴露不一致：entry 的 `activeKind` 在内容完成切换（80ms 后）才更新，而 shell 滑块/aria 立即同步，25ms 连点时二者窗口错位，出现“滑块数字、内容模拟”。修复为 `activeKind` 立即锁定最后目标 + 新增 `visibleKind` 独立跟踪实际显示面板（动画期间保持旧值），并特判“目标即当前可见面板”时直接落地。修复后正反双向 10 次连点（25ms 间隔）均一致。
+- 首次打开模拟台为懒创建（容器 hidden 挂载中）：等待 `.circuit-workbench` 出现在容器内再切换（40ms 轮询、1500ms 超时→ onNotify 错误并保留旧内容），无需固定延迟；实测 t30 数字台 opacity≈0.37（淡出中）、t80 已切显隐、t180 opacity≈0.98、t500 =1，无空白页。
+- 动画中返回教材（点击切模拟 30ms 后点顶栏退出）：600ms 后 `sessions=0`（unmount 清理无残留、无旧回调重显），重进工作台仅数字台显示、模拟台重新懒创建。
+- 状态保留：数字台 100%→放大至 120%，切模拟再切回仍 120%。键盘 ArrowRight/Home/End：40ms 内完成切换（即时）、焦点留在切换器、thumb 同步；`is-instant` 类一帧后移除。reduced-motion：重写 matchMedia 模拟后点击 30ms 内即完成切换（JS 路径）；CSS 侧规则与静态断言覆盖（Playwright CLI 无 emulateMedia 命令，未在真 CSSOM 环境复验）。
+- 移动端 390×844：scrollWidth=clientWidth=390 无溢出，滑块 184px 正常；桌面 1440×900 与深色模式截图均正常（深色主题下选中底块 #3a4048、轨道 #23262c，文字清晰）。
+- 完整测试 15/15 通过（原 12 + 新增 3 项结构断言），`node --check app.js` 通过；`workbench.bundle.js` 重新构建（249.8kB）。既有 `favicon.ico` 404 未处理（不在本轮范围）。
+- 恢复标签：修改前 `restore-2026-09-05-before-kind-switcher-slider`（1c6cdf9），完成后 `restore-2026-09-05-after-kind-switcher-slider`（提交后创建）。

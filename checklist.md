@@ -62,3 +62,14 @@
 - [x] 计划：沿用现有灰色变量、字体与右对齐布局；圆角面板、胶囊切换、清晰焦点和禁用态。独立保存副本组件以优化按键状态，原站不变。
 - [x] 优化按钮与样式，构建工作台。
 - [x] 测试和浏览器验收，准备提交优化恢复点。
+## 2026-09-05：数字/模拟切换滑块与内容淡入淡出
+
+- [x] 检查 git 分支/工作区/标签，创建修改前恢复标签 `restore-2026-09-05-before-kind-switcher-slider`。
+- [x] 编写实施计划（docs/superpowers/plans/2026-09-05-kind-switcher-slider-and-transition.md）。
+- [x] 滑块结构：kindSwitcher 合并为共享滑块（thumb + role=tab 等宽两项）。
+- [x] 滑块样式：184×44、4px 边距、深灰轨道、深色填充+细描边、180ms cubic-bezier(.22,1,.36,1) 只过渡 transform、文字固定；清理旧互覆盖规则。
+- [x] 内容过渡：workbench-entry.tsx 管理 80ms 淡出/120ms 淡入；挂载就绪判断；失败反馈。
+- [x] 边界：快速连点最后一次为准；过渡期间内容不可操作；卸载清理；键盘方向键；prefers-reduced-motion 即时。
+- [x] 构建 bundle、运行完整测试与语法检查。
+- [x] Playwright 桌面/移动验收（双向切换、连点10次、首次/动画中返回/再进入、状态保留、键盘、reduced-motion）。
+- [x] 提交逻辑变更并创建优化版恢复标签 `restore-2026-09-05-after-kind-switcher-slider`，汇报结果与限制。

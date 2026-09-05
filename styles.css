@@ -88,32 +88,62 @@
 
 .workbench-stage { min-width: 0; opacity: 1; transition: opacity 140ms ease-out; }
 
+/* 数字/模拟切换：共享滑块分段控件（184×44，4px 边距，等宽两项）。
+   文字固定不动，仅选中底块（.kind-thumb）左右滑动；只过渡 transform。 */
 .kind-switcher {
+  position: relative;
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(84px, 1fr));
-  gap: 4px;
-  margin: 0 0 8px;
+  grid-template-columns: repeat(2, 1fr);
+  width: 184px;
   padding: 4px;
-  border: 1px solid var(--line);
+  margin: 0 0 8px;
   border-radius: 12px;
-  background: var(--panel);
+  background: light-dark(#e0e3e7, #23262c);
 }
 
+.kind-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border: 1px solid var(--ink-faint);
+  border-radius: 9px;
+  background: light-dark(#c9ced6, #3a4048);
+  transform: translateX(0);
+  transition: transform 180ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* 键盘触发切换：滑块即时归位（一帧后恢复缓动） */
+.kind-switcher.is-instant .kind-thumb { transition: none; }
+
 .kind-switch-button {
-  min-height: 40px;
+  position: relative;
+  min-height: 36px;
   padding: 0 18px;
   border: 0;
   border-radius: 9px;
   background: transparent;
   color: var(--ink-soft);
   font-weight: 750;
+  transition: color 120ms;
 }
 
-.kind-switch-button:hover { background: var(--panel-2); color: var(--ink); }
+.kind-switch-button:hover { color: var(--ink); }
 
-.kind-switch-button.is-active {
-  background: var(--accent);
-  color: #fff;
+.kind-switch-button.is-active { color: var(--ink); }
+
+/* 工作台内容切换过渡：只改透明度与会话面板的可操作性 */
+.prototype-workbench-session { transition: opacity 80ms ease; }
+
+.prototype-workbench-session.cw-switching,
+.prototype-workbench-session.cw-switching-in { pointer-events: none; }
+
+.prototype-workbench-session.cw-switching-in { transition-duration: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kind-thumb { transition: none; }
+  .prototype-workbench-session { transition: none; }
 }
 
 .prototype-workbench-session[hidden] { display: none; }
@@ -1573,9 +1603,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 /* 与实验演练统一：灰阶面板、胶囊选择、可辨识的操作状态。 */
-.kind-switcher { border: 0; background: transparent; padding: 0; gap: 8px; }
-.kind-switch-button { border: 1px solid transparent; border-radius: 999px; background: var(--panel-2); }
-.kind-switch-button.is-active { background: var(--bg); border-color: var(--ink-faint); color: var(--ink); }
 .workbench-root .cw-palette,
 .workbench-root .cw-inspector,
 .workbench-root .cw-canvas-panel { border: 0; border-radius: 16px; background: var(--panel); }

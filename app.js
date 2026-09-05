@@ -685,6 +685,8 @@
   var notebookRoot = document.getElementById("notebookRoot");
   var workbenchStage = document.getElementById("workbenchStage");
   var workbenchRoot = document.getElementById("workbenchRoot");
+  var kindSwitcher = document.getElementById("kindSwitcher");
+  var kindThumb = kindSwitcher.querySelector(".kind-thumb");
   var kindSwitchButtons = Array.prototype.slice.call(document.querySelectorAll(".kind-switch-button"));
   var lessonEl = document.querySelector(".lesson");
   var workbenchButton = document.getElementById("workbenchToggle");
@@ -1526,11 +1528,7 @@
     var prev = activeWorkbench;
     if (prev === wbKind) return;
     if (isCircuitWorkbench(prev) && isCircuitWorkbench(wbKind)) {
-      activeWorkbench = wbKind;
-      PrototypeWorkbench.setKind(wbKind);
-      pendingExperimentId = "";
-      syncKindSwitcher();
-      syncWorkbenchButton();
+      switchWorkbenchKind(wbKind, false);
       return;
     }
     activeWorkbench = wbKind;
@@ -1600,18 +1598,55 @@
     practiceButton.setAttribute("aria-pressed", activeWorkbench === "notebook" ? "true" : "false");
   }
 
-  function syncKindSwitcher() {
+  /* 工作台内部类型切换：滑块立即动，内容过渡由 bundle 管理；
+     immediate=true 用于键盘与 reduced-motion（instant 触发 thumb 一帧无缓动） */
+  function switchWorkbenchKind(kind, immediate) {
+    activeWorkbench = kind;
+    if (typeof PrototypeWorkbench !== "undefined") PrototypeWorkbench.setKind(kind, !!immediate);
+    pendingExperimentId = "";
+    syncKindSwitcher(!!immediate);
+    syncWorkbenchButton();
+  }
+
+  function syncKindSwitcher(instant) {
+    if (instant) kindSwitcher.classList.add("is-instant");
+    var activeKind = null;
     kindSwitchButtons.forEach(function (button) {
       var active = button.dataset.kind === activeWorkbench;
+      if (active) activeKind = button.dataset.kind;
       button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.setAttribute("aria-selected", active ? "true" : "false");
     });
+    kindThumb.style.transform = activeKind === "analog" ? "translateX(100%)" : "translateX(0)";
+    if (instant) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { kindSwitcher.classList.remove("is-instant"); });
+      });
+    }
   }
 
   kindSwitchButtons.forEach(function (button) {
     button.addEventListener("click", function () {
       var kind = button.dataset.kind;
       if (kind !== activeWorkbench) setView(kind);
+    });
+  });
+
+  /* 键盘访问：方向键/Home/End 切换，焦点保留在切换项内，即时切换（无内容过渡） */
+  var kindOrder = ["digital", "analog"];
+  kindSwitcher.addEventListener("keydown", function (event) {
+    if (!isCircuitWorkbench(activeWorkbench)) return;
+    var index = kindOrder.indexOf(activeWorkbench);
+    var next = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = kindOrder[Math.min(index + 1, kindOrder.length - 1)];
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = kindOrder[Math.max(index - 1, 0)];
+    else if (event.key === "Home") next = kindOrder[0];
+    else if (event.key === "End") next = kindOrder[kindOrder.length - 1];
+    if (!next || next === activeWorkbench) return;
+    event.preventDefault();
+    switchWorkbenchKind(next, true);
+    kindSwitchButtons.forEach(function (button) {
+      if (button.dataset.kind === next) button.focus();
     });
   });
 

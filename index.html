@@ -95,9 +95,10 @@
         <section id="notebookRoot" class="notebook-root" hidden aria-label="实验演练实践"></section>
         <!-- 统一工作台：切换器留在 React 根节点外，数字/模拟会话可独立保留草稿 -->
         <section id="workbenchStage" class="workbench-stage" hidden aria-label="电路工作台">
-          <nav id="kindSwitcher" class="kind-switcher" aria-label="工作台类型">
-            <button type="button" class="kind-switch-button" data-kind="digital" aria-pressed="false">数字</button>
-            <button type="button" class="kind-switch-button" data-kind="analog" aria-pressed="false">模拟</button>
+          <nav id="kindSwitcher" class="kind-switcher" role="tablist" aria-label="工作台类型">
+            <span class="kind-thumb" aria-hidden="true"></span>
+            <button type="button" id="kindTabDigital" class="kind-switch-button" role="tab" data-kind="digital" aria-selected="true" aria-controls="workbenchPanelDigital">数字</button>
+            <button type="button" id="kindTabAnalog" class="kind-switch-button" role="tab" data-kind="analog" aria-selected="false" aria-controls="workbenchPanelAnalog">模拟</button>
           </nav>
           <div id="workbenchRoot" class="workbench-root"></div>
         </section>

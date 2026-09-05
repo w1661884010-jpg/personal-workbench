@@ -36,7 +36,7 @@ test("digital and analog keep separate mounted React sessions while switching", 
 
   assert.match(entry, /const roots:\s*Partial<Record<CircuitKind, Root>>\s*=\s*\{\}/);
   assert.match(entry, /const sessionContainers:\s*Partial<Record<CircuitKind, HTMLElement>>\s*=\s*\{\}/);
-  assert.match(entry, /export function setKind\(kind: CircuitKind\)/);
+  assert.match(entry, /export function setKind\(kind: CircuitKind, immediate = false\)/);
   assert.match(entry, /container\.hidden\s*=\s*sessionKind\s*!==\s*kind/);
   assert.doesNotMatch(entry, /setKind[\s\S]{0,500}confirm\(/, "kind switching must not offer a discard path");
 });
@@ -44,11 +44,45 @@ test("digital and analog keep separate mounted React sessions while switching", 
 test("the shell switches an active workbench in place and synchronizes both controls", async () => {
   const app = await read("app.js");
 
-  assert.match(app, /function syncKindSwitcher\(\)/);
+  assert.match(app, /function syncKindSwitcher\(instant\)/);
   assert.match(app, /isCircuitWorkbench\(prev\)\s*&&\s*isCircuitWorkbench\(wbKind\)/);
-  assert.match(app, /PrototypeWorkbench\.setKind\(wbKind\)/);
+  assert.match(app, /function switchWorkbenchKind\(kind, immediate\)/);
+  assert.match(app, /PrototypeWorkbench\.setKind\(kind, !!immediate\)/);
   assert.match(app, /button\.dataset\.kind/);
-  assert.match(app, /setAttribute\(["']aria-pressed["']/);
+  assert.match(app, /setAttribute\(["']aria-selected["']/);
+});
+
+test("the kind switcher is one shared sliding track with fixed labels", async () => {
+  const [html, styles] = await Promise.all([read("index.html"), read("styles.css")]);
+
+  assert.match(html, /id="kindSwitcher"[\s\S]{0,80}class="kind-thumb"/, "the slider thumb rides in the switcher");
+  assert.match(html, /class="kind-switch-button" role="tab" data-kind="digital"[^>]*aria-controls="workbenchPanelDigital"/);
+  assert.match(html, /class="kind-switch-button" role="tab" data-kind="analog"[^>]*aria-controls="workbenchPanelAnalog"/);
+  assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,220}width:\s*184px/);
+  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,320}transition:\s*transform 180ms cubic-bezier\(\.22, 1, \.36, 1\)/);
+  assert.doesNotMatch(styles, /\.kind-switch-button\.is-active\s*\{[\s\S]{0,80}background/, "active state must not repaint the label, only the thumb slides");
+  assert.match(styles, /\.kind-switcher\.is-instant \.kind-thumb\s*\{\s*transition:\s*none;\s*\}/);
+});
+
+test("the content transition is tokenized so rapid switches settle on the last choice", async () => {
+  const entry = await read("workbench-entry.tsx");
+
+  assert.match(entry, /let switchSeq\s*=\s*0/);
+  assert.match(entry, /const seq = \+\+switchSeq;/);
+  assert.match(entry, /if \(seq !== switchSeq\) return;/);
+  assert.match(entry, /prefersReducedMotion\(\)/);
+  assert.match(entry, /waitForSessionReady\(/, "target mount readiness gates the swap, not a fixed guess");
+  assert.match(entry, /activeOptions\?\.onNotify\?\.\(["']工作台内容加载失败[\s\S]*"error"\)/, "mount failure keeps content and reports an error");
+  assert.match(entry, /export function unmount\(\)[\s\S]{0,200}switchSeq \+= 1;[\s\S]{0,120}clearPendingTimers\(\);[\s\S]{0,120}clearReadyWatchers\(\);/);
+});
+
+test("keyboard switching is instant and reduced motion disables both transitions", async () => {
+  const [app, styles] = await Promise.all([read("app.js"), read("styles.css")]);
+
+  assert.match(app, /kindSwitcher\.addEventListener\(["']keydown["']/);
+  assert.match(app, /event\.key === "ArrowRight"/);
+  assert.match(app, /switchWorkbenchKind\(next, true\)/, "keyboard path falls through to the instant switch");
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]{0,160}\.kind-thumb\s*\{\s*transition:\s*none;\s*\}\s*\.prototype-workbench-session\s*\{\s*transition:\s*none;\s*\}\s*\}/);
 });
 
 test("mobile workbench controls reflow instead of widening the page", async () => {
