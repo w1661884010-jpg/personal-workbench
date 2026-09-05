@@ -990,6 +990,9 @@
   /* ===== 演练工作台：章节间连续操演（切 tab 不丢沙箱/勾选状态） ===== */
   var practiceExperiments = [];   /* [{ experiment, chapter }] 信号课全部演练，构建一次 */
   var practiceShown = "";         /* 当前显示的演练 id（内存态，离开视图再回不丢） */
+  /* 演练演示参数的内存态（按实验 id）：tab 切换会重建 DOM，但参数输入与计算结果保持，
+     与 practiceShown 同生命周期（页面刷新清零）；仅布局/重绘不触碰它。 */
+  var practiceDemoStates = {};
 
   function collectPracticeExperiments() {
     var signalsCourse = courses.find(function (candidate) { return candidate.id === "signals"; });
@@ -1191,7 +1194,7 @@
     /* 参数控件 */
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { amplitude: 2, frequency: 2, sampleRate: 20, duration: 1.5, phase: 0 };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { amplitude: 2, frequency: 2, sampleRate: 20, duration: 1.5, phase: 0 });
     var fields = [
       ["amplitude", "幅值 A / V", 0.1, 10, 0.1],
       ["frequency", "频率 f / Hz", 0.1, 20, 0.1],
@@ -1349,11 +1352,11 @@
       var rows = [
         ["连续周期 T₀", formatNumber(continuousPeriod) + " s"],
         ["采样率对应样点周期", formatNumber(intervalSamples) + " 个样点"],
-        ["峰值时间", "t = " + formatNumber(peakFirst) + " + k·" + formatNumber(continuousPeriod) + " s"]
+        ["峰值时间", "t = " + formatNumber(peakFirst) + " + k·" + formatNumber(continuousPeriod) + " s", "wide"]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);
@@ -1386,7 +1389,7 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { frequency: 7, rateLow: 10, rateHigh: 20, duration: 1, amplitude: 1 };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { frequency: 7, rateLow: 10, rateHigh: 20, duration: 1, amplitude: 1 });
     var fields = [
       ["frequency", "信号频率 f / Hz", 0.5, 50, 0.5],
       ["rateLow", "低采样率 fs₁ / Hz", 4, 200, 1],
@@ -1556,7 +1559,7 @@
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);
@@ -1587,7 +1590,7 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { width1: 1, width2: 1, dt: 0.02 };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { width1: 1, width2: 1, dt: 0.02 });
     var fields = [
       ["width1", "脉冲 1 宽度 w₁ / s", 0.2, 3, 0.1],
       ["width2", "脉冲 2 宽度 w₂ / s", 0.2, 3, 0.1],
@@ -1744,12 +1747,12 @@
         ["解析峰值 t=min(w₁,w₂)", formatNumber(maxY)],
         ["数值峰值", formatNumber(y[Math.round(Math.min(w1, w2) / dt)] || 0)],
         ["最大绝对误差", formatNumber(maxAbsError)],
-        ["支撑区间", "[0, " + formatNumber(w1 + w2) + "] s"],
+        ["支撑区间", "[0, " + formatNumber(w1 + w2) + "] s", "wide"],
         ["脉冲宽度", formatNumber(w1) + " / " + formatNumber(w2) + " s"]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);
@@ -1780,7 +1783,7 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { a: 0.5, length: 20, input: "step", initial: 0 };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { a: 0.5, length: 20, input: "step", initial: 0 });
     var fields = [
       ["a", "递推系数 a", 0.05, 0.95, 0.05],
       ["length", "序列长度 N", 5, 40, 1],
@@ -1970,7 +1973,7 @@
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);
@@ -1999,7 +2002,7 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { f1: 2, f2: 20, window: 5, ratio: 0.6, win: "rect" };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { f1: 2, f2: 20, window: 5, ratio: 0.6, win: "rect" });
     var fields = [
       ["f1", "低频信号 f₁ / Hz", 0.5, 10, 0.5],
       ["f2", "高频扰动 f₂ / Hz", 5, 60, 1],
@@ -2182,7 +2185,7 @@
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);
@@ -2211,7 +2214,7 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { count: 100000, variance: 9, window: 3, dist: "gauss" };
+    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { count: 100000, variance: 9, window: 3, dist: "gauss" });
     var fields = [
       ["count", "样本数 N", 1000, 500000, 1000],
       ["variance", "噪声方差 σ²", 1, 25, 1],
@@ -2402,7 +2405,7 @@
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
-        item.className = "demo-metric";
+        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
         item.appendChild(textElement("span", row[0], "demo-metric-label"));
         item.appendChild(textElement("strong", row[1], "demo-metric-value"));
         metrics.appendChild(item);

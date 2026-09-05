@@ -206,3 +206,10 @@
 - 手动核验（Playwright 系统 Chrome）：390px 键盘 ArrowDown 即时切模拟（aria-selected=true、thumb translateX(100%)）；放大至 110% 后数字→模拟→数字往返缩放保留；emulateMedia reduced-motion 下 thumb transition 0s 且即时切换；390↔1440 反复缩放 thumb 方向正确归位且均在 64/176×44 轨道内；返回教材再进入无残留。
 - 桌面一致性：阶段 A 前 1440 截图与阶段 B 后 1440 截图 SHA256 完全一致（A6A15A49…），1440 布局零改动。完整套件 69/69（38 旧 + 12 A + 19 B），node --check app.js、git diff --check 通过；未改打包入口，未重建 bundle。
 - 交付截图：`%TEMP%\narrow-B-{390,560,760,820,1440}.png`、`narrow-B-390-dark.png`；修改前 `narrow-A-pre-*`；含完整工具栏。
+## 2026-09-05：演练页窄窗口布局优化（阶段 A 实施完成）
+- 用户要求：只改 3010；不改成算/默认参数/完成判定；不新增“已完成 0/6”；先记录计划/checklist/context-notes 与恢复点；两阶段分别验证提交；恢复用分支/revert 不用 reset --hard。
+- 现状核对：`.demo-controls` auto-fit minmax(150px,1fr) 在 390px 只剩 1 列（五参数纵向）；`.demo-metric` min-width:170px + flex 0 0 auto 窄屏单列右侧留白；无长结果语义类；六段 draw 各自 6/5 个 X 刻度 + 单位标签画在 width-14（与末端刻度同位，桌面也重叠）。
+- 实施：styles.css 新增 ≤760 块（`demo-controls` → repeat(2,minmax(0,1fr)) 间距 12、输入 min-height 42、`demo-metrics` → grid 2 列 + `.demo-metric{min-width:0}` + `.demo-metric.is-wide{grid-column:1/-1}`）+ ≤340 极窄单列；≤620 块压缩 `.notebook-page` gap/padding（16/16 14）、`.notebook-demo` padding 12 12 16 gap 10、返回按钮 5px 10px/0.78rem/30px。
+- app.js：`practiceDemoStates[experiment.id]` 内存持久化六处演示 state（tab 切换会重建 DOM，此前参数编辑态在切 tab 后丢失——新测试先暴露该行为，按用户“缩放+切换不回滚”要求修复；页面刷新清零，与 practiceShown 同生命周期）；rows 第三元素 "wide"（信号观察「峰值时间」、卷积验证「支撑区间」）→ `demo-metric is-wide`，六处渲染块改 `row[2]==="wide"` 条件类名，未用 nth-child。
+- 测试 tests/narrow-practice-layout.test.mjs 6 项（真实浏览器）：390 两列+输入 40-44+标签完整、560/620/621/760 两列+1440 五参数单行不变、结果两列+is-wide 满行（先误用演示卡宽比较导致 298 vs 322 失败，改与 .demo-metrics 宽比较后过）、参数修改→缩放→切 tab→回滚校验值+默认结果对照（0.5 s / 10 个样点）、8 视口×6 演练无横向溢出、≤620 留白压缩+返回紧凑。修复前 5/6 失败，修复后 6/6 通过。
+- 阶段 A 完整套件 75/75（69 旧 + 6 新）；node --check app.js 通过；未改打包入口未重建 bundle；阶段 B 未开始（刻度/单位/画布核验留到 B）。截图 `%TEMP%\practice-pre-{390,560,760,1440}-{1..6}.png` / `practice-postA-*.png`。
