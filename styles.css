@@ -163,19 +163,19 @@
   .prototype-workbench-session { transition: none; }
 }
 
-/* 实验边界说明：切换气泡下方的警示图标，悬停/聚焦弹出 page-tip 文字提示 */
+/* 实验边界说明：切换气泡下方的警示图标（圆圈感叹号），悬停/聚焦弹出 page-tip 文字提示 */
 .limit-tip-button {
   position: absolute;
-  left: 17px;
+  left: 13px;             /* 在 64px 气泡宽度内水平居中（(64-38)/2） */
   top: 92px;
   z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 50%;
   background: transparent;
   color: var(--ink-faint);
   cursor: help;
