@@ -56,5 +56,8 @@ test("the migrated lesson surface omits instructional figures", async () => {
 
   assert.doesNotMatch(lessonSurface, /StudyDiagram|study-diagram|图示内容/);
   assert.doesNotMatch(html, /<(?:canvas|figure|img)\b/i);
-  assert.doesNotMatch(app, /createElement\(["'](?:canvas|figure|img)["']\)/i);
+  const lessonStart = app.indexOf("function renderLesson(course, chapter)");
+  const lessonEnd = app.indexOf("function renderChapters()", lessonStart);
+  assert.ok(lessonStart >= 0 && lessonEnd > lessonStart, "locate the actual lesson renderer before checking its content");
+  assert.doesNotMatch(app.slice(lessonStart, lessonEnd), /(?:createElement|textElement)\(["'](?:canvas|figure|img)["']\)/i, "lesson text stays free of figures; separate interactive practice may use canvas");
 });

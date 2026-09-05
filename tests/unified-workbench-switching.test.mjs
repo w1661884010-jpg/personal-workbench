@@ -24,7 +24,7 @@ test("the workbench switcher stays outside the React mount so React cannot erase
 test("the topbar exposes one workbench entry while kind selection stays inside", async () => {
   const [html, app] = await Promise.all([read("index.html"), read("app.js")]);
 
-  assert.equal((html.match(/class="tool-button workbench-button"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="workbenchToggle"/g) ?? []).length, 1, "there is one circuit-workbench entry; practice may share its visual button class");
   assert.match(html, /id="workbenchToggle"[\s\S]{0,700}<span>工作台<\/span>/);
   assert.doesNotMatch(html, /<span>数字台<\/span>|<span>模拟台<\/span>/);
   assert.match(app, /var workbenchButton\s*=\s*document\.getElementById\(["']workbenchToggle["']\)/);

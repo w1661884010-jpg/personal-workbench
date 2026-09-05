@@ -1572,6 +1572,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .workbench-root .cw-main-grid { margin-top: 10px; }
 }
 
+/* 与实验演练统一：灰阶面板、胶囊选择、可辨识的操作状态。 */
+.kind-switcher { border: 0; background: transparent; padding: 0; gap: 8px; }
+.kind-switch-button { border: 1px solid transparent; border-radius: 999px; background: var(--panel-2); }
+.kind-switch-button.is-active { background: var(--bg); border-color: var(--ink-faint); color: var(--ink); }
+.workbench-root .cw-palette,
+.workbench-root .cw-inspector,
+.workbench-root .cw-canvas-panel { border: 0; border-radius: 16px; background: var(--panel); }
+.workbench-root .cw-inspector { padding: 16px; }
+.workbench-root .cw-palette-list button { border-color: transparent; border-radius: 10px; background: var(--panel-2); }
+.workbench-root .circuit-workbench button { border-radius: 9px; transition: background-color 120ms, border-color 120ms; }
+.workbench-root .circuit-workbench button:not(:disabled):hover { background: var(--panel-2); border-color: var(--ink-faint); }
+.workbench-root .circuit-workbench button:disabled { opacity: .38; cursor: not-allowed; }
+.workbench-root .circuit-workbench button:focus-visible,
+.workbench-root .circuit-workbench input:focus-visible,
+.workbench-root .circuit-workbench select:focus-visible,
+.kind-switch-button:focus-visible { outline: 2px solid var(--ink-faint); outline-offset: 3px; }
+.workbench-root .cw-canvas-toolbar button[aria-pressed] { border-radius: 999px; }
+.workbench-root .cw-canvas-toolbar button[aria-pressed="true"] { background: var(--bg); color: var(--ink); border-color: var(--ink-faint); }
+.workbench-root .cw-canvas-toolbar { padding: 10px 12px; gap: 10px; }
+.workbench-root .cw-meter-grid > div,
+.workbench-root .cw-live-values > div { border-radius: 10px; background: var(--panel-2); }
+@media (prefers-reduced-motion: reduce) {
+  .workbench-root .circuit-workbench button { transition: none; }
+}
+
 /* 移动端：把桌面紧凑网格重新排成单列/三列，避免存储和实验操作撑宽页面。 */
 @media (max-width: 760px) {
   .workbench-root .cw-experiment-strip {
