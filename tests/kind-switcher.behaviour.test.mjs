@@ -30,7 +30,7 @@ test.before(async () => {
     const res = await fetch(BASE);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch {
-    throw new Error("3010 服务器未运行：请在 personal-workbench-shell 目录执行 node serve.mjs");
+    throw new Error("3010 服务器未运行：请在 personal-workbench-shell-3010 目录执行 node serve.mjs");
   }
   browser = await chromium.launch({ headless: true, channel: "chrome" });
 });

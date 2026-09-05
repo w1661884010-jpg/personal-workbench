@@ -1,6 +1,6 @@
 # 3010 本地恢复
 
-仓库位置：`C:\Users\Lenovo\Documents\codex_projects\personal-workbench-shell`
+仓库位置：`C:\Users\Lenovo\Desktop\learning\repositories\personal-workbench-shell-3010`
 
 - `baseline-3010`：本次优化前的完整页面。
 - `workbench-ui-v1`：工作台风格与按键状态优化版。
