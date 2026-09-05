@@ -71,6 +71,92 @@ function switcherState(page) {
   }));
 }
 
+test("instrument bridge must not change toolbar geometry during entry or switching", async () => {
+  for (const width of [1440, 2300, 390]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    await openWorkbench(page);
+    for (const kind of ["digital", "analog"]) {
+      if (kind === "analog") {
+        await page.click("#kindTabAnalog");
+        await page.waitForTimeout(300);
+      }
+      const result = await page.evaluate((kind) => {
+        const host = document.querySelector(`.prototype-workbench-session[data-kind="${kind}"]`);
+        const wb = host.querySelector(".circuit-workbench");
+        const instruments = host.querySelector(".cw-instruments");
+        const parent = instruments.parentElement;
+        const next = instruments.nextSibling;
+        const measure = () => [".cw-heading", ".cw-experiment-strip", ".cw-storage-bar"].map((s) => {
+          const r = host.querySelector(s).getBoundingClientRect();
+          return [r.x, r.y, r.width, r.height];
+        });
+        const settled = measure();
+        host.classList.add("cw-bridging");
+        wb.appendChild(instruments); // exact initial React structure, before async bridge
+        const transient = measure();
+        parent.insertBefore(instruments, next);
+        host.classList.remove("cw-bridging");
+        return { settled, transient };
+      }, kind);
+      result.settled.forEach((rect, i) => rect.forEach((n, j) => {
+        assert.ok(Math.abs(n - result.transient[i][j]) <= 1,
+          `${width}px ${kind} toolbar ${i} coordinate ${j}: settled=${n}, transient=${result.transient[i][j]}`);
+      }));
+    }
+    await page.close();
+  }
+});
+
+test("painted toolbar rows stay stable on first entry, re-entry and rapid kind switches", async () => {
+  const page = await browser.newPage({ viewport: { width: 2300, height: 1000 } });
+  await page.goto(BASE);
+  await page.evaluate(() => {
+    window.toolbarFrames = [];
+    window.captureToolbar = true;
+    const sample = () => {
+      const stage = document.getElementById("workbenchStage");
+      if (!stage.hidden) {
+        document.querySelectorAll(".prototype-workbench-session:not([hidden])").forEach((host) => {
+          const heading = host.querySelector(".cw-heading");
+          const storage = host.querySelector(".cw-storage-bar");
+          if (!heading || !storage) return;
+          const a = heading.getBoundingClientRect(), b = storage.getBoundingClientRect();
+          window.toolbarFrames.push({ kind: host.dataset.kind, height: a.height, offset: b.y - a.y });
+        });
+      }
+      if (window.captureToolbar) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.click("#workbenchToggle");
+  await page.waitForTimeout(400);
+  await page.click("#kindTabAnalog");
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 8; i++) {
+    await page.locator(i % 2 ? "#kindTabAnalog" : "#kindTabDigital").dispatchEvent("click");
+    await page.waitForTimeout(25);
+  }
+  await page.waitForTimeout(300);
+  await page.click("#workbenchToggle");
+  await page.waitForTimeout(300);
+  await page.click("#workbenchToggle");
+  await page.waitForTimeout(400);
+  const frames = await page.evaluate(() => {
+    window.captureToolbar = false;
+    return window.toolbarFrames;
+  });
+  for (const kind of ["digital", "analog"]) {
+    const samples = frames.filter((f) => f.kind === kind);
+    assert.ok(samples.length > 3, `${kind}: captured painted frames`);
+    for (const key of ["height", "offset"]) {
+      const values = samples.map((f) => f[key]);
+      assert.ok(Math.max(...values) - Math.min(...values) <= 1,
+        `${kind} ${key} must not jump across painted frames: ${Math.min(...values)}..${Math.max(...values)}`);
+    }
+  }
+  await page.close();
+});
+
 test("first mounts of both kinds complete the instruments bridge (layout tasks survive switching)", async () => {
   const page = await browser.newPage();
   await openWorkbench(page);

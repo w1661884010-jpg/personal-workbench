@@ -163,3 +163,9 @@
 - 验证：6 tab 逐一跳转（短标题→完整标题→active id 一致）；勾选/取消进度（0/3→1/3→3/3→2/3）与 aria-pressed、✓ 可见性、tab 完成标记；参数频率 2→3 后结果 0.5s→0.333s、10→6.667 个样点（默认值基线不变）；canvas 位图=CSS 宽（851/851，dpr=1，无拉伸）；返回教材落在绪论章“信号分析与处理概览”；快速切 6+1 tab 无运行时错误、页面 scrollY 稳定；390px 文档无溢出、tabs 自身滚动、单列、选中项可见；键盘可聚焦 step-check/tabs/back，Enter 可勾选；深色模式（1920×1000）截图正常。
 - 新增 `tests/practice.behaviour.test.mjs` 7 项（Playwright 系统 Chrome，隔离 context）：六 tab 映射、总进度移除+勾选状态机、参数更新+canvas 尺寸、状态往返保留+返回章节、快速切换滚动稳定+零错误、390 窄屏溢出/自身滚动/选中可见、键盘可达+Enter 勾选。完整套件 33/33 通过（11 切换结构 + 9 开关行为 + 7 演练行为 + 6 既有）。
 - 截图：D:\pw-practice-before.png（1440 基线）、pw-practice-step1.png（1440 第一步后）、pw-practice-conv.png（卷积 2 参数）、pw-practice-dark.png（1920 深色）。修复期间误用 PowerShell 读写含中文文件的风险已在之前 context 记录。未验证项：非 Chromium 浏览器（inert/scrollbar-width 兼容性）、真机触控。
+# 2026-09-05 切换排版稳定性
+- 用户要求消除进入/切换时工具栏骤高骤低，保持稳定态样式。
+- 假设：cw-bridging 只用 visibility 隐藏仪器卡，卡片仍是固定高度工作台的直接网格子项；异步移入 inspector 后网格再次分配高度。
+- 先用同一真实 DOM 在桥接前后测量工具栏矩形验证，不靠延长动画或固定工具栏高度掩盖。
+- 验证假设成立：1440px 数字工作台 heading 高度稳定 53px、桥接前 164.4375px。改为仅隐藏未迁移的直接子仪器卡（display:none），迁入 inspector 自动恢复显示；未改动画时序/业务逻辑。
+- 新回归覆盖两种工作台 1440/2300/390px 下三块工具栏矩形；2300px 下 requestAnimationFrame 采样首次进入、重进和快速切换，行高及存档行相对位置变化不超过 1px。完整测试 38/38。未验证非 Chromium 浏览器。

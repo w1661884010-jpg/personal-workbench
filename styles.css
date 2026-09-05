@@ -194,8 +194,8 @@
 
 .prototype-workbench-session[hidden] { display: none; }
 
-/* 挂载瞬态：仪器卡在桥接进检查器前暂不可见（占位保留，避免 heading 行瞬时重叠） */
-.cw-bridging .cw-instruments { visibility: hidden; }
+/* 桥接前不参与外层网格；visibility:hidden 仍占隐式轨道，会瞬时撑高工具栏。 */
+.cw-bridging .circuit-workbench > .cw-instruments { display: none; }
 
 .notebook-root {
   max-width: none;
