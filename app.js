@@ -758,7 +758,6 @@
       var states = notebookChecks[entry.experiment.id];
       var doneCount = states ? states.filter(function (v) { return v; }).length : 0;
       tab.appendChild(textElement("span", experimentShortTitle(entry.experiment), "practice-tab-title"));
-      if (doneCount === entry.experiment.steps.length) tab.appendChild(textElement("span", "✓", "practice-tab-done"));
       if (entry.experiment.id === experiment.id) {
         tab.classList.add("is-active");
         tab.setAttribute("aria-selected", "true");
@@ -825,42 +824,19 @@
     stepsSection.className = "notebook-step-section";
     var stepsHeading = document.createElement("header");
     stepsHeading.appendChild(textElement("h2", "实验步骤"));
-    var progress = textElement("strong", "", "notebook-progress");
-    stepsHeading.appendChild(progress);
     stepsSection.appendChild(stepsHeading);
 
+    /* 步骤只列出：编号 + 完整正文，无完成校验与进度显示
+       （notebookChecks 状态保留在内存中，仅不在界面展示） */
     var stepList = document.createElement("ol");
     stepList.className = "notebook-steps";
-    var stepButtons = [];
-
-    function updateStepState(button, check, index) {
-      var done = states[index];
-      button.classList.toggle("is-done", done);
-      button.setAttribute("aria-pressed", done ? "true" : "false");
-      check.classList.toggle("is-hidden", !done);
-      var completed = states.filter(function (value) { return value; }).length;
-      progress.textContent = "已完成 " + completed + "/" + states.length;
-    }
-
     experiment.steps.forEach(function (step, index) {
       var item = document.createElement("li");
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "step-check";
-      button.appendChild(textElement("span", String(index + 1).padStart(2, "0"), "step-number"));
-      button.appendChild(textElement("span", step, "step-copy"));
-      /* 完成标记：行内 ✓（未完成不占位）；去掉每项重复的“待完成”文字 */
-      button.appendChild(textElement("span", "✓", "step-check-mark"));
-      button.addEventListener("click", function () {
-        states[index] = !states[index];
-        updateStepState(button, button.querySelector(".step-check-mark"), index);
-        updateTabsCompletion();
-      });
-      item.appendChild(button);
+      item.className = "notebook-step-item";
+      item.appendChild(textElement("span", String(index + 1).padStart(2, "0"), "step-number"));
+      item.appendChild(textElement("span", step, "step-copy"));
       stepList.appendChild(item);
-      stepButtons.push([button, button.querySelector(".step-check-mark"), index]);
     });
-    stepButtons.forEach(function (entry) { updateStepState(entry[0], entry[1], entry[2]); });
     stepsSection.appendChild(stepList);
     side.appendChild(stepsSection);
 
@@ -888,23 +864,6 @@
     var a = active.getBoundingClientRect();
     var t = tabsEl.getBoundingClientRect();
     tabsEl.scrollLeft += a.left - t.left - t.width / 2 + a.width / 2;
-  }
-
-  /* 勾选变化后刷新 tab 完成标记（不改当前视图；按 data-experiment-id 精确匹配，不依赖标题文本） */
-  function updateTabsCompletion() {
-    var tabs = notebookRoot.querySelectorAll(".practice-tab");
-    if (!tabs.length) return;
-    tabs.forEach(function (tab) {
-      var id = tab.getAttribute("data-experiment-id");
-      var entry = practiceExperiments.find(function (candidate) { return candidate.experiment.id === id; });
-      if (!entry) return;
-      var states = notebookChecks[entry.experiment.id];
-      var doneCount = states ? states.filter(function (v) { return v; }).length : 0;
-      var done = doneCount === entry.experiment.steps.length;
-      tab.classList.toggle("is-done", done);
-      tab.querySelector(".practice-tab-done")?.remove();
-      if (done) tab.appendChild(textElement("span", "✓", "practice-tab-done"));
-    });
   }
 
   function openNotebookExperiment(experiment, chapter) {

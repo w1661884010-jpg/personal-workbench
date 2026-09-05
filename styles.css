@@ -228,30 +228,20 @@
 
 .notebook-steps {
   display: grid;
-  gap: 2px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* 步骤：紧凑勾选行（编号 + 全文 + 勾选标记），靠背景差分层级，不套卡片边框 */
-.step-check {
+/* 步骤只列出：编号 + 全文字符行，无勾选/完成标记 */
+.notebook-step-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  white-space: normal;
+  align-items: start;
+  padding: 2px 0;
 }
-
-.step-check:hover { background: var(--panel); }
-
-.step-check.is-done { background: var(--accent-soft); border-color: transparent; }
 
 .step-number {
   color: var(--ink-faint);
@@ -261,12 +251,6 @@
 }
 
 .step-copy { line-height: 1.55; }
-
-.step-check.is-done .step-copy { color: var(--ink-soft); }
-
-.step-check-mark { color: var(--accent-ink); font-weight: 750; }
-
-.step-check-mark.is-hidden { visibility: hidden; }
 
 .notebook-evidence {
   padding: 12px 14px;

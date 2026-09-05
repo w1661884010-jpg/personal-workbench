@@ -87,7 +87,7 @@ test("six tabs show short titles and jump to the matching full-titled experiment
   await page.close();
 });
 
-test("the total-progress overview is gone; step state and progress stay functional", async () => {
+test("the total-progress overview is gone and steps are listed without checks", async () => {
   const page = await browser.newPage();
   await openPractice(page);
 
@@ -98,44 +98,20 @@ test("the total-progress overview is gone; step state and progress stay function
   assert.equal(overview.node, false, "no overview node rendered");
   assert.equal(overview.text, false, "no overview text anywhere in the page");
 
-  const steps = await page.$$(".step-check");
-  assert.equal(steps.length, 3);
-  await steps[0].click();
-  await page.waitForTimeout(120);
-  let state = await page.evaluate(() => ({
-    done: document.querySelectorAll(".step-check.is-done").length,
-    progress: document.querySelector(".notebook-progress")?.textContent.trim(),
-    markHidden: document.querySelector(".step-check-mark")?.classList.contains("is-hidden"),
-    pressed: document.querySelector(".step-check")?.getAttribute("aria-pressed"),
-    tabDone: document.querySelector(".practice-tab.is-active")?.classList.contains("is-done"),
+  const steps = await page.evaluate(() => ({
+    items: document.querySelectorAll(".notebook-step-item").length,
+    numbers: document.querySelectorAll(".notebook-step-item .step-number").length,
+    copies: Array.from(document.querySelectorAll(".notebook-step-item .step-copy")).map((e) => e.textContent.trim()),
+    progress: Boolean(document.querySelector(".notebook-progress")),
+    checks: document.querySelectorAll(".step-check").length,
+    progressText: document.body.textContent.includes("已完成 0/3"),
   }));
-  assert.equal(state.done, 1);
-  assert.equal(state.progress, "已完成 1/3");
-  assert.equal(state.markHidden, false, "check mark visible once done");
-  assert.equal(state.pressed, "true");
-  assert.equal(state.tabDone, false, "tab done only when every step is done");
-
-  /* 全部勾选 → 当前 tab 出现完成标记；取消恢复 */
-  await steps[1].click();
-  await steps[2].click();
-  await page.waitForTimeout(120);
-  state = await page.evaluate(() => ({
-    progress: document.querySelector(".notebook-progress")?.textContent.trim(),
-    tabDone: document.querySelector(".practice-tab.is-active")?.classList.contains("is-done"),
-    tabMark: Boolean(document.querySelector(".practice-tab.is-active .practice-tab-done")),
-  }));
-  assert.equal(state.progress, "已完成 3/3");
-  assert.equal(state.tabDone, true);
-  assert.equal(state.tabMark, true);
-
-  await page.click(".step-check");
-  await page.waitForTimeout(120);
-  state = await page.evaluate(() => ({
-    progress: document.querySelector(".notebook-progress")?.textContent.trim(),
-    tabDone: document.querySelector(".practice-tab.is-active")?.classList.contains("is-done"),
-  }));
-  assert.equal(state.progress, "已完成 2/3");
-  assert.equal(state.tabDone, false);
+  assert.equal(steps.items, 3, "three steps listed");
+  assert.equal(steps.numbers, 3);
+  assert.equal(steps.copies[0].length > 10, true, "full step text present");
+  assert.equal(steps.progress, false, "no completion progress in the steps header");
+  assert.equal(steps.checks, 0, "no check buttons — steps are a plain list");
+  assert.equal(steps.progressText, false, "no 已完成 x/y text");
   await page.close();
 });
 
@@ -168,23 +144,20 @@ test("parameter edits update the chart metrics for the same defaults", async () 
   await page.close();
 });
 
-test("check state survives experiment round-trip and back navigates to the chapter", async () => {
+test("experiment round-trip keeps metrics state and back navigates to the chapter", async () => {
   const page = await browser.newPage();
   await openPractice(page);
 
-  await page.click(".step-check");
-  await page.waitForTimeout(100);
-  const tabs = await page.$$(".practice-tab");
-  await tabs[1].click();
+  const readMetrics = () =>
+    page.evaluate(() => Array.from(document.querySelectorAll(".demo-metric-value")).map((e) => e.textContent.trim()));
+  const before = await readMetrics();
+
+  await page.evaluate(() => Array.from(document.querySelectorAll(".practice-tab"))[1].click());
   await page.waitForTimeout(200);
   await page.evaluate(() => Array.from(document.querySelectorAll(".practice-tab"))[0].click());
   await page.waitForTimeout(200);
-  const restored = await page.evaluate(() => ({
-    progress: document.querySelector(".notebook-progress")?.textContent.trim(),
-    done: document.querySelectorAll(".step-check.is-done").length,
-  }));
-  assert.equal(restored.progress, "已完成 1/3", "memory state survives the round-trip");
-  assert.equal(restored.done, 1);
+  const after = await readMetrics();
+  assert.deepEqual(after, before, "demo state (metrics) survives the experiment round-trip");
 
   await page.click(".notebook-back");
   await page.waitForTimeout(800);
@@ -260,36 +233,21 @@ test("narrow screen: page has no horizontal overflow; only the tab strip scrolls
   await page.close();
 });
 
-test("keyboard can reach step checks, tabs and the back button", async () => {
+test("keyboard can reach tabs and the back button", async () => {
   const page = await browser.newPage();
   await openPractice(page);
 
   const reachable = await page.evaluate(() => {
-    const first = document.querySelector(".step-check");
     const back = document.querySelector(".notebook-back");
     const activeTab = document.querySelector(".practice-tab.is-active");
-    first.focus();
-    const a = document.activeElement === first;
     back.focus();
     const b = document.activeElement === back;
     activeTab.focus();
     const c = document.activeElement === activeTab;
-    return { step: a, back: b, tab: c };
+    return { back: b, tab: c };
   });
-  assert.equal(reachable.step, true);
   assert.equal(reachable.back, true);
   assert.equal(reachable.tab, true);
-
-  /* 焦点在步骤按钮上按 Enter → 勾选切换（原生按钮激活路径） */
-  await page.evaluate(() => document.querySelector(".step-check").focus());
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(120);
-  const state = await page.evaluate(() => ({
-    progress: document.querySelector(".notebook-progress")?.textContent.trim(),
-    pressed: document.querySelector(".step-check")?.getAttribute("aria-pressed"),
-  }));
-  assert.equal(state.progress, "已完成 1/3");
-  assert.equal(state.pressed, "true");
   await page.close();
 });
 
