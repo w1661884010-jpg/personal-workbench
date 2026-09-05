@@ -219,3 +219,9 @@
 - Canvas 核验：`canvas.width = round(rect.width × dpr) && setTransform(dpr)` 本就正确（六演练 × 390/760/1440 属性==CSS×DPR 相差 ≤1px、CSS 高 240/340 未压扁）；图例为画布下方文档流 flex-wrap（不遮曲线）；本轮未改。
 - 测试 tests/narrow-practice-chart.test.mjs 4 项：fillText 打点法（page 内 monkey-patch CanvasRenderingContext2D.prototype.fillText + 触发 resize 重绘）实测“单位与末端刻度水平距离 <14px 即重叠”——修复前 390 重叠 12 处、1440 重叠（1.5 被遮）失败；修复后 0 处且窄图单位行刻度 ≤4。踩坑记录：切 tab 重建 DOM 时旧画布被移除前会以宽度坍缩为 100px 再画一次（杂散 fillText 记录误报重叠）——打点记录附带 canvas.clientWidth，过滤 <200px 的瞬态绘制后稳定；另记录器重复装裱会双录，测试内以 __textPatch 一次性安装。
 - 阶段 B 完整套件 79/79（75 + 4）；node --check app.js、git diff --check 通过；未改打包入口。截图 `%TEMP%\practice-postB-{390,560,760,1440}-{1..6}.png`（与 pre/postA 同视口对照）。
+## 2026-09-05：正文底部意外显示工作台切换器（hidden 失效修复）
+- 用户截图确认：课程正文底部（复习总结后）出现「数字/模拟」切换器与 ⓘ 图标；已确认原因 = ≤820px `.workbench-stage{display:flex}` 与 `.limit-tip-button{display:inline-flex}` 是作者样式，覆盖 UA `[hidden]{display:none}`；JS 已正确设置 hidden，无需改路由/重复设置 hidden/重建 DOM。
+- 修复仅 styles.css：新增 `.workbench-stage[hidden], .workbench-stage .limit-tip-button[hidden] { display:none }`（特异性 0,2,0 / 0,3,0 > 显示规则的 0,1,0，无 !important）；全表审计无其他更高特异性 display 规则、无 display !important。
+- 回归测试 tests/workbench-hidden-visibility.test.mjs 6 项（真实浏览器）：A 课程页直开（390/405/820/821/900/1440）computed none + 零尺寸 + 不可聚焦（focus() 不生效）；B 数字台→教材停留 700ms 无残留；C 模拟台→教材/工作台→演练/工作台→错题均无切换器/图标/占位；D 重进正常（≤820 stage flex、横向切换动画路径 translateX(100%)）；E 图标 hidden=true 隐藏、需要说明时 600ms 后显示；F 停留课程页跨 820 断点缩放保持隐藏。修复前 5/6 失败（390 报“实际 flex”与根因一致），修复后 6/6。
+- 重要发现：既有 narrow-workbench-layout 的 4 项“说明图标同行”测试**依赖 bug 状态**（openDigital 后 400ms 快照，此时 updateWorkbenchLimit(600ms) 未运行、tip 仍 hidden=true，但旧显示规则让它“可见”）——修复后改为 waitForFunction 等待 tip 取消 hidden 再断言。完整套件 85/85。
+- 截图：`%TEMP%\hidden-pre-{390-light,390-dark,1440-light}.png` / `hidden-post-*`（390 深色对照用户截图的同尺寸全页图，修复后正文底部无切换器）。

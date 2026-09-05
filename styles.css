@@ -239,6 +239,14 @@
 
 .prototype-workbench-session[hidden] { display: none; }
 
+/* 窄屏显示规则（.workbench-stage{display:flex}、.limit-tip-button{display:inline-flex}）
+   是作者样式，会覆盖 UA 的 [hidden]{display:none}——hidden 已由 JS 正确设置，
+   这里用更高特异性的局部隐藏规则还原，不使用 !important。 */
+.workbench-stage[hidden],
+.workbench-stage .limit-tip-button[hidden] {
+  display: none;
+}
+
 /* 桥接前不参与外层网格；visibility:hidden 仍占隐式轨道，会瞬时撑高工具栏。 */
 .cw-bridging .circuit-workbench > .cw-instruments { display: none; }
 

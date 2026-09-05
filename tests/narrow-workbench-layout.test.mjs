@@ -127,6 +127,9 @@ for (const width of NARROW) {
     const page = await browser.newContext({ viewport: { width, height: 900 } }).then((c) => c.newPage());
     try {
       await openDigital(page);
+      /* 等 updateWorkbenchLimit(600ms) 把图标切到可见，再断言位置（修复后 hidden 才真正生效） */
+      await page.waitForFunction(() => !document.getElementById("workbenchLimit").hidden, null, { timeout: 3000 });
+      await page.waitForTimeout(100);
       const s = await page.evaluate(snapScript);
       assert.equal(s.tipVisible, true, "说明图标应可见");
       assert.equal(s.tipBesideSwitcher, true, `说明图标应在切换器右侧同行（tip=${JSON.stringify(s.tip)} switcher=${JSON.stringify(s.switcher)}）`);

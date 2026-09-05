@@ -51,3 +51,16 @@
 - 阶段 A/B 分别汇报：修改文件、根因、测试结果、提交号、恢复标签（before + after 各阶段）。
 - 窄屏修改前后截图与 1440 桌面对照截图，含完整工具栏（不只滑块）。
 - 完成后停在本地验收，等确认后再同步 GitHub 与线上网页。
+
+## 追加修复 2026-09-05：课程正文底部意外显示切换器（hidden 失效）
+
+- 根因（用户确认 + 代码核对）：≤820px 的 `.workbench-stage { display: flex }` 与 `.limit-tip-button` 的
+  显式 `display: inline-flex` 是作者样式，优先级高于 UA 的 `[hidden] { display: none }`——
+  `hidden` 属性正确设置（app.js setView 置 `stage.hidden`），但显示类规则覆盖了它，
+  JS 无需再改；不改路由、不反复设 hidden、不删除/重建切换器 DOM。
+- 修复：仅在工作台样式区添加局部隐藏规则（比显示规则更具体，不用 !important）：
+  `.workbench-stage[hidden], .workbench-stage .limit-tip-button[hidden] { display: none; }`
+- 回归要求：课程页直接打开即 display:none 且无布局尺寸/不可聚焦；数字台→教材（返回后停留）、
+  模拟台→教材、工作台→演练、工作台→错题均无残留；重新进入切换器正常；说明图标 hidden 显示正确；
+  390/405/820/821/900/1440（含停留课程页跨 820 断点缩放）；断言计算样式与实际可见性，非仅 hidden 属性；
+  完整测试 + git diff --check + 修复前后同尺寸截图；单独一个 fix 提交；先本地验收不推送。

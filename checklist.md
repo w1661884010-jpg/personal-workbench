@@ -131,3 +131,8 @@
 - [x] 阶段 B：Canvas 属性尺寸 = CSS×DPR 核验（390/760/1440 × 六演练均一致、高度 240/340 不压扁）；图例文档流换行不遮曲线。
 - [x] 阶段 B：回归测试先失败（2/4）后通过（4/4）；提交 + after 标签。
 - [x] 完整套件 79/79 + git diff --check + node --check app.js + 前后截图（390/560/760/1440 × 六演练 + 1440 桌面回归）；停本地验收；不推送不发布。
+## 2026-09-05：正文底部意外显示工作台切换器（hidden 被显示规则覆盖）
+- [x] 核验 Git（工作区干净 HEAD 9061ca5），恢复点标签 `restore-2026-09-05-before-switcher-hidden-fix`；计划补充于 2026-09-05-narrow-workbench-ui.md。
+- [x] 真实浏览器回归测试先失败：课程页直开 390/405/820/821/900/1440 `#workbenchStage` 计算样式应为 none、无尺寸、不可聚焦；各视图往返无残留；说明图标 hidden 正确；停留页面跨断点缩放；重新进入正常。
+- [x] 修复：`.workbench-stage[hidden], .workbench-stage .limit-tip-button[hidden] { display: none; }`（特异性高于显示规则，无 !important）。
+- [x] 完整测试 + git diff --check + 修复前后同尺寸截图；单 fix 提交；先本地验收不推送。
