@@ -166,8 +166,8 @@
 /* 实验边界说明：切换气泡下方的警示图标（圆圈感叹号），悬停/聚焦弹出 page-tip 文字提示 */
 .limit-tip-button {
   position: absolute;
-  left: 13px;             /* 在 64px 气泡宽度内水平居中（(64-38)/2） */
-  top: 84px;              /* 紧贴气泡下方 */
+  left: 13px;             /* 在 64px 气泡宽度内水平居中（38px 图标中心 32 = 气泡中心） */
+  top: 80px;              /* 紧贴气泡下缘 */
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -182,9 +182,14 @@
   transition: none;
 }
 
-/* 聚焦时无任何视觉变化（不做外圈/背景），仅保留可弹出提示的能力 */
+/* 聚焦（含 focus-visible）与悬停：无任何视觉变化（不做外圈/背景），仅保留可弹出提示的能力 */
+.limit-tip-button:focus,
 .limit-tip-button:focus-visible {
   outline: none;
+}
+.limit-tip-button:hover {
+  background: transparent;
+  color: var(--ink-faint);
 }
 
 .prototype-workbench-session[hidden] { display: none; }
