@@ -183,3 +183,17 @@
 - Both working trees clean before move. 3010 imports source/dependencies from sibling sites; replace absolute build paths with relative sibling references. Historical docs/comments remain historical.
 - Windows Move-Item partially moved 3010 then stopped at an empty hidden directory. Completed only remaining non-colliding files, then removed verified-empty source directories. No source files deleted or overwritten; both old roots now absent.
 - New-root verification: workbench/KaTeX/Pages build passed; generated bundles have no Git content differences. Original npm test 79/79, shell node tests 38/38; servers restarted hidden on 3000/3010. No push/deployment for this local relocation.
+## 2026-09-05：窄窗口工作台 UI 优化（规划确认）
+- 用户明确：仅修改 3010；3000 只作依赖来源；保留配色/风格/仿真/存档；先查 git 状态并保留已有改动（清理提交 e2a7df9 已由用户完成，工作区干净）；分阶段 A/B 各验证各提交；不推送不部署。
+- 已创建修改前恢复标签 restore-2026-09-05-before-narrow-workbench-ui（HEAD e2a7df9）；计划写入 docs/superpowers/plans/2026-09-05-narrow-workbench-ui.md。
+- 代码核对确认阶段 A 根因：≤820px 切换器 position:static 使 .kind-thumb 的 absolute 包含块跳到 .workbench-stage（relative），thumb 变为舞台尺寸的巨型覆盖块；.limit-tip-button 同为 absolute 挂在舞台 (13,80)，窄屏会压在卡片顶部。
+- 用户禁止用降低透明度/隐藏滑块/全局 overflow:hidden/极端 z-index 掩盖；要求先复现测量、再最小修复；回归测试先失败后通过；测试宽度含 820/821/900/901（切换器断点 820、桌面网格断点 901）。
+- 阶段 B 约束：切换器横向约 176×44 两项等宽、图标在其旁（不绝对定位）；app.js 的 transform 按断点方向写入（窄 translateX / 宽 translateY），跨断点归位，不互相覆盖；运行按钮换行且启动类优先；实验目标选择框独占一行；存区分两组 + 低强调的清空/全删；输入可收缩、按钮不竖排；空列空行固定高度清除；不改画布坐标/缩放/元件操作；顶栏本轮只检查不重构。
+## 2026-09-05：窄窗口工作台 UI 阶段 A（实施完成）
+- 复现测量（修改前，dpr=1）：≤820px 时 `.kind-switcher` 为 static，thumb 的 absolute 包含块跳到 `.workbench-stage`——390/560/760/820px thumb 实为 358×662.9 / 528×641.9 / 728×670.5 / 788×626.7（正确值 56×36），thumbOverlapsRun/Canvas=true，运行区中心 `elementFromPoint` 命中的是 `.kind-thumb`（「启动」点击被拦截，trial 点击通过但文本不切换）。
+- 821/900px 发现第二处既有遮挡：悬浮气泡（12,80,64×80）完全盖住「启动」按钮（29,91,43×32，中心命中返回 kind-switch-button）；说明图标（25,160,38×38）压住实验条卡片（tipOverlapsStrip=true，其 absolute 同样参照 stage）。901+ 网格有 72px pad 列，气泡不遮内容（heading x=84）。
+- 修复只改 styles.css：`@media (max-width: 900px)` 中 `.workbench-stage .kind-switcher { position: relative; display: grid; margin: 0 0 8px }`（原来是 ≤820 的 static），说明图标 `position: static` 并置于文档流。没有用透明化/隐藏/overflow:hidden/z-index 掩盖；未改 app.js/bundle/画布逻辑。
+- 踩坑：媒体块里的 `.limit-tip-button` 覆盖最初放在文件前部（约 145 行），被其后 167 行的同特异性基础规则（absolute）盖掉，修复后 tipOverlapsSwitcher/Heading 仍为 true——把窄屏幕 tip 规则移到基础规则（含 :hover/:focus）之后解决；期间的 11/11 测试失败数据正是该问题的证据链。
+- 修复后测量：五种窄宽 thumb 均 56×36 且完全在 64×80 轨道内（switcherPos=relative），thumbOverlapsRun/Canvas=false，运行区中心命中 BUTTON；说明图标在切换器下方文档流，不与其他控件相交；821/900「启动」命中 run 区；901/1440 桌面布局数值与修改前一致（heading 84,80 150.1×53；canvas 192,198）。
+- 新增 tests/narrow-workbench-switcher.test.mjs 12 项（真实浏览器、隔离 context）：四窄宽定位边界 + 点击启动真正生效、四窄宽模拟态（含 translateY 36px 矩阵断言 + 图标不遮实验条）、821/900 气泡/图标遮挡禁止、窄屏 25ms 连点 10 次终态、跨断点 760→1440→760 模拟态保持。首跑 11/11 全部失败（与预期一致），修复后 12/12 通过。
+- 完整套件 50/50 通过（38 旧 + 12 新），git diff --check 通过；styles.css 单文件改动，无需重构建 bundle（未改打包入口）。截图：`%TEMP%\narrow-A-pre-{390,760,820,821,900,1440}.png` 与 `narrow-A-post-*.png`（含完整工具栏：切换器/运行/实验/存档/元件/画布工具栏）。

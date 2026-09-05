@@ -111,3 +111,13 @@
 - [x] Move only two confirmed repositories into repositories with port suffixes; old directories absent.
 - [x] Update build/import paths; preserve Git refs and configurations (3000 d70d0dd, 3010 0965849 before migration commit).
 - [x] Rebuild workbench, KaTeX and Pages; tests 3000 79/79, 3010 38/38; both ports listening from new roots.
+## 2026-09-05：窄窗口工作台 UI 优化（阶段 A：滑块遮挡；阶段 B：窄屏布局）
+- [x] 计划已记录（docs/superpowers/plans/2026-09-05-narrow-workbench-ui.md）；修改前恢复标签 `restore-2026-09-05-before-narrow-workbench-ui`（e2a7df9）。
+- [x] 阶段 A：真实浏览器复现 + 测量（390/560/760/820/821/900/901/1440）——≤820 thumb 358~788×627~671（舞台尺寸），821/900 气泡盖「启动」、说明图标压实验条。
+- [x] 阶段 A：≤900px 切换器恢复定位参照（relative 回文档流）、说明图标改作用域内静态；两种选中态 thumb 均在 56×36 轨道内、不覆盖工具栏/画布。
+- [x] 阶段 A：回归测试先失败（11/11）后通过（12/12，含窄屏快速连点）；全视口核验 + 完整套件 50/50；提交检查点 + after 标签。
+- [ ] 阶段 B：横向紧凑切换器（约176×44）+ 图标旁边 + 断点 transform/aria 归位。
+- [ ] 阶段 B：运行按钮换行、目标选择框独占行、存区分组、输入可收缩、清理空列空行。
+- [ ] 阶段 B：验证 + 回归测试先失败后通过；提交。
+- [ ] 完整测试套件 + git diff --check + 窄屏前后截图与 1440 桌面对照截图。
+- [ ] 停在本地验收；未经确认不推送、不部署。

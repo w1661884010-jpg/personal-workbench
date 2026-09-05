@@ -141,10 +141,12 @@
 
 .kind-switch-button.is-active { color: var(--ink); }
 
-/* 窄窗（≤820px）：气泡单独占一行，不覆盖内容；下方工作台保持其自身响应式全宽布局 */
-@media (max-width: 820px) {
+/* 窄窗（≤900px）：切换器进入文档流并恢复自身定位参照 —— 否则 .kind-thumb 的绝对定位
+   包含块跳到 .workbench-stage，尺寸变成舞台尺寸的巨型覆盖块（挡住工具栏/画布并拦截点击）；
+   同时把说明图标从 absolute 改回文档流（否则参照舞台压住实验条卡片）。 */
+@media (max-width: 900px) {
   .workbench-stage .kind-switcher {
-    position: static;
+    position: relative;
     display: grid;
     margin: 0 0 8px;
   }
@@ -190,6 +192,16 @@
 .limit-tip-button:hover {
   background: transparent;
   color: var(--ink-faint);
+}
+
+/* 窄窗（≤900px）：说明图标回到文档流（放在切换器下方），避免参照舞台压住实验条卡片 */
+@media (max-width: 900px) {
+  .limit-tip-button {
+    position: static;
+    top: auto;
+    left: auto;
+    margin: 0 0 8px;
+  }
 }
 
 .prototype-workbench-session[hidden] { display: none; }
