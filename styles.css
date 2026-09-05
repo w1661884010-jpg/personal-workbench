@@ -1696,8 +1696,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 .workbench-root .cw-inspector .cw-model-warning { margin-top: 10px; }
 
-/* 桌面：仿真与实验同行，存档整行排列，操作按用途相邻。 */
-@media (min-width: 1200px) {
+/* 桌面：仿真与实验同行，存档整行排列，操作按用途相邻（901 起统一两行式排版）。 */
+@media (min-width: 901px) {
   .workbench-root .circuit-workbench {
     grid-template-areas:
       "pad head strip"
