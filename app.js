@@ -2498,7 +2498,7 @@
       button.setAttribute("aria-selected", active ? "true" : "false");
       button.setAttribute("tabindex", active ? "0" : "-1");
     });
-    kindThumb.style.transform = activeKind === "analog" ? "translateY(100%)" : "translateY(0)";
+    kindThumb.style.transform = activeKind === "analog" ? "translateX(100%)" : "translateX(0)";
     if (instant) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () { kindSwitcher.classList.remove("is-instant"); });

@@ -97,12 +97,12 @@
         <section id="mistakesRoot" class="mistakes-root" hidden aria-label="错题回顾"></section>
         <!-- 统一工作台：切换器留在 React 根节点外，数字/模拟会话可独立保留草稿 -->
         <section id="workbenchStage" class="workbench-stage" hidden aria-label="电路工作台">
-          <div id="workbenchRoot" class="workbench-root"></div>
           <nav id="kindSwitcher" class="kind-switcher" role="tablist" aria-label="工作台类型">
             <span class="kind-thumb" aria-hidden="true"></span>
             <button type="button" id="kindTabDigital" class="kind-switch-button" role="tab" data-kind="digital" aria-selected="true" tabindex="0" aria-controls="workbenchPanelDigital">数字</button>
             <button type="button" id="kindTabAnalog" class="kind-switch-button" role="tab" data-kind="analog" aria-selected="false" tabindex="-1" aria-controls="workbenchPanelAnalog">模拟</button>
           </nav>
+          <div id="workbenchRoot" class="workbench-root"></div>
         </section>
       </main>
     </div>

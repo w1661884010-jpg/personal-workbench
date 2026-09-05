@@ -16,7 +16,7 @@ test("the workbench switcher stays outside the React mount so React cannot erase
 
   assert.ok(stageIndex >= 0, "missing the unified workbench stage");
   assert.ok(switcherIndex > stageIndex, "the kind switcher must be inside the stage");
-  assert.ok(switcherIndex > rootIndex, "the switcher sits below the React mount — still a sibling, never inside it");
+  assert.ok(rootIndex > switcherIndex, "the React mount must follow, not contain, the switcher");
   assert.match(html, /data-kind="digital"/);
   assert.match(html, /data-kind="analog"/);
 });
@@ -58,8 +58,8 @@ test("the kind switcher is one shared sliding track with fixed labels", async ()
   assert.match(html, /id="kindSwitcher"[\s\S]{0,80}class="kind-thumb"/, "the slider thumb rides in the switcher");
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="digital"[^>]*aria-controls="workbenchPanelDigital"/);
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="analog"[^>]*aria-controls="workbenchPanelAnalog"/);
-  assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,220}width:\s*44px/, "vertical slider sits at the bottom (44px wide)");
-  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,360}transform:\s*translateY\(0\);[\s\S]{0,160}transition:\s*transform 180ms cubic-bezier\(\.22, 1, \.36, 1\)/);
+  assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,220}width:\s*184px/);
+  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,320}transition:\s*transform 180ms cubic-bezier\(\.22, 1, \.36, 1\)/);
   assert.doesNotMatch(styles, /\.kind-switch-button\.is-active\s*\{[\s\S]{0,80}background/, "active state must not repaint the label, only the thumb slides");
   assert.match(styles, /\.kind-switcher\.is-instant \.kind-thumb\s*\{\s*transition:\s*none;\s*\}/);
 });
