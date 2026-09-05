@@ -352,6 +352,19 @@
 
 .mistake-chapter { color: var(--accent-ink); font-size: .78rem; font-weight: 750; }
 
+.mistake-badge, .mistake-badge-mastered {
+  font-size: .68rem;
+  font-weight: 750;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.mistake-badge-mastered { background: var(--warm-soft); color: var(--warm); }
+
+.mistake-reason { margin: 0; color: var(--ink-soft); font-size: .86rem; line-height: 1.6; }
+
 .mistake-date { color: var(--ink-faint); font-size: .72rem; }
 
 .mistake-question { margin: 0; font-weight: 700; line-height: 1.55; }

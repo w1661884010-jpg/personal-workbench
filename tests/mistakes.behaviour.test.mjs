@@ -81,34 +81,98 @@ test("wrong check answers are recorded, shown in the mistakes view and removable
   assert.equal(view.title, "错题回顾");
   assert.equal(view.cards, stored.length);
   assert.ok(view.wrong.startsWith("我的答案："), "shows my (wrong) answer");
-  assert.ok(view.correct.startsWith("正确答案："), "shows the correct answer");
-  assert.ok(view.explanation > 10, "shows the explanation");
+  const hasReason = await page.evaluate(() => Boolean(document.querySelector(".mistake-reason")));
+  const hasApproach = await page.evaluate(() => Boolean(document.querySelector(".mistake-correct")));
+  assert.equal(hasReason, true, "shows the reason line (章节检验中选择了…)");
+  assert.equal(hasApproach, true, "shows the correct approach line (正确答案是…)");
 
-  /* 已掌握 → 未掌握页签过滤 → 全部 → 移除 */
-  await page.click(".mistake-card .mistake-actions button");
+  /* 已复盘 toggle → badge 出现 → 撤销（定位首题卡片操作） */
+  await page.evaluate((prompt) => {
+    const card = Array.from(document.querySelectorAll(".mistake-card")).find((c) =>
+      c.querySelector(".mistake-question")?.textContent.trim().startsWith(prompt.slice(0, 8)));
+    card.querySelectorAll(".mistake-actions button")[0].click();
+  }, record.prompt);
   await page.waitForTimeout(250);
-  assert.equal(await page.evaluate(() => document.querySelector(".mistake-card").classList.contains("is-mastered")), true);
+  assert.equal(await page.evaluate(() => document.querySelectorAll(".mistake-badge").length), 1, "badge appears once reviewed");
+
+  /* 闭环：返回教材重新提交——首题答对（其余任意）→ 该错题自动标记已复盘 */
+  await page.click(".notebook-back");
+  await page.waitForTimeout(600);
+  await page.evaluate((correctIndex) => {
+    const cards = Array.from(document.querySelectorAll(".check-card"));
+    cards.forEach((card, index) => {
+      const radios = card.querySelectorAll("input[type=radio]");
+      if (index === 0) radios[correctIndex].click();
+      else radios[0].click();
+    });
+  }, record.answer);
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll("button")).find((x) => x.textContent.includes("提交章节检验"));
+    btn.click();
+  });
+  await page.waitForTimeout(400);
+  const closed = await page.evaluate((key) => {
+    const list = JSON.parse(localStorage.getItem(key) || "[]");
+    return list.find((item) => item.reviewed === true) ? list.find((item) => item.reviewed === true).id : null;
+  }, KEY);
+  assert.equal(closed, record.id, "re-submitting the answer correctly marks the mistake as reviewed");
+
+  /* 重新打开错题页做已掌握流程（定位首题卡片） */
+  await page.click("#mistakeToggle");
+  await page.waitForTimeout(400);
+  await page.evaluate((prompt) => {
+    const card = Array.from(document.querySelectorAll(".mistake-card")).find((c) =>
+      c.querySelector(".mistake-question")?.textContent.trim().startsWith(prompt.slice(0, 8)));
+    card.querySelectorAll(".mistake-actions button")[1].click();
+  }, record.prompt);
+  await page.waitForTimeout(250);
+  const firstCardMastered = await page.evaluate((prompt) => {
+    const card = Array.from(document.querySelectorAll(".mistake-card")).find((c) =>
+      c.querySelector(".mistake-question")?.textContent.trim().startsWith(prompt.slice(0, 8)));
+    return card.classList.contains("is-mastered");
+  }, record.prompt);
+  assert.equal(firstCardMastered, true);
   await page.evaluate(() => {
     const tab = Array.from(document.querySelectorAll(".practice-tab")).find((x) => x.textContent.includes("未掌握"));
     tab.click();
   });
-  await page.waitForTimeout(250);
-  assert.equal(await page.evaluate(() => document.querySelectorAll(".mistake-card").length), 0, "mastered hidden in the 未掌握 tab");
+  await page.waitForFunction(
+    (prompt) => !Array.from(document.querySelectorAll(".mistake-card .mistake-question")).some((el) => el.textContent.trim().startsWith(prompt)),
+    record.prompt.slice(0, 8),
+  );
+  await page.waitForTimeout(150);
   await page.evaluate(() => {
     const tab = Array.from(document.querySelectorAll(".practice-tab")).find((x) => x.textContent.includes("全部"));
     tab.click();
   });
   await page.waitForTimeout(250);
-  await page.click(".mistake-card .mistake-actions button:last-child");
+  /* 移除首题（其余闭环新错题保留） */
+  await page.evaluate((prompt) => {
+    const cards = Array.from(document.querySelectorAll(".mistake-card"));
+    const target = cards.find((card) => card.querySelector(".mistake-question")?.textContent.trim().startsWith(prompt.slice(0, 8)));
+    target.querySelector(".mistake-actions button:last-child").click();
+  }, record.prompt);
   await page.waitForTimeout(250);
-  const afterRemove = await page.evaluate((key) => ({
-    cards: document.querySelectorAll(".mistake-card").length,
-    empty: document.querySelector(".practice-placeholder")?.textContent.includes("暂无错题"),
-    storage: JSON.parse(localStorage.getItem(key) || "[]").length,
-  }), KEY);
-  assert.equal(afterRemove.cards, 0);
-  assert.equal(afterRemove.empty, true);
-  assert.equal(afterRemove.storage, 0);
+  const afterRemove = await page.evaluate(({ key, prompt }) => {
+    const list = JSON.parse(localStorage.getItem(key) || "[]");
+    return {
+      gone: !list.some((item) => item.prompt === prompt),
+    };
+  }, { key: KEY, prompt: record.prompt });
+  assert.equal(afterRemove.gone, true, "the reviewed mistake is removed from storage");
+  const remaining = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) || "[]").map((m) => m.prompt.slice(0, 6)), KEY);
+  assert.ok(remaining.every((p) => p !== record.prompt.slice(0, 6)), "only the loop-added mistakes remain");
+
+  /* 移除剩余错题后显示空态；返回教材正常 */
+  await page.evaluate(() => {
+    Array.from(document.querySelectorAll(".mistake-card")).forEach((card) =>
+      card.querySelector(".mistake-actions button:last-child").click(),
+    );
+  });
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => document.querySelectorAll(".mistake-card").length), 0);
+  assert.equal(await page.evaluate(() => document.querySelector(".practice-placeholder")?.textContent.includes("暂无错题")), true);
 
   /* 已无错题时点击错题按钮仍可打开空态视图；返回教材正常 */
   await page.click(".notebook-back");

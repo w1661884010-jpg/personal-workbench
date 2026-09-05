@@ -420,13 +420,24 @@
     }
   }
 
-  /* 检验答错时收录（同章节+题目去重更新，保留首次时间，更新时间与掌握状态） */
+  /* 检验提交闭环（对齐原站 submitChapterCheck 语义）：
+     - 答错：收录/更新错题，理由与正确思路按原站模板生成，reviewed=false；
+     - 答对：既往错题自动标记已复盘（reviewed=true），形成闭环；
+     - 字段：origin/reason/correctApproach/reviewed/mastered/时间戳。 */
   function recordMistakes(courseId, chapter, answers) {
     var changed = false;
+    var now = new Date().toISOString();
     chapter.check.forEach(function (question, index) {
-      if (answers[index] === question.answer) return;
       var id = "mistake-" + chapter.id + "-" + question.id;
       var existing = mistakes.find(function (item) { return item.id === id; });
+      if (answers[index] === question.answer) {
+        if (existing && !existing.reviewed) {
+          existing.reviewed = true;
+          existing.updatedAt = now;
+          changed = true;
+        }
+        return;
+      }
       var record = {
         id: id,
         courseId: courseId,
@@ -437,12 +448,16 @@
         chosen: answers[index],
         answer: question.answer,
         explanation: question.explanation,
-        createdAt: existing ? existing.createdAt : new Date().toISOString(),
-        mastered: existing ? existing.mastered : false
+        origin: "check",
+        reason: "章节检验中选择了「" + question.options[answers[index]] + "」。",
+        correctApproach: "正确答案是「" + question.options[question.answer] + "」。" + question.explanation,
+        reviewed: false,
+        mastered: existing ? existing.mastered : false,
+        createdAt: existing ? existing.createdAt : now,
+        updatedAt: now
       };
       if (existing) {
-        var position = mistakes.indexOf(existing);
-        mistakes[position] = record;
+        mistakes[mistakes.indexOf(existing)] = record;
       } else {
         mistakes.push(record);
       }
@@ -464,16 +479,16 @@
     tabs.setAttribute("role", "tablist");
     var allTab = document.createElement("button");
     allTab.type = "button";
-    allTab.className = "practice-tab is-active";
+    allTab.className = "practice-tab" + (mistakesHideMastered ? "" : " is-active");
     allTab.setAttribute("role", "tab");
-    allTab.setAttribute("aria-selected", "true");
+    allTab.setAttribute("aria-selected", mistakesHideMastered ? "false" : "true");
     allTab.appendChild(textElement("span", "全部错题", "practice-tab-title"));
     tabs.appendChild(allTab);
     var masteredTab = document.createElement("button");
     masteredTab.type = "button";
-    masteredTab.className = "practice-tab" + (mistakesHideMastered ? "" : " is-active");
+    masteredTab.className = "practice-tab" + (mistakesHideMastered ? " is-active" : "");
     masteredTab.setAttribute("role", "tab");
-    masteredTab.setAttribute("aria-selected", mistakesHideMastered ? "false" : "true");
+    masteredTab.setAttribute("aria-selected", mistakesHideMastered ? "true" : "false");
     masteredTab.appendChild(textElement("span", "未掌握", "practice-tab-title"));
     tabs.appendChild(masteredTab);
     var hideMastered = function () {
@@ -534,24 +549,43 @@
           var head = document.createElement("div");
           head.className = "mistake-head";
           head.appendChild(textElement("span", record.chapterTitle, "mistake-chapter"));
-          head.appendChild(textElement("span", formatMistakeDate(record.createdAt), "mistake-date"));
+          if (record.reviewed) head.appendChild(textElement("span", "已复盘", "mistake-badge"));
+          if (record.mastered) head.appendChild(textElement("span", "已掌握", "mistake-badge-mastered"));
+          head.appendChild(textElement("span", formatMistakeDate(record.updatedAt || record.createdAt), "mistake-date"));
           card.appendChild(head);
           card.appendChild(textElement("p", record.prompt, "mistake-question"));
           var chosenText = record.options[record.chosen];
           var correctText = record.options[record.answer];
           card.appendChild(textElement("p", "我的答案：" + chosenText, "mistake-wrong"));
-          if (record.chosen !== record.answer) {
-            card.appendChild(textElement("p", "正确答案：" + correctText, "mistake-correct"));
+          if (record.origin === "check") {
+            card.appendChild(textElement("p", record.reason, "mistake-reason"));
+            card.appendChild(textElement("p", record.correctApproach, "mistake-correct"));
+          } else {
+            if (record.chosen !== record.answer) {
+              card.appendChild(textElement("p", "正确答案：" + correctText, "mistake-correct"));
+            }
+            card.appendChild(textElement("p", record.explanation, "mistake-explanation"));
           }
-          card.appendChild(textElement("p", record.explanation, "mistake-explanation"));
           var actions = document.createElement("div");
           actions.className = "mistake-actions";
+          var reviewButton = document.createElement("button");
+          reviewButton.type = "button";
+          reviewButton.className = "secondary";
+          reviewButton.textContent = record.reviewed ? "撤销已复盘" : "标记已复盘";
+          reviewButton.addEventListener("click", function () {
+            record.reviewed = !record.reviewed;
+            record.updatedAt = new Date().toISOString();
+            saveMistakes();
+            renderMistakesView();
+          });
+          actions.appendChild(reviewButton);
           var masterButton = document.createElement("button");
           masterButton.type = "button";
           masterButton.className = "secondary";
           masterButton.textContent = record.mastered ? "撤销已掌握" : "标记已掌握";
           masterButton.addEventListener("click", function () {
             record.mastered = !record.mastered;
+            record.updatedAt = new Date().toISOString();
             saveMistakes();
             renderMistakesView();
           });
