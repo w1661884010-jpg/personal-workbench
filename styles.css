@@ -169,16 +169,30 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--hairline);
 }
 
-.notebook-heading h1 { margin: 4px 0 6px; font-size: 1.5rem; letter-spacing: -0.015em; }
+.notebook-heading-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
 
-.notebook-eyebrow, .notebook-progress, .step-status {
-  color: var(--accent-ink);
-  font-size: .78rem;
-  font-weight: 750;
+.notebook-heading h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.015em; }
+
+/* 标题仅由程序聚焦（tabIndex=-1，键盘不可达）：精确移除该单点焦点环，不动全局 outline */
+.notebook-heading h1:focus { outline: none; }
+
+.notebook-eyebrow, .notebook-progress {
+  color: var(--ink-faint);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.notebook-goal-line {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .9rem;
+  line-height: 1.55;
 }
 
 .notebook-meta { margin: 0; color: var(--ink-soft); font-size: .84rem; }
@@ -190,14 +204,14 @@
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.notebook-goal, .notebook-step-section, .notebook-evidence { display: grid; gap: 10px; }
+.notebook-step-section, .notebook-evidence { display: grid; gap: 10px; }
 
-.notebook-goal h2, .notebook-step-section h2, .notebook-evidence h2 {
+.notebook-step-section h2, .notebook-evidence h2 {
   margin: 0;
   font-size: 1rem;
 }
 
-.notebook-goal p, .notebook-evidence p { margin: 0; color: var(--ink-soft); }
+.notebook-evidence p { margin: 0; color: var(--ink-soft); }
 
 .notebook-step-section > header {
   display: flex;
@@ -208,42 +222,50 @@
 
 .notebook-steps {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* 步骤：紧凑勾选行（编号 + 全文 + 勾选标记），靠背景差分层级，不套卡片边框 */
 .step-check {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 13px 14px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   text-align: left;
   white-space: normal;
 }
 
-.step-check.is-done { background: var(--accent-soft); border-color: var(--accent); }
+.step-check:hover { background: var(--panel); }
+
+.step-check.is-done { background: var(--accent-soft); border-color: transparent; }
 
 .step-number {
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
   font-weight: 750;
+  padding-top: 1px;
 }
 
 .step-copy { line-height: 1.55; }
 
 .step-check.is-done .step-copy { color: var(--ink-soft); }
 
+.step-check-mark { color: var(--accent-ink); font-weight: 750; }
+
+.step-check-mark.is-hidden { visibility: hidden; }
+
 .notebook-evidence {
-  padding: 14px 16px;
-  border-left: 3px solid var(--accent);
+  padding: 12px 14px;
   border-radius: 8px;
-  background: var(--panel-2);
+  background: var(--panel);
 }
 
 .notebook-boundary { margin: 0; }
@@ -257,9 +279,10 @@
   background: var(--panel-2);
 }
 
+/* 参数：按实际参数数量等宽铺满（4 项 4 列、2 项 2 列；窄屏 auto-fit 自然回落到 2/1 列） */
 .demo-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 
@@ -272,11 +295,14 @@
 }
 
 .demo-field input {
-  width: 120px;
-  padding: 6px 9px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
+  font-size: .9rem;
+  line-height: 1.3;
 }
 
 .demo-canvas-wrap { min-width: 0; }
@@ -291,7 +317,7 @@
 
 .demo-canvas-tall { height: 340px; }
 
-/* ===== 演练工作台：tab + 布局 ===== */
+/* ===== 演练工作台：短标题导航 + 布局 ===== */
 .practice-topbar {
   display: grid;
   gap: 8px;
@@ -299,18 +325,23 @@
 
 .practice-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .practice-tab {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 7px;
-  min-height: 38px;
+  gap: 6px;
+  min-height: 34px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--panel-2);
   color: var(--ink-soft);
   font-weight: 700;
@@ -327,25 +358,13 @@
 
 .practice-tab.is-done { color: var(--accent-ink); }
 
-.practice-tab-num {
-  color: var(--accent-ink);
-  font-family: var(--mono);
-  font-size: .72rem;
-}
-
-.practice-tab-title { font-size: .84rem; }
+.practice-tab-title { font-size: .82rem; }
 
 .practice-tab-done { color: var(--accent-ink); font-weight: 750; }
 
-.practice-overview {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: .78rem;
-}
-
 .practice-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -395,27 +414,26 @@
 .demo-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .demo-metric {
   display: grid;
   gap: 3px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--panel);
 }
 
-.demo-metric-label { font-size: .7rem; color: var(--ink-soft); }
+.demo-metric-label { font-size: .7rem; color: var(--ink-faint); }
 
-.demo-metric-value { font-family: var(--mono); font-size: .86rem; }
+.demo-metric-value { font-family: var(--mono); font-size: .92rem; font-weight: 750; white-space: normal; }
 
 @media (max-width: 620px) {
   .notebook-page { gap: 18px; padding: 18px 16px; border-radius: 10px; }
   .notebook-heading { display: grid; gap: 14px; }
   .notebook-back { justify-self: start; }
-  .step-check { grid-template-columns: auto minmax(0, 1fr); }
-  .step-status { grid-column: 2; }
+  .practice-tabs { margin: 0 -4px; padding: 0 4px; }
 }
 
 /* 视图切换的淡入淡出：左栏与正文同一节奏 */

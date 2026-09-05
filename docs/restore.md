@@ -7,7 +7,9 @@
 - `restore-2026-09-05-before-kind-switcher-slider`：滑块与内容过渡**修改前**（`1c6cdf9`）。
 - `restore-2026-09-05-after-kind-switcher-slider`：滑块与内容过渡**第一版**（`8c32b85`）。
 - `restore-2026-09-05-before-kind-switcher-fix`：核验修正**修改前**（`8c32b85`）。
-- `restore-2026-09-05-after-kind-switcher-fix`：核验修正完成版（当前提交）。
+- `restore-2026-09-05-after-kind-switcher-fix`：核验修正完成版。
+- `restore-2026-09-05-before-practice-polish`：演练页 UI 优化**修改前**。
+- `restore-2026-09-05-after-practice-polish`：演练页 UI 优化完成版（当前提交）。
 - `main`：当前开发版本。
 
 先运行 `git status`。存在未提交修改时，先提交或备份，再切换版本。

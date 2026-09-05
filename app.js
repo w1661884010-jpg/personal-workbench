@@ -722,29 +722,41 @@
   }
   collectPracticeExperiments();
 
+  /* 演练导航短标题：实验 ID → 短标题的显式映射（与 courses.js 真实 id 一一对应） */
+  var EXPERIMENT_SHORT_TITLES = {
+    "signals-intro-notebook": "信号观察",
+    "signals-ch1-convolution": "卷积验证",
+    "signals-ch2-aliasing": "采样混叠",
+    "signals-ch3-first-order-lti": "LTI 系统",
+    "signals-ch4-moving-average": "FIR 滤波",
+    "signals-ch5-random-average": "方差验证"
+  };
+
+  function experimentShortTitle(experiment) {
+    return EXPERIMENT_SHORT_TITLES[experiment.id] || experiment.title;
+  }
+
   function renderNotebookView(course, chapter, experiment) {
     notebookRoot.textContent = "";
     var page = document.createElement("article");
     page.className = "notebook-page";
 
-    /* —— 顶部：演练 tab + 进度总览 —— */
+    /* —— 顶部：紧凑短标题导航（当前实验高亮；完成标记 ✓ 保留） —— */
     var topbar = document.createElement("header");
     topbar.className = "practice-topbar";
 
     var tabs = document.createElement("nav");
     tabs.className = "practice-tabs";
     tabs.setAttribute("role", "tablist");
-    var totalCompleted = 0;
     practiceExperiments.forEach(function (entry) {
       var tab = document.createElement("button");
       tab.type = "button";
       tab.className = "practice-tab";
       tab.setAttribute("role", "tab");
+      tab.setAttribute("data-experiment-id", entry.experiment.id);
       var states = notebookChecks[entry.experiment.id];
       var doneCount = states ? states.filter(function (v) { return v; }).length : 0;
-      if (doneCount === entry.experiment.steps.length) totalCompleted += 1;
-      tab.appendChild(textElement("span", entry.chapter.number === "绪论" ? "绪论" : entry.chapter.number.replace("第", "").replace("章", ""), "practice-tab-num"));
-      tab.appendChild(textElement("span", entry.experiment.title, "practice-tab-title"));
+      tab.appendChild(textElement("span", experimentShortTitle(entry.experiment), "practice-tab-title"));
       if (doneCount === entry.experiment.steps.length) tab.appendChild(textElement("span", "✓", "practice-tab-done"));
       if (entry.experiment.id === experiment.id) {
         tab.classList.add("is-active");
@@ -759,9 +771,6 @@
       tabs.appendChild(tab);
     });
     topbar.appendChild(tabs);
-
-    var overview = textElement("p", "已完成 " + totalCompleted + "/" + practiceExperiments.length + " 个演练", "practice-overview");
-    topbar.appendChild(overview);
     page.appendChild(topbar);
 
     /* —— 两步布局：主导区（目标+沙箱）｜右侧栏（步骤+预期证据） —— */
@@ -774,10 +783,13 @@
     var heading = document.createElement("header");
     heading.className = "notebook-heading";
     var headingCopy = document.createElement("div");
+    headingCopy.className = "notebook-heading-copy";
     headingCopy.appendChild(textElement("span", "实验演练 · " + chapter.number + " " + chapter.title, "notebook-eyebrow"));
     var title = textElement("h1", experiment.title);
     title.tabIndex = -1;
     headingCopy.appendChild(title);
+    /* 标题区一句目标：移除“实验目标”独立标题，目标文字随标题层级 */
+    headingCopy.appendChild(textElement("p", experiment.goal, "notebook-goal-line"));
     heading.appendChild(headingCopy);
 
     var backButton = document.createElement("button");
@@ -790,12 +802,6 @@
     });
     heading.appendChild(backButton);
     main.appendChild(heading);
-
-    var goal = document.createElement("section");
-    goal.className = "notebook-goal";
-    goal.appendChild(textElement("h2", "实验目标"));
-    goal.appendChild(textElement("p", experiment.goal));
-    main.appendChild(goal);
 
     /* 沙箱演示：已实现预置演示的实验进入 canvas 交互区；未实现放占位提示 */
     if (SIGNAL_DEMOS[experiment.id]) {
@@ -826,11 +832,11 @@
     stepList.className = "notebook-steps";
     var stepButtons = [];
 
-    function updateStepState(button, status, index) {
+    function updateStepState(button, check, index) {
       var done = states[index];
       button.classList.toggle("is-done", done);
       button.setAttribute("aria-pressed", done ? "true" : "false");
-      status.textContent = done ? "已完成" : "待完成";
+      check.classList.toggle("is-hidden", !done);
       var completed = states.filter(function (value) { return value; }).length;
       progress.textContent = "已完成 " + completed + "/" + states.length;
     }
@@ -842,16 +848,16 @@
       button.className = "step-check";
       button.appendChild(textElement("span", String(index + 1).padStart(2, "0"), "step-number"));
       button.appendChild(textElement("span", step, "step-copy"));
-      var status = textElement("span", "", "step-status");
-      button.appendChild(status);
+      /* 完成标记：行内 ✓（未完成不占位）；去掉每项重复的“待完成”文字 */
+      button.appendChild(textElement("span", "✓", "step-check-mark"));
       button.addEventListener("click", function () {
         states[index] = !states[index];
-        updateStepState(button, status, index);
+        updateStepState(button, button.querySelector(".step-check-mark"), index);
         updateTabsCompletion();
       });
       item.appendChild(button);
       stepList.appendChild(item);
-      stepButtons.push([button, status, index]);
+      stepButtons.push([button, button.querySelector(".step-check-mark"), index]);
     });
     stepButtons.forEach(function (entry) { updateStepState(entry[0], entry[1], entry[2]); });
     stepsSection.appendChild(stepList);
@@ -868,27 +874,36 @@
     page.appendChild(layout);
 
     notebookRoot.appendChild(page);
+    /* 窄屏时把当前实验滚进视野：只滚动 tabs 自身，不改变页面滚动位置
+       （DOM 挂载后才有有效几何，因此放在 append 之后执行） */
+    scrollActiveTabIntoView();
   }
 
-  /* 勾选变化后刷新 tab 完成标记与总览（不改当前视图） */
+  function scrollActiveTabIntoView() {
+    var tabsEl = notebookRoot.querySelector(".practice-tabs");
+    if (!tabsEl) return;
+    var active = tabsEl.querySelector(".practice-tab.is-active");
+    if (!active || tabsEl.scrollWidth <= tabsEl.clientWidth) return;
+    var a = active.getBoundingClientRect();
+    var t = tabsEl.getBoundingClientRect();
+    tabsEl.scrollLeft += a.left - t.left - t.width / 2 + a.width / 2;
+  }
+
+  /* 勾选变化后刷新 tab 完成标记（不改当前视图；按 data-experiment-id 精确匹配，不依赖标题文本） */
   function updateTabsCompletion() {
     var tabs = notebookRoot.querySelectorAll(".practice-tab");
     if (!tabs.length) return;
-    var totalCompleted = 0;
     tabs.forEach(function (tab) {
-      var title = tab.querySelector(".practice-tab-title");
-      var experiment = practiceExperiments.find(function (entry) { return entry.experiment.title === (title ? title.textContent : ""); });
-      if (!experiment) return;
-      var states = notebookChecks[experiment.experiment.id];
+      var id = tab.getAttribute("data-experiment-id");
+      var entry = practiceExperiments.find(function (candidate) { return candidate.experiment.id === id; });
+      if (!entry) return;
+      var states = notebookChecks[entry.experiment.id];
       var doneCount = states ? states.filter(function (v) { return v; }).length : 0;
-      var done = doneCount === experiment.experiment.steps.length;
-      if (done) totalCompleted += 1;
+      var done = doneCount === entry.experiment.steps.length;
       tab.classList.toggle("is-done", done);
       tab.querySelector(".practice-tab-done")?.remove();
       if (done) tab.appendChild(textElement("span", "✓", "practice-tab-done"));
     });
-    var overview = notebookRoot.querySelector(".practice-overview");
-    if (overview) overview.textContent = "已完成 " + totalCompleted + "/" + practiceExperiments.length + " 个演练";
   }
 
   function openNotebookExperiment(experiment, chapter) {
@@ -999,8 +1014,8 @@
       var accentInk = canvasColor("--accent-ink");
       var gridSoft = "rgba(128, 133, 141, 0.14)";
       var gridMid = "rgba(128, 133, 141, 0.32)";
-      var gridText = "rgba(128, 133, 141, 0.5)";
-      var margin = { left: 34, right: 12, top: 10, bottom: 22 };
+      var gridText = "rgba(128, 133, 141, 0.72)";
+      var margin = { left: 40, right: 14, top: 10, bottom: 24 };
       var plotW = width - margin.left - margin.right;
       var plotH = height - margin.top - margin.bottom;
       var T = state.duration;
@@ -1023,19 +1038,21 @@
 
       /* 坐标轴文字：固定 ±2V 刻度标签（标准刻度，不随 A 变） */
       ctx.fillStyle = gridText;
-      ctx.font = "10px system-ui, sans-serif";
+      ctx.font = "11px system-ui, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText("2", margin.left - 6, margin.top + 4);
       ctx.fillText("0", margin.left - 6, zeroY + 3);
       ctx.fillText("-2", margin.left - 6, margin.top + plotH + 4);
 
-      /* 连续曲线：采样 400 点（限制在绘图区，A>2 时超出部分裁剪） */
+      /* 连续曲线：采样 400 点（限制在绘图区，A>2 时超出部分裁剪）；
+         与离散采样点用线型+明度双重区分（虚线浅色 vs 实线深色+标记） */
       ctx.save();
       ctx.beginPath();
       ctx.rect(margin.left, margin.top, plotW, plotH);
       ctx.clip();
       ctx.strokeStyle = accent;
       ctx.lineWidth = 2;
+      ctx.setLineDash([7, 4]);
       ctx.beginPath();
       var samples = 400;
       for (var i = 0; i <= samples; i += 1) {
@@ -1045,6 +1062,7 @@
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.stroke();
+      ctx.setLineDash([]);
 
       /* 采样点 stem 图 */
       ctx.strokeStyle = accentInk;
@@ -1185,8 +1203,8 @@
       var accentInk = canvasColor("--accent-ink");
       var gridSoft = "rgba(128, 133, 141, 0.14)";
       var gridMid = "rgba(128, 133, 141, 0.32)";
-      var gridText = "rgba(128, 133, 141, 0.5)";
-      var margin = { left: 34, right: 12, top: 8, bottom: 8 };
+      var gridText = "rgba(128, 133, 141, 0.72)";
+      var margin = { left: 40, right: 14, top: 8, bottom: 8 };
       var rows = 2;
       var T = state.duration;
       var f = state.frequency;
@@ -1201,7 +1219,7 @@
 
         /* 行标题 */
         ctx.fillStyle = gridText;
-        ctx.font = "10px system-ui, sans-serif";
+        ctx.font = "11px system-ui, sans-serif";
         ctx.textAlign = "left";
         ctx.fillText("fs = " + formatNumber(fs) + " Hz" + (rowIndex === 1 ? "（满足采样定理）" : "（低于 2f，发生混叠）"), margin.left, rowTop + 10);
 
@@ -1384,8 +1402,8 @@
       var accentInk = canvasColor("--accent-ink");
       var gridSoft = "rgba(128, 133, 141, 0.14)";
       var gridMid = "rgba(128, 133, 141, 0.32)";
-      var gridText = "rgba(128, 133, 141, 0.5)";
-      var margin = { left: 34, right: 12, top: 10, bottom: 22 };
+      var gridText = "rgba(128, 133, 141, 0.72)";
+      var margin = { left: 40, right: 14, top: 10, bottom: 24 };
       var plotW = width - margin.left - margin.right;
       var plotH = height - margin.top - margin.bottom;
       var w = state.width;
@@ -1407,7 +1425,7 @@
 
       /* Y 轴刻度 */
       ctx.fillStyle = gridText;
-      ctx.font = "10px system-ui, sans-serif";
+      ctx.font = "11px system-ui, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(formatNumber(maxY), margin.left - 6, margin.top + 4);
       ctx.fillText("0", margin.left - 6, zeroY + 3);
