@@ -281,7 +281,7 @@
 .notebook-demo {
   display: grid;
   gap: 12px;
-  padding: 14px;
+  padding: 14px 14px 28px;
   border-radius: 10px;
   background: var(--panel-2);
 }
