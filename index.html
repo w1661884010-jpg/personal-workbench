@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>个人电子工作台</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./katex.min.css" />
+  <link rel="stylesheet" href="./workbench.bundle.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部全局导航：科目切换 + 功能入口（纯文字，无图标） -->
+    <header class="topbar" id="topbar">
+      <div class="topbar-brand"><span class="brand-mark">电</span><span>个人电子工作台</span></div>
+      <nav class="subject-tabs" aria-label="科目切换">
+        <button type="button" class="subject-tab is-active" data-subject="signals">信号与系统</button>
+        <button type="button" class="subject-tab" data-subject="digital">数字电子技术</button>
+        <button type="button" class="subject-tab" data-subject="analog">模拟电子技术</button>
+      </nav>
+      <div class="global-search">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m10.4 10.4 3.8 3.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <label class="sr-only" for="globalSearchInput">全局搜索</label>
+        <input id="globalSearchInput" type="search" placeholder="搜索课程、章节、知识讲解或实验" autocomplete="off" />
+      </div>
+      <nav class="topbar-actions" aria-label="功能入口">
+        <button id="workbenchToggle" type="button" class="tool-button workbench-button" data-tip="电路工作台：进入后切换数字与模拟电路">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 1.2v2M8 1.2v2M10.5 1.2v2M5.5 12.8v2M8 12.8v2M10.5 12.8v2M1.2 5.5h2M1.2 8h2M1.2 10.5h2M12.8 5.5h2M12.8 8h2M12.8 10.5h2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span>工作台</span>
+        </button>
+        <button id="practiceToggle" type="button" class="tool-button workbench-button" data-tip="实验演练：信号课实验的交互演示">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8c1.2-3.4 2.6-3.4 3.8 0s2.6 3.4 3.8 0 2.6-3.4 3.8 0 1.7 1.7 3.6 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <span>演练</span>
+        </button>
+        <button type="button" class="tool-button" data-tip="练习与错题：记录原因与正确思路，不参与章节完成度">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
+          <span>错题</span>
+        </button>
+        <button type="button" class="tool-button" id="themeToggle" data-tip="外观模式：跟随系统。点击切换" aria-label="外观模式：跟随系统。点击切换">
+          <span id="themeIcon" aria-hidden="true"></span>
+          <span id="themeLabel">系统</span>
+        </button>
+      </nav>
+    </header>
+
+    <div class="shell" id="shell">
+      <!-- 顶栏浅分隔线：独立固定元素；顶栏收起时随之上移，最终与窗口上边界对齐 -->
+      <div class="topbar-divider" aria-hidden="true"></div>
+      <div class="chapter-col">
+        <!-- 左栏：当前科目的章节目录（固定，独立滚动；可收起为"当前章节"竖条） -->
+        <aside class="chapter-panel" id="chapterPanel" aria-label="章节目录">
+          <div class="chapter-panel-head">
+            <div class="chapter-panel-title" id="chapterPanelTitle">章节目录 · 信号与系统</div>
+            <button type="button" id="chapterPanelToggle" class="icon-toggle" aria-label="收起章节目录" title="收起">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <nav class="chapter-list" id="chapterList" aria-label="章节列表">
+            <!-- JS 按当前科目填充：编号 + 标题 -->
+          </nav>
+          <nav class="chapter-rail" id="chapterRail" hidden aria-label="章节列表（收起）">
+            <!-- JS 填充：每章一个方块（章节序号/首字），选中高亮 -->
+          </nav>
+        </aside>
+
+        <!-- 翻页气泡：吸附窗口最下方，左缘与章节栏对齐，两气泡等宽 -->
+        <div class="page-pager">
+          <button type="button" id="prevChapter" aria-label="上一章">上一章</button>
+          <button type="button" id="nextChapter" aria-label="下一章">下一章</button>
+        </div>
+      </div>
+
+      <!-- 中间：当前章节正文 -->
+      <main class="content" id="content">
+        <article class="lesson">
+          <header class="lesson-heading">
+            <h1 id="lessonTitle">绪论 · 信号分析与处理概览</h1>
+          </header>
+
+          <details class="lesson-guide" open>
+            <summary>课程导读</summary>
+            <div id="lessonGuideContent"></div>
+          </details>
+
+          <section class="lesson-focus" aria-label="本章重点">
+            <h2>本章重点</h2>
+            <ul id="lessonFocusList"></ul>
+          </section>
+
+          <section class="lesson-body" id="lessonBody" aria-label="核心正文"></section>
+
+          <section class="lesson-resources" id="lessonResources" aria-label="例题、实验、检验与总结"></section>
+        </article>
+        <!-- 实验演练页：从信号课程实验卡进入，步骤勾选仅保留在当前页面内存 -->
+        <section id="notebookRoot" class="notebook-root" hidden aria-label="实验演练实践"></section>
+        <!-- 统一工作台：切换器留在 React 根节点外，数字/模拟会话可独立保留草稿 -->
+        <section id="workbenchStage" class="workbench-stage" hidden aria-label="电路工作台">
+          <nav id="kindSwitcher" class="kind-switcher" aria-label="工作台类型">
+            <button type="button" class="kind-switch-button" data-kind="digital" aria-pressed="false">数字</button>
+            <button type="button" class="kind-switch-button" data-kind="analog" aria-pressed="false">模拟</button>
+          </nav>
+          <div id="workbenchRoot" class="workbench-root"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="./courses.js"></script>
+  <script src="./katex.bundle.js"></script>
+  <script src="./workbench.bundle.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

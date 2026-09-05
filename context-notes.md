@@ -1,0 +1,110 @@
+# Context Notes
+
+## 2026-09-04：正文迁移
+
+- 目标副本是 `C:\Users\Lenovo\Documents\codex_projects\personal-workbench-shell`，由 `node serve.mjs 3010` 提供服务。
+- 原站内容源是 `C:\Users\Lenovo\Documents\codex_projects\personal-workbench-sites\app\data\courses\index.ts`；其模电数据已按用户指定官方教案校正。
+- 当前 `courses.js` 虽由原站生成，但仍是校正前的旧包；当前 `index.html` 的正文是固定占位文本，`app.js` 切章时只更新标题与检验摘要。
+- “迁移正文”解释为迁入章节的课程导读、学习目标、前置知识、知识讲解、公式与变量、例题、实验文字、检验题和复习总结，使原站的可读课程信息不丢失。
+- “移除图示内容”解释为不迁入 `StudyDiagram`、教学 canvas、图片或 figure；顶栏功能图标和独立电路工作台不属于正文图示，保持不变。
+- 选择更新且已通过原站测试的数据定义作为唯一内容源，不混用 3010 的旧包或硬编码占位正文。
+- 3010 项目没有 Git 元数据；本任务不创建仓库、不提交、不推送。
+- 用户已直接要求实施，因此计划完成后在当前会话内执行，不再停在执行方式选择。
+- 迁移测试首次运行结果为 1 通过、2 失败：旧包仍出现“第四版教材参照”，HTML 缺少 `lessonGuideContent` 等动态挂载点；图示排除测试已通过。该失败与预期一致，证明测试能识别本次迁移目标。
+- 首次刷新包的 Node 内联脚本因 Windows 绝对路径不是有效 ESM URL 而失败；改用 `file:///C:/...` 后成功生成 120.9 kB 数据包。刷新后的测试还暴露测试把补充章误写为 `analog-10`，核对实际数据后修正为稳定 ID `analog-11`；`analog-10` 是计入进度的第 9 章“直流电源”。
+- 渲染层继续沿用原静态页面结构，只把固定占位文本替换为 `renderLesson(course, chapter)`；所有内容节点使用 `textContent`，没有引入 HTML 字符串、图片、canvas 或新依赖。
+- 专项迁移测试最终为 3/3 通过。
+- 静态验收：`node --test tests/*.test.mjs` 为 3/3 通过，`node --check app.js` 通过，旧占位/第四版旧标注/教学图示扫描无命中，改动文件尾随空白扫描通过。
+- Browser 插件及其 browser skill 未在本会话提供，因此按前端测试技能要求使用 Playwright CLI。验收视口为 1440×900 和 390×844；已验证“模拟电子技术 → 第2章 → h 参数正文”和“第10章 → 不计进度说明”两个状态，正文内 `canvas/figure/img` 数量为 0。
+- 浏览器控制台仅有原页面未提供 `favicon.ico` 的 404；没有正文脚本异常或框架错误覆盖层。本任务不顺带修改这一既有静态资源问题。
+- Playwright 首次尝试递归删除临时产物目录被工具策略在执行前拒绝；随后核对源目录和目标目录后，将整个 `.playwright-cli` 可恢复地移动到 `C:\Users\Lenovo\AppData\Local\Temp\codex-playwright-course-migration-20260904`，仓库内未残留浏览器产物。
+- 桌面与移动截图分别保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-course-migration-desktop.png` 和 `C:\Users\Lenovo\AppData\Local\Temp\codex-course-migration-mobile.png`。
+- 没有修改 3000 原站、3010 的导航/工作台，也没有发布、推送或提交；3010 项目本身没有 Git 元数据。
+- 最终 HTTP 检查脚本首次因 PowerShell 不允许直接在 `foreach` 语句后接空管道位置而解析失败；把结果先赋给 `$results` 后重跑，`/`、`app.js`、`courses.js`、`styles.css` 均返回 200。
+
+## 2026-09-04：实践功能区阶段 A
+
+- 用户给出的 `C:\Users\Lenovo\Documents\codex\_projects\...` 不存在；核验到实际项目为 `C:\Users\Lenovo\Documents\codex_projects\personal-workbench-shell`，计划文件名一致，因此按实际路径推进。
+- 主计划是分期计划且明确推荐 A→B→C；本轮只实施可独立验收的阶段 A，避免把 Notebook 缺口与工作台草稿策略混为一个变更。
+- 当前确定性盘点为 Notebook 6、数字工作台 8、模拟工作台 11；`http://localhost:3010/` 返回 200，既有测试 3/3 通过，`app.js` 语法检查通过。
+- 当前 Notebook 实验卡按钮文案为「查看使用方式」，点击后只显示 toast；数据已经包含标题、目标、步骤、预期证据和边界说明，足够生成静态实践页。
+- 采用主计划推荐的 D1/A1 静态步骤页；勾选态只存页面内存。阶段 A 不处理 D2 数字/模拟草稿、不增加可选顶栏 Notebook 入口。
+- 主计划提到「复制表达式」，但实验 schema 没有独立表达式字段；从步骤自然语言推断公式不可靠，核验后将其从阶段 A 最小实现中排除。
+- Browser 插件及其 browser skill 未提供，按前端测试技能使用 Playwright CLI。基线页面身份正确，当前控制台只有既有 `/favicon.ico` 404。
+- Playwright 临时工作目录首次在目录创建前被作为 `workdir` 使用，进程启动失败；随后从现有目录创建目标。`New-Item -LiteralPath` 在当前 PowerShell 中不是有效参数，读取错误后改用 `-Path` 成功。
+- Notebook 契约测试首次运行结果为 3 项中 1 项通过、2 项失败：六条实验数据完整性已通过；缺少 `#notebookRoot`、`renderNotebookView` 与内存勾选状态的两项按预期失败。
+- 最小实现只改 `index.html`、`app.js`、`styles.css`：新增独立 `notebookRoot`，把 Notebook 实验卡按钮改为「打开实验」，扩展既有 `setView` 分支，并用 `notebookChecks[experiment.id]` 保存页面内勾选态。
+- Notebook 页面渲染实验目标、步骤、完成计数、预期证据和数据中已有的边界说明；返回按钮沿用既有 `setView(null)` 与 `jumpToChapter(chapter.id)` 调用链。
+- 新增契约测试实现后为 3/3 通过，`node --check app.js` 通过；真实浏览器回归尚待执行。
+- 最终自动验收为 6/6 测试通过、0 失败、0 跳过；`node --check app.js` 通过，旧 Notebook toast 文案无命中，改动文件无尾随空白。
+- `http://localhost:3010/` 及 `app.js`、`courses.js`、`styles.css`、`katex.bundle.js`、`workbench.bundle.js` 均返回 HTTP 200。
+- Playwright 桌面流在 1440×900 验证：打开实验显示 0/3，勾选第一步后显示 1/3 且按钮为 `aria-pressed=true`，返回正文后再次打开仍保持 1/3。
+- Playwright 移动流在 390×844 验证 Notebook 页面可读且 `scrollWidth === clientWidth === 390`；从 Notebook 直接点击「数字台」可正常挂载原数字电路工作台。
+- 基线首次打开时记录到既有 `/favicon.ico` 404；完成交互后的最终 `console error` 查询为 0 条，没有脚本异常或框架错误覆盖层。本阶段未增加 favicon。
+- 桌面与移动截图分别保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-practice-area-desktop.png` 和 `C:\Users\Lenovo\AppData\Local\Temp\codex-practice-area-mobile.png`。
+- 阶段 A 已完成；阶段 B（数字/模拟统一切换与草稿策略）和阶段 C（入口文案/课程首页快捷入口）均未开始。
+
+## 2026-09-04：实践功能区阶段 B
+
+- 用户明确要求推进阶段 B；本轮只处理数字/模拟工作台内部切换，不实施阶段 C 的入口统一或 Dashboard。
+- 阶段 B 主计划存在冲突：Global Constraints 要求切换不丢草稿，D2 推荐却是确认后丢弃。按目标约束优先，选择“不丢草稿”，不混合两种行为。
+- 原站 `CircuitWorkbench` 的电路状态封装在组件内部，未暴露 draft 回调；但副本入口可以为数字/模拟各维护一个独立 React root，切换时只改显隐，退出工作台才统一卸载。该方案不修改原站源码、不新增依赖，也不需要序列化内部状态。
+- 草稿保留范围定义为“同一次工作台会话”：数字/模拟往返时保留；返回教材或刷新页面后清空。已保存电路仍沿用原组件的浏览器本地存储。
+- 原型项目没有 Git 元数据；本阶段不创建仓库、不提交或推送。
+- 当前基线为 6/6 测试通过，`node --check app.js` 通过，`http://localhost:3010/` 返回 200。
+- Browser 插件及其 `browser` skill 未在本会话提供；渲染验收将按技能要求使用 Playwright CLI，并记录此回退原因。
+- 阶段 B 契约测试首次运行 3/3 失败：分别确认缺少 `workbenchStage/kindSwitcher`、bundle 的双 root/`setKind` 接口、shell 的就地切换与状态同步；失败原因与预期一致。
+- 最小实现新增 `workbenchStage`，把分段切换器放在 `workbenchRoot` 外；`workbench-entry.tsx` 按需创建数字/模拟两个 React root，`setKind` 只切换容器显隐，`unmount` 才统一还原 instruments 并销毁两个会话。
+- `app.js` 对 circuit → circuit 直接调用 `PrototypeWorkbench.setKind`，不走 150ms 卸载/重挂流程；顶栏工作台按钮与内部分段按钮分别同步选中态和 `aria-pressed`。
+- 阶段 B 专项测试实现后为 3/3 通过，`node build-workbench.mjs` 成功生成约 249.1 kB JS 与 11.3 kB CSS，`node --check app.js` 通过；完整回归与浏览器验收尚待执行。
+- 首轮移动验收暴露页面级横向溢出：390px viewport 的 CSS client width 为 375px，而 document scroll width 为 433px；定位到全局紧凑样式把 `.cw-storage-bar` 固定成 5 列，且样式表末尾原有一个多余 `}` 导致随后新增的移动 media query 未被浏览器解析。
+- 为该问题新增意图测试后，测试按预期以 `{`/`}` 数量 295/296 失败；移除多余闭合括号，并在 760px 以下把实验操作排成三行、存储操作排成自适应三列。专项测试最终 4/4 通过。
+- Playwright 双草稿流：数字台加入 1 个“开关”，切到模拟台加入 1 个“接地”，再切回数字与模拟；DOM 快照分别仍有 1 个元件，且顶栏按钮与内部分段按钮的 pressed 状态同步。
+- 最终移动复验为 `scrollWidth === clientWidth === 375`，存储区计算列宽为 `178.5px 65.4167px 65.4167px`，最终 media query 已进入 CSSOM；视觉截图中名称、存储和操作文字均正常横排。
+- 浏览器页面身份为 `http://localhost:3010/` / `个人电子工作台`，无空白页或框架错误覆盖层；首次载入只记录既有 `/favicon.ico` 404，最终刷新后控制台为 0 错误、0 警告。
+- 桌面与移动截图保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-stage-b-desktop.png` 与 `C:\Users\Lenovo\AppData\Local\Temp\codex-stage-b-mobile.png`；浏览器会话结束前将关闭。
+- 阶段 B 已完成；阶段 C（实践入口文案与课程首页快捷入口）仍未实施。
+- 最终计划扫描首次用宽泛模式匹配到计划头部对复选框语法的说明文字，并以非零码中止；确认不是未完成步骤后，改用行首锚定规则重新扫描。
+- 最终自动验证为 10/10 测试通过、0 失败、0 跳过；`node --check app.js` 与 `node build-workbench.mjs` 均成功，目标 HTML/JS/CSS 资源全部返回 HTTP 200，改动文件无尾随空白，CSS 花括号计数为 295/295。
+- 桌面 1440×900 复验为 `scrollWidth === clientWidth === 1425`，移动 390×844 复验为 375/375；Playwright 会话已正常关闭。
+
+## 2026-09-04：顶栏工作台入口合并
+
+- 用户截图指向顶栏“数字台 / 模拟台”两个入口，并要求统一成一个；结合阶段 B 已有内部类型切换，本轮解释为合并成单一“工作台”入口，而不是仅把两个 SVG 画成同样图标。
+- 单一入口复用现有芯片 SVG；从教材或 Notebook 打开时默认进入数字台，在数字或模拟工作台内点击时统一退出。类型选择继续由工作台内部“数字 / 模拟”分段控件承担。
+- 本轮不修改 `workbench-entry.tsx`、bundle、草稿策略或课程实验卡，属于阶段 C 的局部入口收敛，不代表阶段 C 全部完成。
+- 基线为 10/10 测试通过，`node --check app.js` 通过；项目仍无 Git 元数据。
+- Browser 插件及其 `browser` skill 未提供，渲染验收继续使用 Playwright CLI。
+- 单入口契约测试首次运行 5 项中 4 项通过、1 项按预期失败：顶栏仍有两个 `.workbench-button`，证明测试确实覆盖本轮待改行为。
+- 最小实现仅修改 `index.html` 与 `app.js`：两个入口合并为 `#workbenchToggle`，标签改为「工作台」；顶栏高亮覆盖数字/模拟两种状态，点击激活入口时退出，未激活时默认进入数字台。
+- 专项测试实现后为 5/5 通过，`node --check app.js` 通过；完整回归与真实浏览器验收尚待执行。
+- 最终自动回归为 11/11 测试通过、0 失败、0 跳过；`node --check app.js` 通过，页面及 `app.js`、`styles.css`、`workbench.bundle.js` 均返回 HTTP 200。
+- Playwright 桌面流验证顶栏只有一个「工作台」按钮：从教材进入默认数字台，内部切到模拟台后顶栏继续保持 `aria-pressed=true`，再次点击顶栏入口可返回教材并变为 `false`。
+- 390×844 移动视口验证顶栏入口数为 1、默认数字台状态同步，且页面 `scrollWidth === clientWidth === 375`，无新增横向溢出。
+- 浏览器控制台唯一错误为项目既有的 `/favicon.ico` 404，没有与本次入口合并相关的脚本错误。桌面和移动截图分别保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-single-workbench-entry-desktop.png` 与 `C:\Users\Lenovo\AppData\Local\Temp\codex-single-workbench-entry-mobile.png`。
+- 本轮只完成阶段 C 的顶栏入口收敛；课程首页快捷入口等阶段 C 其余内容仍未实施。
+
+## 2026-09-04：工作台顶部控制区密度优化
+
+- 用户截图指向工作台顶部运行、实验目标和电路存档三区，问题是超宽屏空白过多且宽度比例失衡；本轮不改变控件数量或行为。
+- 2037×900 真实页面基线：工作台内容宽 1998px，运行区 170px、实验区 914px、存档区 914px；名称输入与本地电路下拉仍各固定 150px，确认主要空白来自等分外层列和固定宽度存档控件。
+- 选择只在 ≥1500px 启用 CSS 覆盖：运行区固定 220px且按钮等分，实验操作与下拉同行，存档区使用弹性主列加三列动作。这样不影响既有普通桌面与移动端布局，也不需要修改原站 React 组件或 bundle。
+- 视觉令牌保持现状：不改颜色、字体、圆角、边框和 32px 控件高度；本次设计辨识点是三组操作形成连续、对齐的仪器控制条，而不是增加装饰。
+- Browser 插件及其 `browser` skill 未提供，按前端测试技能使用 Playwright CLI；修改前截图保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-workbench-controls-before.png`。
+- 修改前完整测试为 11 项中 9 项通过、2 项失败：课程演练新代码创建 `canvas`，与旧“正文不含图示”契约冲突；顶栏新增「演练」按钮复用了 `.workbench-button`，与旧“仅一个工作台按钮”契约冲突。两项均早于本轮 CSS 修改且不在本轮范围内。
+- 项目仍无 Git 元数据，不执行提交。
+- 宽屏密度专项测试首次运行 1/1 按预期失败，错误为缺少 `@media (min-width: 1500px)`；测试已证明能够在旧布局下失败。
+- 最小实现只修改 `styles.css`：新增 ≥1500px 覆盖，不修改 DOM、JavaScript、React 组件或 bundle；专项测试实现后为 1/1 通过。
+- 首次真实渲染发现外层 220/960/818 列宽已生效，但实验操作和存档弹性列被后续基础规则覆盖。计算样式仍为 `grid-area: 2 / 2`、五列存档网格，根因是宽屏块被插在文件中部而非最终规则之后。
+- 为层叠顺序补充意图断言后，测试按预期失败；将同一宽屏块移动到最终移动端规则之后，未增加选择器权重或重复样式，测试恢复为 1/1 通过。
+- 2037×900 最终尺寸为运行 220px、实验 960px、存档 818px；名称输入由 150px 扩展到 500px，本地电路下拉由 150px 扩展到 549px，实验操作计算位置为 `1 / 2`，页面 `scrollWidth === clientWidth === 2022`。
+- 深色模式验证数字/模拟切换正常；模拟台三个运行按钮保持完整可用且无容器溢出。1440×900 下宽屏媒体查询不生效，页面宽度为 1425/1425；390×844 下存档区仍为原三列移动布局，页面宽度为 375/375。
+- 最终浏览器控制台为 0 错误、0 警告，没有框架错误覆盖层。宽屏深色与移动截图分别保存为 `C:\Users\Lenovo\AppData\Local\Temp\codex-workbench-controls-after-wide-dark.png` 和 `C:\Users\Lenovo\AppData\Local\Temp\codex-workbench-controls-after-mobile.png`。
+- 本轮新增宽屏测试通过；完整套件为 12 项中 10 项通过、2 项失败，失败项与修改前完全相同，仍是外部新增 canvas 演练和第二个 `.workbench-button` 与旧契约冲突。本轮未修改这些功能或测试。
+- 最终回归期间 `courses.js` 在 00:11 被外部流程重写，第一次读取撞到未完成文件而临时新增 2 个语法失败；文件写入完成后 `node --check courses.js` 通过，完整套件复跑恢复为上述 10 通过、2 个既有失败。该文件不在本轮修改范围。
+## 2026-09-05：顶部操作关系整理
+
+- 仅调整 3010 副本样式。移除两种工作台的能力说明；≥1200px 用两行操作条，上排仿真及实验，下排存档，保留按钮功能。
+- 现有样式已由其他修改统一为无 1500px 断点；旧宽屏测试失效。沿用当前统一样式，不恢复旧布局。
+- 成功标准：说明不可见、按钮无重叠、两种工作台切换正常、记录完整测试结果。使用应用内浏览器验证。
+- 验收：1920px 两行排列，1200px 存档容器 clientWidth/scrollWidth 均 1159；390px 页面宽度 375 无横向溢出；两种能力说明均 display:none，数字切模拟正常，控制台无错误或警告。完整测试 10/12 通过；剩余为正文 canvas 与旧无图契约冲突、演练按钮复用工作台样式与旧单按钮计数冲突，均在修改前存在。已更新本轮相关旧宽屏断言；app.js 语法检查通过。
