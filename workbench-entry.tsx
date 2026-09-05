@@ -2,10 +2,10 @@
    连同 React 运行时打成独立 IIFE，暴露 PrototypeWorkbench.mount/setKind/unmount。
    骨架页本身保持零依赖，只在需要时加载这个 bundle。
    React 以相对路径直取原站 node_modules（骨架目录无 node_modules，不做符号链接）。 */
-import { createRoot, type Root } from "../personal-workbench-sites/node_modules/react-dom/client.js";
-import { createElement } from "../personal-workbench-sites/node_modules/react/index.js";
+import { createRoot, type Root } from "../personal-workbench-sites-3000/node_modules/react-dom/client.js";
+import { createElement } from "../personal-workbench-sites-3000/node_modules/react/index.js";
 import { CircuitWorkbench } from "./CircuitWorkbench";
-import type { CircuitKind } from "../personal-workbench-sites/app/lib/circuit/types";
+import type { CircuitKind } from "../personal-workbench-sites-3000/app/lib/circuit/types";
 
 type NotifyTone = "success" | "warning" | "error";
 

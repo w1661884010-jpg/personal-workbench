@@ -178,3 +178,8 @@
 - Local 3010 clean at 0a8cee4; full tests 38/38. Old main ae25963 fetched. Tags preserve both snapshots. Git CLI requires host permission for Windows TLS; gh CLI auth fails, connector is authenticated.
 - Keep source bundle rebuild dependence on sibling old project explicit. Deployment uses tested committed bundles, not unverified rebuilding. No localStorage upload/migration.
 - Released merge 481564401b7f386cce7671c984f0f9bded02fdf4 (first parent 3010, second old origin/main). Runtime tree unchanged by merge. Pages run https://github.com/w1661884010-jpg/personal-workbench/actions/runs/33950935490 succeeded; public /personal-workbench/ renders new lesson, both workbenches verified, zero console errors. Local 3000 untouched. release-3010-2026-09-05 identifies deployed commit including workflow.
+# Repository relocation
+- Target folders: Desktop/learning/repositories/personal-workbench-sites-3000 and personal-workbench-shell-3010. Preserve existing four other repositories.
+- Both working trees clean before move. 3010 imports source/dependencies from sibling sites; replace absolute build paths with relative sibling references. Historical docs/comments remain historical.
+- Windows Move-Item partially moved 3010 then stopped at an empty hidden directory. Completed only remaining non-colliding files, then removed verified-empty source directories. No source files deleted or overwritten; both old roots now absent.
+- New-root verification: workbench/KaTeX/Pages build passed; generated bundles have no Git content differences. Original npm test 79/79, shell node tests 38/38; servers restarted hidden on 3000/3010. No push/deployment for this local relocation.

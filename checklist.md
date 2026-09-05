@@ -107,3 +107,7 @@
 - [x] Publish allowlist: 8 runtime files + 60 fonts, relative paths validated.
 - [x] Full tests 38/38; historical credential-pattern scan zero matches; both histories preserved.
 - [x] Push 4815644; Pages run 33950935490 successful; public lesson and digital/analog switch verified, no console errors.
+# Repository relocation
+- [x] Move only two confirmed repositories into repositories with port suffixes; old directories absent.
+- [x] Update build/import paths; preserve Git refs and configurations (3000 d70d0dd, 3010 0965849 before migration commit).
+- [x] Rebuild workbench, KaTeX and Pages; tests 3000 79/79, 3010 38/38; both ports listening from new roots.

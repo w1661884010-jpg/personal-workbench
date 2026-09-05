@@ -4,12 +4,16 @@
 
 ## 当前发布与恢复
 
+- 本地稳定版（3010）：`C:\Users\Lenovo\Desktop\learning\repositories\personal-workbench-shell-3010`。
+- 本地原站（3000）：`C:\Users\Lenovo\Desktop\learning\repositories\personal-workbench-sites-3000`。
+- 构建入口通过相对路径引用同级 `personal-workbench-sites-3000`，移动整个 repositories 目录无需修改这些入口。
+
 - 启动：`node serve.mjs 3010`；发布包：`node build-pages.mjs`。
 - main 推送触发 Pages，只上传已验证的 HTML/CSS/JS 与字体，不上传开发文档或本地配置。
 - 稳定快照：`stable-3010-2026-09-05`（0a8cee4）；旧线上快照：`before-3010-pages-2026-09-05`（ae25963）。新提交保留两条历史，不强推。
 - 查看旧版请使用新目录：`git worktree add --detach <新目录> before-3010-pages-2026-09-05`。线上回滚用新提交重新部署，不覆盖共享历史。
 - `node --test tests/*.test.mjs` 是本地完整测试，需要 3010 服务、系统 Chrome 和测试中指定的 Playwright 缓存。CI 仅执行脚本语法和发布资源校验，不等于完整浏览器回归。
-- 发布使用已提交 bundle。重新构建源码仍依赖同级 personal-workbench-sites 和脚本中指定的本机依赖路径，并非可独立重建的开发包。
+- 发布使用已提交 bundle。重新构建源码仍依赖同级 personal-workbench-sites-3000 的源码和 node_modules，并非可独立重建的开发包。
 - Git 不包含浏览器学习记录。localhost 与 GitHub Pages 属于不同来源，localStorage 不会自动迁移，本次不会上传浏览器数据；旧线上数据也不保证与新模型兼容，请保留导出备份。
 
 ## 以下为早期骨架设计记录（不代表当前功能清单）

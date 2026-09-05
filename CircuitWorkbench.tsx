@@ -1,17 +1,17 @@
 "use client";
 
-import * as React from "../personal-workbench-sites/node_modules/react/index.js";
+import * as React from "../personal-workbench-sites-3000/node_modules/react/index.js";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "../personal-workbench-sites/node_modules/react/index.js";
-import { getCircuitPreset } from "../personal-workbench-sites/app/data/circuit-presets";
-import type { ChapterExperiment, CourseDefinition } from "../personal-workbench-sites/app/lib/course-model";
-import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../personal-workbench-sites/app/lib/circuit/analog-simulator";
-import { deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../personal-workbench-sites/app/lib/circuit/circuit-storage";
-import { evaluateDigitalCircuit, generateTruthTable, sampleDigitalCircuit, type DigitalRuntime, type DigitalSimulationResult, type DigitalTraceSample, type TruthTableRow } from "../personal-workbench-sites/app/lib/circuit/digital-simulator";
-import { findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../personal-workbench-sites/app/lib/circuit/geometry";
-import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, transformComponent, updateComponentParameters } from "../personal-workbench-sites/app/lib/circuit/graph";
-import { componentPorts, terminalKey, type AnalogComponentKind, type CircuitComponent, type CircuitComponentKind, type CircuitDocument, type CircuitEndpoint, type CircuitKind, type DigitalComponentKind, type LogicValue } from "../personal-workbench-sites/app/lib/circuit/types";
-import "../personal-workbench-sites/app/components/sandbox/workbench.css";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "../personal-workbench-sites-3000/node_modules/react/index.js";
+import { getCircuitPreset } from "../personal-workbench-sites-3000/app/data/circuit-presets";
+import type { ChapterExperiment, CourseDefinition } from "../personal-workbench-sites-3000/app/lib/course-model";
+import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../personal-workbench-sites-3000/app/lib/circuit/analog-simulator";
+import { deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../personal-workbench-sites-3000/app/lib/circuit/circuit-storage";
+import { evaluateDigitalCircuit, generateTruthTable, sampleDigitalCircuit, type DigitalRuntime, type DigitalSimulationResult, type DigitalTraceSample, type TruthTableRow } from "../personal-workbench-sites-3000/app/lib/circuit/digital-simulator";
+import { findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../personal-workbench-sites-3000/app/lib/circuit/geometry";
+import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, transformComponent, updateComponentParameters } from "../personal-workbench-sites-3000/app/lib/circuit/graph";
+import { componentPorts, terminalKey, type AnalogComponentKind, type CircuitComponent, type CircuitComponentKind, type CircuitDocument, type CircuitEndpoint, type CircuitKind, type DigitalComponentKind, type LogicValue } from "../personal-workbench-sites-3000/app/lib/circuit/types";
+import "../personal-workbench-sites-3000/app/components/sandbox/workbench.css";
 
 type NotifyTone = "success" | "warning" | "error";
 

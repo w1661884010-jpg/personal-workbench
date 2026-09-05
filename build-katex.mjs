@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const esbuild = require("C:/Users/Lenovo/Documents/codex_projects/personal-workbench-sites/node_modules/esbuild/lib/main.js");
+const esbuild = require("../personal-workbench-sites-3000/node_modules/esbuild/lib/main.js");
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
