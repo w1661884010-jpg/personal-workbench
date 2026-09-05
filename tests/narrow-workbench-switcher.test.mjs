@@ -131,7 +131,7 @@ for (const width of NARROW) {
       await page.waitForTimeout(700); /* 内容过渡 + updateWorkbenchLimit(600ms) */
       const s = await page.evaluate(snapScript);
       assert.equal(s.thumbInsideSwitcher, true, `模拟态 thumb 应仍在轨道内（thumb=${JSON.stringify(s.thumb)}）`);
-      assert.match(s.thumbTransform, /matrix\(1, 0, 0, 1, 0, 36\)/, `模拟态 thumb transform 应为 translateY(100%)（实际 ${s.thumbTransform}）`);
+      assert.match(s.thumbTransform, /matrix\(1, 0, 0, 1, 84, 0\)/, `模拟态 thumb transform 应为横向 translateX(100%)（实际 ${s.thumbTransform}）`);
       assert.equal(s.thumbOverlapsRun, false);
       assert.equal(s.thumbOverlapsCanvas, false);
       if (s.tipVisible) assert.equal(s.tipOverlapsStrip, false, "说明图标不得压住实验条卡片");
@@ -200,13 +200,14 @@ test("跨断点：760px 选中模拟 → 1440 → 回 760，滑块归位且状�
     });
     await page.waitForSelector(`${sessionSel("analog")} .circuit-workbench`, { state: "visible", timeout: 8000 });
     await page.waitForTimeout(700);
+    const expectedTransform = { 1440: /matrix\(1, 0, 0, 1, 0, 36\)/, 760: /matrix\(1, 0, 0, 1, 84, 0\)/ };
     for (const width of [1440, 760, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.waitForTimeout(250);
       const s = await page.evaluate(snapScript);
       assert.equal(s.thumbInsideSwitcher, true, `${width}px 下 thumb 应仍在轨道内`);
       assert.equal(s.thumbOverlapsRun, false, `${width}px 下 thumb 不得覆盖运行按钮`);
-      assert.match(s.thumbTransform, /matrix\(1, 0, 0, 1, 0, 36\)/, `${width}px 下模拟态 thumb 应保持 translateY(100%)`);
+      assert.match(s.thumbTransform, expectedTransform[width], `${width}px 下模拟态 thumb 应保持 ${width === 1440 ? "竖向 translateY(100%)" : "横向 translateX(100%)"}`);
       assert.equal(await page.evaluate(() => document.querySelector('[data-kind="analog"].kind-switch-button')?.getAttribute("aria-selected")), "true", `${width}px 下 aria-selected 保持在模拟`);
     }
     await page.close();

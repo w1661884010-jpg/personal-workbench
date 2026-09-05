@@ -2580,13 +2580,24 @@
       button.setAttribute("aria-selected", active ? "true" : "false");
       button.setAttribute("tabindex", active ? "0" : "-1");
     });
-    kindThumb.style.transform = activeKind === "analog" ? "translateY(100%)" : "translateY(0)";
+    /* 数字/模拟滑块方向随断点变化：≤820px 横向分段控件走 X 轴，桌面竖向气泡走 Y 轴。
+       写入时只保留当前选中态这一个 transform，跨断点后按新的方向重新计算，不互相覆盖。 */
+    var axis = window.matchMedia("(max-width: 820px)").matches ? "translateX" : "translateY";
+    kindThumb.style.transform = axis + "(" + (activeKind === "analog" ? "100%" : "0") + ")";
     if (instant) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () { kindSwitcher.classList.remove("is-instant"); });
       });
     }
   }
+
+  /* 跨断点（≤820px ↔ >820px）时按当前选中态重写滑块方向与位置 */
+  var kindNarrowMedia = window.matchMedia("(max-width: 820px)");
+  function syncKindOnBreakpoint() {
+    if (isCircuitWorkbench(activeWorkbench)) syncKindSwitcher(true);
+  }
+  if (kindNarrowMedia.addEventListener) kindNarrowMedia.addEventListener("change", syncKindOnBreakpoint);
+  else kindNarrowMedia.addListener(syncKindOnBreakpoint);
 
   kindSwitchButtons.forEach(function (button) {
     button.addEventListener("click", function (event) {

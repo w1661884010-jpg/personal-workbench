@@ -197,3 +197,12 @@
 - 修复后测量：五种窄宽 thumb 均 56×36 且完全在 64×80 轨道内（switcherPos=relative），thumbOverlapsRun/Canvas=false，运行区中心命中 BUTTON；说明图标在切换器下方文档流，不与其他控件相交；821/900「启动」命中 run 区；901/1440 桌面布局数值与修改前一致（heading 84,80 150.1×53；canvas 192,198）。
 - 新增 tests/narrow-workbench-switcher.test.mjs 12 项（真实浏览器、隔离 context）：四窄宽定位边界 + 点击启动真正生效、四窄宽模拟态（含 translateY 36px 矩阵断言 + 图标不遮实验条）、821/900 气泡/图标遮挡禁止、窄屏 25ms 连点 10 次终态、跨断点 760→1440→760 模拟态保持。首跑 11/11 全部失败（与预期一致），修复后 12/12 通过。
 - 完整套件 50/50 通过（38 旧 + 12 新），git diff --check 通过；styles.css 单文件改动，无需重构建 bundle（未改打包入口）。截图：`%TEMP%\narrow-A-pre-{390,760,820,821,900,1440}.png` 与 `narrow-A-post-*.png`（含完整工具栏：切换器/运行/实验/存档/元件/画布工具栏）。
+## 2026-09-05：窄窗口工作台 UI 阶段 B（实施完成）
+- 设计决策：横向紧凑切换器断点取 ≤820px（与 821/900 竖向、901+ 网格桩位一致；821-900 保持阶段 A 的竖向文档流气泡，1440 桌面不动）；旧的 ≤760 工具栏块并入 ≤820 分组块（761-820 也使用新组布局）。阶段 B 前标签 `restore-2026-09-05-before-narrow-layout`（= 阶段 A 提交 006178d）。
+- styles.css：① ≤820 切换器 `repeat(2, minmax(0,1fr))` 两等宽（84px 段）、176×44、thumb 覆盖为 84×36（`calc(50% - 4px)`×`calc(100% - 8px)`），stage 改 flex-wrap（切换器+说明图标同行 8px 间隔，root 100% 另起一行，margin-top 8）；② ≤820 工具栏：运行区 flex-wrap + `.cw-primary { order: -1 }`（模拟台「启动瞬态」前置，DOM 顺序未动）；实验条单列（行1 选择框、行2 能力、行3 操作）；存区 4 行网格 `minmax(0,1fr) auto auto`（组1 名称+保存+另存、组2 选择+载入+删除、行3/4 清空画布与删除本类存档通栏左对齐、静默低强调 ink-faint、悬停恢复），名称输入/下拉 `minmax(0,1fr)` 可收缩。
+- app.js：`syncKindSwitcher` 按 `matchMedia("(max-width: 820px)")` 写 X/Y 轴 transform（一次只保留当前选中态一个 transform），新增 matchMedia change 监听 `syncKindOnBreakpoint` → `syncKindSwitcher(true)` 跨断点归位（复用 is-instant 帧级取消过渡）；aria-selected/tabindex/键盘/即时路径未改。
+- 回归测试：tests/narrow-workbench-layout.test.mjs 19 项——四窄宽横向等宽+滑块 translateX(84px)+Analog 态、图标同行右侧、跨断点 760↔1440 transform 方向归位、821/900 竖向保持、运行按钮 wrap+primary 优先+不竖排、选择框独占行、存区分组+低强调、1440 桌面对照护栏、390 返回教材重新进入。首跑 15/18 失败（821/900 与 1440 护栏 3 项通过，符合预期），实现后 19/19。原阶段 A 测试的窄屏模拟态断言同步更新为 translateX(84px)。
+- 测试自建陷阱记录：`primaryRun` 误用 find 映射对象（非 DOM 元素）导致 pick TypeError；双会话 hidden 面板仍在 DOM，querySelector 命中隐藏面板（rect 全 0）使断言失真——所有工具栏查询改为限定 `.prototype-workbench-session:not([hidden])`。
+- 手动核验（Playwright 系统 Chrome）：390px 键盘 ArrowDown 即时切模拟（aria-selected=true、thumb translateX(100%)）；放大至 110% 后数字→模拟→数字往返缩放保留；emulateMedia reduced-motion 下 thumb transition 0s 且即时切换；390↔1440 反复缩放 thumb 方向正确归位且均在 64/176×44 轨道内；返回教材再进入无残留。
+- 桌面一致性：阶段 A 前 1440 截图与阶段 B 后 1440 截图 SHA256 完全一致（A6A15A49…），1440 布局零改动。完整套件 69/69（38 旧 + 12 A + 19 B），node --check app.js、git diff --check 通过；未改打包入口，未重建 bundle。
+- 交付截图：`%TEMP%\narrow-B-{390,560,760,820,1440}.png`、`narrow-B-390-dark.png`；修改前 `narrow-A-pre-*`；含完整工具栏。
