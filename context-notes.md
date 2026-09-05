@@ -169,3 +169,7 @@
 - 先用同一真实 DOM 在桥接前后测量工具栏矩形验证，不靠延长动画或固定工具栏高度掩盖。
 - 验证假设成立：1440px 数字工作台 heading 高度稳定 53px、桥接前 164.4375px。改为仅隐藏未迁移的直接子仪器卡（display:none），迁入 inspector 自动恢复显示；未改动画时序/业务逻辑。
 - 新回归覆盖两种工作台 1440/2300/390px 下三块工具栏矩形；2300px 下 requestAnimationFrame 采样首次进入、重进和快速切换，行高及存档行相对位置变化不超过 1px。完整测试 38/38。未验证非 Chromium 浏览器。
+# Narrow chapters UI
+- Mobile rule changes direction but retains desktop 186px chapter-list width, 48px rail, and collapsed shell columns. Fix responsive overrides only; keep chapter logic and desktop rules intact.
+- Retain existing colors/type; full-width rounded navigation, thin scrollbar and in-flow pager are limited to the existing mobile breakpoint.
+- Browser found align-self:start also retained max-content sizing; overriding to stretch fixed measured overflow (932px down to viewport 375px including scrollbar). Collapsed title needed matching selector specificity. 390/760px navigation and last chapter selection passed, desktop 1440 retained 186px vertical list/fixed pager. No console errors; full suite 38/38. Tested Chromium only.

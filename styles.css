@@ -1325,24 +1325,51 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     padding-top: 208px;   /* 移动端顶栏：4 行气泡（品牌/搜索/科目/工具）+ 12px 内边距 */
   }
 
+  .shell.is-panel-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .chapter-col { min-width: 0; }
+
   .chapter-panel {
     position: static;
+    align-self: stretch;
     height: auto;
-    border-radius: 0;
+    max-height: none;
+    min-width: 0;
+    margin: 14px 14px 0;
+    border-radius: 14px;
   }
 
-  .chapter-list {
+  .chapter-list, .chapter-rail {
+    width: 100%;
+    min-width: 0;
+    flex: none;
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 8px 12px;
+    padding: 8px 10px 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ink-faint) transparent;
+    overscroll-behavior-x: contain;
   }
 
-  .chapter-list button { white-space: nowrap; }
+  .chapter-list button { width: auto; flex: 0 0 auto; min-height: 40px; white-space: nowrap; }
+  .chapter-panel.is-collapsed .chapter-panel-head { padding: 12px 10px 8px; }
+  .chapter-panel.is-collapsed .chapter-panel-head .chapter-panel-title { display: block; }
+  .chapter-panel .icon-toggle svg { transform: rotate(90deg); }
+  .chapter-panel.is-collapsed .icon-toggle svg { transform: rotate(-90deg); }
+  .chapter-panel:not(.is-collapsed) .chapter-list,
+  .chapter-panel.is-collapsed .chapter-rail { animation: none; }
 
   /* 移动端收起后：方块章节项横排 */
-  .chapter-rail { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
-  .chapter-rail-item { min-width: 36px; }
+  .chapter-rail-item { flex: 0 0 40px; min-height: 40px; }
+  .page-pager, .shell.is-panel-collapsed .page-pager {
+    display: grid;
+    position: static;
+    width: auto;
+    margin: 8px 14px 0;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
 }
 
 /* ===== 工作台头部整合（原型密度调整，覆盖 bundle.css 原站版式；不动原组件代码） =====

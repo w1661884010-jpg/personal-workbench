@@ -99,3 +99,7 @@
 - [x] 复现仪器桥接前后工具栏几何差异（53px → 164.4375px）。
 - [x] 最小修复瞬态占位，不改变稳定布局。
 - [x] 完整测试 38/38，差异检查通过；增加桥接几何和逐帧回归。
+# Narrow chapters UI
+- [x] Fix narrow width/collapsed layout and in-flow pager.
+- [x] Browser: 390/760px expanded/collapsed, last chapter selection; 1440px desktop preserved.
+- [x] Full suite 38/38; diff check passed.
