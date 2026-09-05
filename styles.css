@@ -167,7 +167,7 @@
 .limit-tip-button {
   position: absolute;
   left: 13px;             /* 在 64px 气泡宽度内水平居中（(64-38)/2） */
-  top: 92px;
+  top: 84px;              /* 紧贴气泡下方 */
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -179,14 +179,7 @@
   background: transparent;
   color: var(--ink-faint);
   cursor: help;
-  transition: background-color 120ms, color 120ms;
-}
-
-.limit-tip-button:hover,
-.limit-tip-button:focus-visible {
-  background: var(--panel-2);
-  color: var(--warm);
-  outline: none;
+  transition: none;
 }
 
 .prototype-workbench-session[hidden] { display: none; }
