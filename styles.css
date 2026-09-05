@@ -88,15 +88,16 @@
 
 .workbench-stage { min-width: 0; opacity: 1; transition: opacity 140ms ease-out; }
 
-/* 数字/模拟切换：共享滑块分段控件（184×44，4px 边距，等宽两项）。
-   文字固定不动，仅选中底块（.kind-thumb）左右滑动；只过渡 transform。 */
+/* 数字/模拟切换：共享滑块分段控件（上下方向滑动）。
+   数字在上、模拟在下，等宽两项；文字固定，仅选中底块（.kind-thumb）垂直滑动，
+   只过渡 transform。 */
 .kind-switcher {
   position: relative;
   display: inline-grid;
-  grid-template-columns: repeat(2, 1fr);
-  width: 184px;
+  grid-template-rows: repeat(2, 1fr);
+  width: 44px;
   padding: 4px;
-  margin: 0 0 8px;
+  margin: 8px 0 0;
   border-radius: 12px;
   background: light-dark(#e0e3e7, #23262c);
 }
@@ -105,12 +106,12 @@
   position: absolute;
   top: 4px;
   left: 4px;
-  width: calc(50% - 4px);
-  height: calc(100% - 8px);
+  width: calc(100% - 8px);
+  height: calc(50% - 4px);
   border: 1px solid var(--ink-faint);
   border-radius: 9px;
   background: light-dark(#c9ced6, #3a4048);
-  transform: translateX(0);
+  transform: translateY(0);
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -120,7 +121,7 @@
 .kind-switch-button {
   position: relative;
   min-height: 36px;
-  padding: 0 18px;
+  padding: 0 9px;
   border: 0;
   border-radius: 9px;
   background: transparent;

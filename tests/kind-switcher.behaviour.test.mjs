@@ -142,7 +142,7 @@ test("mount failure keeps content and rolls back slider, aria and retry succeeds
   assert.equal(d.hidden, false, "digital content preserved after failure");
   assert.equal(d.opacity, "1");
   assert.equal(a.hidden, true, "failed target stays hidden");
-  assert.equal(ui.thumb, "translateX(0px)", "thumb rolled back to digital");
+  assert.equal(ui.thumb, "translateY(0px)", "thumb rolled back to digital");
   assert.equal(ui.dSel, "true");
   assert.equal(ui.aSel, "false");
 
@@ -157,7 +157,7 @@ test("mount failure keeps content and rolls back slider, aria and retry succeeds
     { timeout: 4000 },
   );
   const ui2 = await switcherState(page);
-  assert.equal(ui2.thumb, "translateX(100%)");
+  assert.equal(ui2.thumb, "translateY(100%)");
   assert.equal(ui2.aSel, "true");
   await page.close();
 });
@@ -180,7 +180,7 @@ test("rapid switching settles on the last choice with no half-faded residue", as
   assert.equal(a.hidden, true);
   assert.ok(!d.className.includes("cw-switching"), "no lingering transition class");
   assert.ok(!a.className.includes("cw-switching"), "no lingering transition class on the hidden panel");
-  assert.equal(ui.thumb, "translateX(0px)");
+  assert.equal(ui.thumb, "translateY(0px)");
   assert.equal(ui.dSel, "true");
   assert.equal(ui.aSel, "false");
   await page.close();
@@ -229,7 +229,7 @@ test("Enter, Space, arrows, Home and End switch instantly", async () => {
     const ui = await switcherState(page);
     assert.equal(state.hidden, false, `${key} shows ${after}`);
     assert.equal(state.opacity, "1", `${key} completes within 40ms (instant)`);
-    assert.equal(ui.thumb, after === "analog" ? "translateX(100%)" : "translateX(0px)");
+    assert.equal(ui.thumb, after === "analog" ? "translateY(100%)" : "translateY(0px)");
   };
 
   await page.evaluate(() => document.querySelector("#kindTabDigital").focus());
@@ -342,7 +342,7 @@ test("during transition old panel is inert but the switcher stays responsive", a
   assert.equal(d.hidden, false, "switcher click during transition takes effect");
   assert.equal(d.opacity, "1");
   assert.equal(d.inert, false, "settled panel is interactive");
-  assert.equal(ui.thumb, "translateX(0px)");
+  assert.equal(ui.thumb, "translateY(0px)");
   await page.close();
 });
 
