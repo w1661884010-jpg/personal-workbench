@@ -292,3 +292,58 @@ test("keyboard can reach step checks, tabs and the back button", async () => {
   assert.equal(state.pressed, "true");
   await page.close();
 });
+
+test("LTI / FIR / variance experiments render interactive demos with correct baselines", async () => {
+  const page = await browser.newPage();
+  await openPractice(page);
+
+  const switchTo = async (index) => {
+    await page.evaluate((i) => Array.from(document.querySelectorAll(".practice-tab"))[i].click(), index);
+    await page.waitForTimeout(400);
+  };
+  const state = () =>
+    page.evaluate(() => ({
+      demo: Boolean(document.querySelector(".notebook-demo")),
+      canvas: Boolean(document.querySelector(".demo-canvas")),
+      placeholder: Boolean(document.querySelector(".practice-placeholder")),
+      metrics: Array.from(document.querySelectorAll(".demo-metric-value")).map((el) => el.textContent.trim()),
+      fields: Array.from(document.querySelectorAll(".demo-field")).map((el) => el.querySelector("input").value),
+    }));
+
+  await switchTo(3); // LTI
+  let s = await state();
+  assert.equal(s.demo, true, "LTI has a demo panel");
+  assert.equal(s.placeholder, false, "LTI placeholder replaced");
+  assert.deepEqual(s.metrics.slice(0, 4), ["2", "2", "0", "2"], "LTI defaults: both algorithms 2, zero error, steady state 2");
+  assert.deepEqual(s.fields, ["0.5", "20"]);
+
+  await switchTo(4); // FIR
+  s = await state();
+  assert.equal(s.demo, true, "FIR has a demo panel");
+  assert.equal(s.metrics[0], "-3.779 dB", "FIR default high-freq attenuation at fs=200, f2=20, M=5");
+  assert.equal(s.metrics[1], "2 个样点", "FIR group delay (M-1)/2");
+  assert.deepEqual(s.fields, ["2", "20", "5"]);
+
+  await switchTo(5); // variance
+  s = await state();
+  assert.equal(s.demo, true, "variance has a demo panel");
+  assert.deepEqual(s.fields, ["100000", "9"]);
+  const inVar = Number(s.metrics[1]);
+  const outVar = Number(s.metrics[2]);
+  assert.ok(Math.abs(inVar - 9) < 0.2, `input variance ≈ 9 (got ${inVar})`);
+  assert.ok(Math.abs(outVar - 3) < 0.15, `output variance ≈ 3 (got ${outVar})`);
+  assert.equal(s.metrics[3], "3", "theoretical σ²/3");
+
+  /* LTI 参数互动：a=0.3 → 稳态 1.429 */
+  await switchTo(3);
+  await page.evaluate(() => {
+    const input = document.querySelector(".demo-field input");
+    input.value = "0.3";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.waitForTimeout(150);
+  s = await state();
+  assert.equal(s.metrics[0], "1.429", "LTI recursion output updates with a");
+  assert.equal(s.metrics[3], "1.429", "theoretical steady state 1/(1-a)");
+  await page.close();
+});
