@@ -150,13 +150,13 @@
   }
 }
 
-/* 工作台内容切换过渡：只改透明度与会话面板的可操作性 */
-.prototype-workbench-session { transition: opacity 80ms ease; }
+/* 工作台内容切换过渡：只改透明度与会话面板的可操作性（40ms 淡出/70ms 淡入） */
+.prototype-workbench-session { transition: opacity 40ms ease; }
 
 .prototype-workbench-session.cw-switching,
 .prototype-workbench-session.cw-switching-in { pointer-events: none; }
 
-.prototype-workbench-session.cw-switching-in { transition-duration: 120ms; }
+.prototype-workbench-session.cw-switching-in { transition-duration: 70ms; }
 
 @media (prefers-reduced-motion: reduce) {
   .kind-thumb { transition: none; }

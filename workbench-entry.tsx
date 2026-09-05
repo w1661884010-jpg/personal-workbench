@@ -26,9 +26,10 @@ let activeOptions: MountOptions | null = null;
 let activeKind: CircuitKind | null = null;   // 最近一次用户请求的目标（shell 滑块以此为准）
 let visibleKind: CircuitKind | null = null;  // 实际显示中的面板（动画期间保持旧值）
 
-/* 内容切换过渡时长（与原型 styles.css 保持一致）：淡出 80ms → 切换 → 淡入 120ms */
-const FADE_OUT_MS = 80;
-const FADE_IN_MS = 120;
+/* 内容切换过渡时长（与原型 styles.css 保持一致）：淡出 40ms → 切换 → 淡入 70ms
+   （缩短以压缩切换瞬态窗口，减少中间帧的排版观感） */
+const FADE_OUT_MS = 40;
+const FADE_IN_MS = 70;
 const READY_POLL_MS = 40;
 const READY_TIMEOUT_MS = 1500;
 
