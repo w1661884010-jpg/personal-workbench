@@ -32,7 +32,7 @@
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8c1.2-3.4 2.6-3.4 3.8 0s2.6 3.4 3.8 0 2.6-3.4 3.8 0 1.7 1.7 3.6 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
           <span>演练</span>
         </button>
-        <button type="button" class="tool-button" data-tip="练习与错题：记录原因与正确思路，不参与章节完成度">
+        <button id="mistakeToggle" type="button" class="tool-button" data-tip="错题：检验答错自动收录，可标记已掌握或移除">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
           <span>错题</span>
         </button>
@@ -93,6 +93,8 @@
         </article>
         <!-- 实验演练页：从信号课程实验卡进入，步骤勾选仅保留在当前页面内存 -->
         <section id="notebookRoot" class="notebook-root" hidden aria-label="实验演练实践"></section>
+        <!-- 错题页：检验答错自动收录，展示我的答案/正确答案与解析 -->
+        <section id="mistakesRoot" class="mistakes-root" hidden aria-label="错题回顾"></section>
         <!-- 统一工作台：切换器留在 React 根节点外，数字/模拟会话可独立保留草稿 -->
         <section id="workbenchStage" class="workbench-stage" hidden aria-label="电路工作台">
           <nav id="kindSwitcher" class="kind-switcher" role="tablist" aria-label="工作台类型">

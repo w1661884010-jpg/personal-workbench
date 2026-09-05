@@ -321,6 +321,7 @@
       }, 0);
       var score = chapter.check.length ? Math.round((correctCount / chapter.check.length) * 100) : 100;
       checkResults[chapterId] = { score: score, correctCount: correctCount, answers: answers };
+      recordMistakes(currentSubject, chapter, answers);   /* 答错即收录（去重更新） */
       renderLesson(courses.find(function (candidate) { return candidate.id === currentSubject; }), chapter);
       renderChapters();
       notify(score >= CHECK_PASS_SCORE
@@ -346,6 +347,204 @@
       actions.appendChild(textElement("strong", "本次得分 " + result.score + "% · " + (passed ? "已通过" : "未通过"), passed ? "check-correct" : "check-wrong"));
     }
     container.appendChild(actions);
+  }
+
+  /* ===== 错题回顾（移植原站错题语义：检验答错自动收录 → 回顾/掌握/移除） =====
+     存储：独立 localStorage key（不读写原站 semester 记录，课程数据不同）；
+     数据：{ id, courseId, chapterId, prompt, options, chosen, answer, explanation, createdAt, mastered } */
+  var MISTAKES_STORAGE_KEY = "personal-workbench-mistakes:v1";
+  var mistakes = loadMistakes();
+  var mistakesHideMastered = false;   /* 视图内“隐藏已掌握”开关（刷新重置） */
+
+  function loadMistakes() {
+    try {
+      var raw = localStorage.getItem(MISTAKES_STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveMistakes() {
+    try {
+      localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(mistakes));
+    } catch (error) {
+      notify("错题记录无法写入浏览器本地存储。", "error");
+    }
+  }
+
+  /* 检验答错时收录（同章节+题目去重更新，保留首次时间，更新时间与掌握状态） */
+  function recordMistakes(courseId, chapter, answers) {
+    var changed = false;
+    chapter.check.forEach(function (question, index) {
+      if (answers[index] === question.answer) return;
+      var id = "mistake-" + chapter.id + "-" + question.id;
+      var existing = mistakes.find(function (item) { return item.id === id; });
+      var record = {
+        id: id,
+        courseId: courseId,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        prompt: question.prompt,
+        options: question.options,
+        chosen: answers[index],
+        answer: question.answer,
+        explanation: question.explanation,
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        mastered: existing ? existing.mastered : false
+      };
+      if (existing) {
+        var position = mistakes.indexOf(existing);
+        mistakes[position] = record;
+      } else {
+        mistakes.push(record);
+      }
+      changed = true;
+    });
+    if (changed) saveMistakes();
+  }
+
+  function renderMistakesView() {
+    mistakesRoot.textContent = "";
+    var page = document.createElement("article");
+    page.className = "notebook-page mistakes-page";
+
+    var topbar = document.createElement("header");
+    topbar.className = "practice-topbar";
+
+    var tabs = document.createElement("nav");
+    tabs.className = "practice-tabs";
+    tabs.setAttribute("role", "tablist");
+    var allTab = document.createElement("button");
+    allTab.type = "button";
+    allTab.className = "practice-tab is-active";
+    allTab.setAttribute("role", "tab");
+    allTab.setAttribute("aria-selected", "true");
+    allTab.appendChild(textElement("span", "全部错题", "practice-tab-title"));
+    tabs.appendChild(allTab);
+    var masteredTab = document.createElement("button");
+    masteredTab.type = "button";
+    masteredTab.className = "practice-tab" + (mistakesHideMastered ? "" : " is-active");
+    masteredTab.setAttribute("role", "tab");
+    masteredTab.setAttribute("aria-selected", mistakesHideMastered ? "false" : "true");
+    masteredTab.appendChild(textElement("span", "未掌握", "practice-tab-title"));
+    tabs.appendChild(masteredTab);
+    var hideMastered = function () {
+      mistakesHideMastered = !mistakesHideMastered;
+      renderMistakesView();
+    };
+    allTab.addEventListener("click", function () { if (mistakesHideMastered) hideMastered(); });
+    masteredTab.addEventListener("click", function () { if (!mistakesHideMastered) hideMastered(); });
+    topbar.appendChild(tabs);
+    page.appendChild(topbar);
+
+    var layout = document.createElement("div");
+    layout.className = "practice-layout mistakes-layout";
+
+    var main = document.createElement("div");
+    main.className = "practice-main";
+
+    var heading = document.createElement("header");
+    heading.className = "notebook-heading";
+    var headingCopy = document.createElement("div");
+    headingCopy.className = "notebook-heading-copy";
+    headingCopy.appendChild(textElement("span", "练习与错题 · 检验答错自动收录", "notebook-eyebrow"));
+    var title = textElement("h1", "错题回顾");
+    title.tabIndex = -1;
+    headingCopy.appendChild(title);
+    headingCopy.appendChild(textElement("p", "复习我的答案、正确答案与解析；已掌握可隐藏或移除。", "notebook-goal-line"));
+    heading.appendChild(headingCopy);
+    var backButton = document.createElement("button");
+    backButton.type = "button";
+    backButton.className = "notebook-back";
+    backButton.textContent = "返回教材";
+    backButton.addEventListener("click", function () { setView(null); });
+    heading.appendChild(backButton);
+    main.appendChild(heading);
+
+    var courseOrder = ["signals", "digital", "analog"];
+    var shown = mistakes.filter(function (item) { return !mistakesHideMastered || !item.mastered; });
+    var count = shown.length;
+
+    if (!shown.length) {
+      main.appendChild(textElement(
+        "p",
+        mistakesHideMastered ? "当前没有未掌握的错题。" : "暂无错题：完成章节检验并答错后，错题会自动收录到这里。",
+        "practice-placeholder",
+      ));
+    } else {
+      courseOrder.forEach(function (courseId) {
+        var courseTitle = { signals: "信号与系统", digital: "数字电子技术", analog: "模拟电子技术" }[courseId] || courseId;
+        var group = shown.filter(function (item) { return item.courseId === courseId; });
+        if (!group.length) return;
+        var section = document.createElement("section");
+        section.className = "mistake-group";
+        section.appendChild(textElement("h2", courseTitle, "mistake-group-title"));
+        section.appendChild(textElement("span", group.length + " 题", "mistake-group-count"));
+        group.reverse().forEach(function (record) {
+          var card = document.createElement("div");
+          card.className = "mistake-card" + (record.mastered ? " is-mastered" : "");
+          var head = document.createElement("div");
+          head.className = "mistake-head";
+          head.appendChild(textElement("span", record.chapterTitle, "mistake-chapter"));
+          head.appendChild(textElement("span", formatMistakeDate(record.createdAt), "mistake-date"));
+          card.appendChild(head);
+          card.appendChild(textElement("p", record.prompt, "mistake-question"));
+          var chosenText = record.options[record.chosen];
+          var correctText = record.options[record.answer];
+          card.appendChild(textElement("p", "我的答案：" + chosenText, "mistake-wrong"));
+          if (record.chosen !== record.answer) {
+            card.appendChild(textElement("p", "正确答案：" + correctText, "mistake-correct"));
+          }
+          card.appendChild(textElement("p", record.explanation, "mistake-explanation"));
+          var actions = document.createElement("div");
+          actions.className = "mistake-actions";
+          var masterButton = document.createElement("button");
+          masterButton.type = "button";
+          masterButton.className = "secondary";
+          masterButton.textContent = record.mastered ? "撤销已掌握" : "标记已掌握";
+          masterButton.addEventListener("click", function () {
+            record.mastered = !record.mastered;
+            saveMistakes();
+            renderMistakesView();
+          });
+          actions.appendChild(masterButton);
+          var removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.className = "secondary";
+          removeButton.textContent = "移除";
+          removeButton.addEventListener("click", function () {
+            mistakes = mistakes.filter(function (item) { return item.id !== record.id; });
+            saveMistakes();
+            renderMistakesView();
+          });
+          actions.appendChild(removeButton);
+          card.appendChild(actions);
+          section.appendChild(card);
+        });
+        main.appendChild(section);
+      });
+    }
+
+    layout.appendChild(main);
+    page.appendChild(layout);
+    mistakesRoot.appendChild(page);
+  }
+
+  function formatMistakeDate(iso) {
+    try {
+      var date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function openMistakesView() {
+    renderMistakesView();
+    setView("mistakes");
   }
 
   function renderLesson(course, chapter) {
@@ -683,6 +882,7 @@
 
   /* ===== 实践视图：实验演练页 + 原站电路工作台 bundle ===== */
   var notebookRoot = document.getElementById("notebookRoot");
+  var mistakesRoot = document.getElementById("mistakesRoot");
   var workbenchStage = document.getElementById("workbenchStage");
   var workbenchRoot = document.getElementById("workbenchRoot");
   var kindSwitcher = document.getElementById("kindSwitcher");
@@ -691,7 +891,8 @@
   var lessonEl = document.querySelector(".lesson");
   var workbenchButton = document.getElementById("workbenchToggle");
   var practiceButton = document.getElementById("practiceToggle");
-  var activeWorkbench = null;   /* "digital" | "analog" | "notebook" | null */
+  var mistakeButton = document.getElementById("mistakeToggle");
+  var activeWorkbench = null;   /* "digital" | "analog" | "notebook" | "mistakes" | null */
   var activeNotebook = null;
   var notebookChecks = {};
 
@@ -701,6 +902,7 @@
 
   function viewElement(view) {
     if (view === "notebook") return notebookRoot;
+    if (view === "mistakes") return mistakesRoot;
     if (isCircuitWorkbench(view)) return workbenchStage;
     return lessonEl;
   }
@@ -2194,12 +2396,15 @@
         workbenchStage.hidden = true;
       } else if (prev === "notebook") {
         notebookRoot.hidden = true;
+      } else if (prev === "mistakes") {
+        mistakesRoot.hidden = true;
       }
       if (isCircuitWorkbench(wbKind)) {
         shell.classList.add("is-workbench");
         shell.classList.remove("is-practice");
         lessonEl.hidden = true;
         notebookRoot.hidden = true;
+        mistakesRoot.hidden = true;
         workbenchStage.hidden = false;
         PrototypeWorkbench.mount(workbenchRoot, {
           kind: wbKind,
@@ -2218,12 +2423,21 @@
         shell.classList.add("is-practice");
         lessonEl.hidden = true;
         workbenchStage.hidden = true;
+        mistakesRoot.hidden = true;
         notebookRoot.hidden = false;
+      } else if (wbKind === "mistakes") {
+        shell.classList.remove("is-workbench");
+        shell.classList.add("is-practice");
+        lessonEl.hidden = true;
+        workbenchStage.hidden = true;
+        notebookRoot.hidden = true;
+        mistakesRoot.hidden = false;
       } else {
         shell.classList.remove("is-workbench");
         shell.classList.remove("is-practice");
         lessonEl.hidden = false;
         notebookRoot.hidden = true;
+        mistakesRoot.hidden = true;
         workbenchStage.hidden = true;
       }
       var entering = viewElement(wbKind);
@@ -2233,19 +2447,25 @@
         window.scrollTo({ top: 0, behavior: "auto" });
         var notebookTitle = notebookRoot.querySelector("h1");
         if (notebookTitle) notebookTitle.focus();
+      } else if (wbKind === "mistakes") {
+        window.scrollTo({ top: 0, behavior: "auto" });
+        var mistakesTitle = mistakesRoot.querySelector("h1");
+        if (mistakesTitle) mistakesTitle.focus();
       } else if (!wbKind) {
         chapterCol.style.opacity = 1;
       }
     }, 150);
   }
 
-  /* 顶栏工作台/演练按钮选中态：数字与模拟工作台共用一个入口；演练用 notebook 视图 */
+  /* 顶栏工作台/演练/错题按钮选中态：数字与模拟工作台共用一个入口；演练用 notebook 视图 */
   function syncWorkbenchButton() {
     var active = isCircuitWorkbench(activeWorkbench);
     workbenchButton.classList.toggle("is-active", active);
     workbenchButton.setAttribute("aria-pressed", active ? "true" : "false");
     practiceButton.classList.toggle("is-active", activeWorkbench === "notebook");
     practiceButton.setAttribute("aria-pressed", activeWorkbench === "notebook" ? "true" : "false");
+    mistakeButton.classList.toggle("is-active", activeWorkbench === "mistakes");
+    mistakeButton.setAttribute("aria-pressed", activeWorkbench === "mistakes" ? "true" : "false");
   }
 
   /* 工作台内部类型切换：滑块立即动，内容过渡由 bundle 管理；
@@ -2328,6 +2548,12 @@
 
   workbenchButton.addEventListener("click", function () {
     setView(isCircuitWorkbench(activeWorkbench) ? null : "digital");
+  });
+
+  /* 错题入口：进入错题回顾（先渲染再切换）；已在错题页时返回正文 */
+  mistakeButton.addEventListener("click", function () {
+    if (activeWorkbench === "mistakes") { setView(null); return; }
+    openMistakesView();
   });
 
   /* 演练入口：已打开过则回最近一次，否则打开第一个 notebook 实验（信号绪论） */
