@@ -163,6 +163,32 @@
   .prototype-workbench-session { transition: none; }
 }
 
+/* 实验边界说明：切换气泡下方的警示图标，悬停/聚焦弹出 page-tip 文字提示 */
+.limit-tip-button {
+  position: absolute;
+  left: 17px;
+  top: 92px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: help;
+  transition: background-color 120ms, color 120ms;
+}
+
+.limit-tip-button:hover,
+.limit-tip-button:focus-visible {
+  background: var(--panel-2);
+  color: var(--warm);
+  outline: none;
+}
+
 .prototype-workbench-session[hidden] { display: none; }
 
 .notebook-root {

@@ -180,6 +180,52 @@
 
   window.addEventListener("scroll", hideTip, { passive: true });
 
+  /* ===== 实验边界说明：切换气泡下方的警示图标 → 悬停/聚焦弹出文字提示（复用 page-tip） ===== */
+  var workbenchLimit = document.getElementById("workbenchLimit");
+  var limitStage = document.getElementById("workbenchStage");
+  var limitRoot = document.getElementById("workbenchRoot");
+
+  function findExperimentById(experimentId) {
+    for (var c = 0; c < courses.length; c += 1) {
+      var course = courses[c];
+      for (var ch = 0; ch < course.chapters.length; ch += 1) {
+        var list = course.chapters[ch].experiments || [];
+        for (var e = 0; e < list.length; e += 1) {
+          if (list[e].id === experimentId) return list[e];
+        }
+      }
+    }
+    return null;
+  }
+
+  function updateWorkbenchLimit() {
+    if (!workbenchLimit) return;
+    /* 双会话：只读当前可见工作台里的实验条 */
+    var visible = null;
+    Array.prototype.forEach.call(limitRoot.querySelectorAll(".prototype-workbench-session"), function (container) {
+      if (!container.hidden) visible = container;
+    });
+    var select = visible && visible.querySelector(".cw-experiment-strip select");
+    var experiment = select && findExperimentById(select.value);
+    var limitation = experiment && experiment.limitation;
+    if (limitation) {
+      workbenchLimit.setAttribute("data-tip", limitation);
+      workbenchLimit.hidden = false;
+    } else {
+      workbenchLimit.setAttribute("data-tip", "");
+      workbenchLimit.hidden = true;
+    }
+  }
+
+  limitStage.addEventListener("change", function (event) {
+    var target = event.target;
+    if (target && target.matches && target.matches(".cw-experiment-strip select")) updateWorkbenchLimit();
+  });
+  workbenchLimit.addEventListener("mouseenter", function () { showTip(workbenchLimit); });
+  workbenchLimit.addEventListener("mouseleave", hideTip);
+  workbenchLimit.addEventListener("focus", function () { showTip(workbenchLimit); });
+  workbenchLimit.addEventListener("blur", hideTip);
+
   /* 顶栏：下滚收起、上滚恢复；章节栏跟随顶栏移动，顶栏收起后置顶。
      死区 2px 以兼容触控板平滑滚动的小增量；接近页面顶部时强制恢复。 */
   var lastY = window.scrollY;
@@ -2418,6 +2464,7 @@
           onKindChange: syncKindFromBundle
         });
         pendingExperimentId = "";
+        setTimeout(updateWorkbenchLimit, 600);   /* 等组件渲染完成再刷新边界说明 */
       } else if (wbKind === "notebook") {
         shell.classList.remove("is-workbench");
         shell.classList.add("is-practice");
@@ -2476,6 +2523,7 @@
     pendingExperimentId = "";
     syncKindSwitcher(!!immediate);
     syncWorkbenchButton();
+    setTimeout(updateWorkbenchLimit, 600);   /* 另一台会话的实验选择可能不同 */
   }
 
   /* bundle 报告已显示类型变化（切换成功落地 / 加载失败回滚）：同步顶栏与滑块。
