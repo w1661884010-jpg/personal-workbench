@@ -293,55 +293,47 @@ test("prefers-reduced-motion media simulation disables slider and content animat
   await page.close();
 });
 
-test("during transition old panel is inert but the switcher stays responsive", async () => {
+test("old content stays fully visible until the target is ready, then swaps instantly", async () => {
   const page = await browser.newPage();
   await openWorkbench(page);
 
   await page.click("#kindTabAnalog");
-  /* 等待目标挂载就绪并进入淡出阶段（startSwitch 设置 outgoing inert） */
-  await page.waitForFunction(
-    () => document.querySelector('.prototype-workbench-session[data-kind="digital"]').inert === true,
-    null,
-    { timeout: 3000 },
-  );
 
+  /* 就绪前：旧面板保持完整可见（无淡出/淡变），目标面板尚未显示 */
   const early = await page.evaluate(() => {
     const d = document.querySelector('.prototype-workbench-session[data-kind="digital"]');
     const a = document.querySelector('.prototype-workbench-session[data-kind="analog"]');
-    return { dInert: d.inert, aHidden: a.hidden };
+    return { dHidden: d.hidden, dOpacity: getComputedStyle(d).opacity, aHidden: a.hidden };
   });
-  assert.equal(early.dInert, true, "outgoing panel is inert during transition");
-  assert.equal(early.aHidden, true, "incoming panel still hidden during fade-out");
+  assert.equal(early.dHidden, false, "outgoing panel stays visible");
+  assert.equal(early.dOpacity, "1", "outgoing panel stays fully opaque (no fade)");
+  assert.equal(early.aHidden, true, "target panel hidden until ready");
 
-  /* 淡入期间目标面板同样 inert：等待目标进入过渡态 */
+  /* 就绪后立即落位 */
   await page.waitForFunction(
     () => {
+      const d = document.querySelector('.prototype-workbench-session[data-kind="digital"]');
       const a = document.querySelector('.prototype-workbench-session[data-kind="analog"]');
-      return a && !a.hidden && a.inert === true;
+      return a && !a.hidden && d.hidden;
     },
     null,
-    { timeout: 2000 },
+    { timeout: 3000 },
   );
+  const settled = await page.evaluate(() => ({
+    aOpacity: getComputedStyle(document.querySelector('.prototype-workbench-session[data-kind="analog"]')).opacity,
+    aInert: document.querySelector('.prototype-workbench-session[data-kind="analog"]').inert,
+  }));
+  assert.equal(settled.aOpacity, "1", "target lands instantly at full opacity");
+  assert.equal(settled.aInert, false, "settled panel is interactive");
 
-  const mid = await page.evaluate(() => {
-    const d = document.querySelector('.prototype-workbench-session[data-kind="digital"]');
-    const a = document.querySelector('.prototype-workbench-session[data-kind="analog"]');
-    const btn = d.querySelector(".cw-canvas-toolbar button");
-    if (btn) btn.focus();
-    return { dInert: d.inert, aInert: a.inert, focusInsidePanel: d.contains(document.activeElement) };
-  });
-  assert.equal(mid.dInert, true);
-  assert.equal(mid.aInert, true, "incoming panel is inert while fading in");
-  assert.equal(mid.focusInsidePanel, false, "inert panel cannot receive focus");
-
-  /* 过渡期间切换控件仍可响应：立即切回数字 */
+  /* 就绪前切换控件仍可响应：立即切回数字 */
+  await page.click(".prototype-workbench-session[data-kind=digital] .cw-canvas-toolbar").catch(() => {});
   await page.click("#kindTabDigital");
   await page.waitForTimeout(400);
   const d = await sessionState(page, "digital");
   const ui = await switcherState(page);
-  assert.equal(d.hidden, false, "switcher click during transition takes effect");
+  assert.equal(d.hidden, false, "switcher click during wait takes effect");
   assert.equal(d.opacity, "1");
-  assert.equal(d.inert, false, "settled panel is interactive");
   assert.equal(ui.thumb, "translateY(0px)");
   await page.close();
 });

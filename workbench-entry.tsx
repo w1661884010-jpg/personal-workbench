@@ -220,11 +220,9 @@ export function mount(container: HTMLElement, options: MountOptions) {
 
 /* 数字/模拟切换：
    - 滑块状态由 shell 立即同步，activeKind 同步立即锁定最后目标；
-   - 内容过渡：先等目标挂载就绪（旧内容保持可见，不提前隐藏唯一可用内容），
-     就绪后旧会话 80ms 淡出 → 切显隐 → 目标 120ms 淡入；
-   - visibleKind 独立跟踪实际显示面板；switchSeq 取消过期回调（快速连点以最后一次为准）；
-   - 过渡期间两面板均 inert（不可点击/聚焦/键盘触发），切换控件始终可响应；
-   - immediate（键盘/reduced-motion/首次显示）走即时路径；失败保留旧内容并回滚 shell 状态。 */
+   - 内容切换：旧内容保持完整可见，等目标挂载就绪后立即落位（无淡变瞬态）；
+     visibleKind 独立跟踪实际显示面板；switchSeq 取消过期回调（快速连点以最后一次为准）；
+   - immediate（键盘/reduced-motion/首次显示）直接落地；失败保留旧内容并回滚 shell 状态。 */
 export function setKind(kind: CircuitKind, immediate = false) {
   if (!activeContainer || !activeOptions || activeKind === kind) return;
   const seq = ++switchSeq;
@@ -260,46 +258,14 @@ export function setKind(kind: CircuitKind, immediate = false) {
     return;
   }
 
-  /* 动画路径：先等目标就绪（旧内容保持可见），就绪后淡出当前 → 切换 → 淡入目标 */
-  const current = prevVisible;
-
-  const startSwitch = () => {
-    if (seq !== switchSeq) return;
-    current.classList.add("cw-switching");
-    current.inert = true;
-    current.style.opacity = "0";
-    scheduleSwitch(() => {
-      if (seq !== switchSeq) return;
-      current.hidden = true;
-      current.classList.remove("cw-switching");
-      current.style.opacity = "";
-      target.hidden = false;
-      target.classList.add("cw-switching-in");
-      target.inert = true;
-      target.style.opacity = "0";
-      void target.offsetHeight; /* 强制回流：淡入过渡在元素显示后才启动 */
-      target.style.opacity = "1";
-      visibleKind = kind;
-      emitKindChange(kind);
-      scheduleSwitch(() => {
-        if (seq !== switchSeq) return;
-        target.classList.remove("cw-switching", "cw-switching-in");
-        target.inert = false;
-        target.style.opacity = "";
-      }, FADE_IN_MS);
-    }, FADE_OUT_MS);
-  };
-
+  /* 默认路径（鼠标/触摸切换）：旧内容保持完整可见（不淡出），
+     等目标挂载就绪后立即落位——避免切换瞬态的排版淡变/错位；
+     失败保留旧内容并反馈错误。 */
   waitForSessionReady(
     target,
-    startSwitch,
+    () => { if (seq === switchSeq) applyNow(); },
     () => {
       if (seq !== switchSeq) return;
-      /* 加载失败：旧内容从未被隐藏，保留并反馈错误；回滚 bundle 与 shell 状态，
-         滑块/aria 回到已显示类型，再次点击可重试 */
-      current.classList.remove("cw-switching");
-      current.inert = false;
-      current.style.opacity = "";
       activeKind = visibleKind ?? kind;
       if (activeKind !== kind) emitKindChange(activeKind);
       activeOptions?.onNotify?.("工作台内容加载失败，已保留当前类型。", "error");
