@@ -398,7 +398,9 @@
   font-size: .85rem;
 }
 
-@media (max-width: 760px) {
+/* 中窗（≤1040px）：单列满宽——标题、参数、图表、结果、步骤、证据依次展示，
+   图表获得整行宽度（避免双列时图表被压成 612px 小图） */
+@media (max-width: 1040px) {
   .practice-layout { grid-template-columns: 1fr; }
   .practice-side { position: static; }
 }
