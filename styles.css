@@ -156,8 +156,8 @@
   transition: opacity 140ms ease-out;
 }
 
-/* 演练视图：内容区左右 20px 固定边距，导航行贴住窗口边 */
-.shell.is-practice .content { padding-left: 20px; padding-right: 20px; }
+/* 演练视图：内容区左右 20px 固定边距、底部贴视口（消除全局 80px 背景滚动区） */
+.shell.is-practice .content { padding-left: 20px; padding-right: 20px; padding-bottom: 0; }
 
 /* 导航行：贴住窗口边（左 20 / 右 20），不受正文卡片宽度限制 */
 .notebook-root > .practice-topbar { margin-bottom: 16px; }
@@ -167,6 +167,7 @@
   gap: 20px;
   width: 100%;
   max-width: none;
+  min-height: calc(100vh - 142px);   /* 撑满视口：实测页面顶偏移 142、底部贴视口，消除底部大片留空 */
   padding: 24px;
   border-radius: 12px;
   background: var(--panel);
