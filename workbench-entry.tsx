@@ -166,11 +166,16 @@ function restoreInstruments(container: HTMLElement) {
 }
 
 /* React createRoot.render 为异步提交：轮询挂载点，待 instruments 出现后桥接。
-   这是布局任务，走 layoutTimers，切换不会取消它。 */
+   这是布局任务，走 layoutTimers，切换不会取消它。
+   桥接完成前给容器加 cw-bridging（仪器卡 visibility:hidden，避免瞬时排版错位）。 */
 function scheduleBridge(container: HTMLElement, attempts = 0) {
-  if (attempts > 20) return;
+  if (attempts > 20) {
+    container.classList.remove("cw-bridging");
+    return;
+  }
   if (container.querySelector(`.${INSTRUMENTS_CLASS}`)) {
     moveInstrumentsIntoInspector(container);
+    container.classList.remove("cw-bridging");
     return;
   }
   scheduleLayout(() => scheduleBridge(container, attempts + 1), 40);
@@ -186,6 +191,7 @@ function ensureSession(kind: CircuitKind, initialExperimentId?: string) {
   container.id = kind === "digital" ? "workbenchPanelDigital" : "workbenchPanelAnalog";
   container.setAttribute("role", "tabpanel");
   container.setAttribute("aria-labelledby", kind === "digital" ? "kindTabDigital" : "kindTabAnalog");
+  container.classList.add("cw-bridging");   /* 仪器桥接完成前隐藏原始位置的仪器卡 */
   activeContainer.appendChild(container);
   const sessionRoot = createRoot(container);
   roots[kind] = sessionRoot;

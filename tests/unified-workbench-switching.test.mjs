@@ -83,7 +83,7 @@ test("mount/layout tasks live outside the switch cancellation scope", async () =
   assert.match(entry, /function scheduleLayout\(fn: \(\) => void, ms: number\)/);
   const setKindBlock = entry.slice(entry.indexOf("export function setKind"), entry.indexOf("export function unmount"));
   assert.doesNotMatch(setKindBlock, /clearLayoutTimers\(\)/, "switching must never cancel layout/bridge tasks");
-  assert.match(entry, /scheduleBridge[\s\S]{0,200}scheduleLayout\(/, "the instruments bridge is scheduled as a layout task");
+  assert.match(entry, /scheduleBridge[\s\S]{0,300}scheduleLayout\(/, "the instruments bridge is scheduled as a layout task");
 });
 
 test("failure and rollback notifies the shell, and keyboard/inert paths are wired", async () => {
