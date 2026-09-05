@@ -833,7 +833,7 @@
     experiment.steps.forEach(function (step, index) {
       var item = document.createElement("li");
       item.className = "notebook-step-item";
-      item.appendChild(textElement("span", String(index + 1).padStart(2, "0"), "step-number"));
+      item.appendChild(textElement("span", String(index + 1), "step-number"));
       item.appendChild(textElement("span", step, "step-copy"));
       stepList.appendChild(item);
     });
