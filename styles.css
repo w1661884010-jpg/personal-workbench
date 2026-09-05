@@ -1357,11 +1357,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .workbench-root .cw-heading p { display: none; }
 
   /* 运行按钮：2 列网格、按按钮数排布 —— 模拟台 3 键恒为「2+1」（重置仿真落次行左对齐），
-     数字台 2 键单行；不随宽度断点变化（全场唯一逻辑） */
+     数字台 2 键单行；不随宽度断点变化（全场唯一逻辑）；按钮组在标题区内居中 */
   .workbench-root .cw-heading .cw-run-controls {
     display: grid;
     grid-template-columns: repeat(2, auto);
-    justify-content: start;
+    margin: 0 auto;
     align-items: center;
     gap: 6px 8px;
   }
@@ -1414,14 +1414,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* 标题行：只保留主标题（隐藏 eyebrow 与副标题说明） */
 .workbench-root .cw-eyebrow,
-.workbench-root .cw-heading p { display: none; }
+.workbench-root .cw-heading p,
+.workbench-root .cw-heading > div:first-child { display: none; }
 
 .workbench-root .cw-heading { padding: 10px 16px; }
-
-/* 桌面：给工作台标题行左侧预留空位（切换气泡覆盖区），卡片本身保持全宽不受挤压 */
-@media (min-width: 821px) {
-  .workbench-root .cw-heading { padding-left: 78px; }
-}
 
 .workbench-root .cw-heading h1 { margin: 0; font-size: clamp(1.2rem, 1.6vw, 1.55rem); }
 
@@ -1673,6 +1669,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .workbench-root .cw-heading .cw-run-controls {
     display: flex;
     flex-wrap: nowrap;
+    margin: 0 auto;
   }
   .workbench-root .cw-experiment-strip {
     grid-template-columns: minmax(0, 1fr) auto;
