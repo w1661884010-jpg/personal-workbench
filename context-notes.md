@@ -177,3 +177,4 @@
 - User confirmed replacing old 3000 site online. Destination w1661884010-jpg/personal-workbench main; existing Pages workflow currently builds old Vite sources.
 - Local 3010 clean at 0a8cee4; full tests 38/38. Old main ae25963 fetched. Tags preserve both snapshots. Git CLI requires host permission for Windows TLS; gh CLI auth fails, connector is authenticated.
 - Keep source bundle rebuild dependence on sibling old project explicit. Deployment uses tested committed bundles, not unverified rebuilding. No localStorage upload/migration.
+- Released merge 481564401b7f386cce7671c984f0f9bded02fdf4 (first parent 3010, second old origin/main). Runtime tree unchanged by merge. Pages run https://github.com/w1661884010-jpg/personal-workbench/actions/runs/33950935490 succeeded; public /personal-workbench/ renders new lesson, both workbenches verified, zero console errors. Local 3000 untouched. release-3010-2026-09-05 identifies deployed commit including workflow.

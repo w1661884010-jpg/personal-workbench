@@ -104,6 +104,6 @@
 - [x] Browser: 390/760px expanded/collapsed, last chapter selection; 1440px desktop preserved.
 - [x] Full suite 38/38; diff check passed.
 # Stable 3010 GitHub Pages
-- [ ] Publish allowlist and subpath validation.
-- [ ] Tests, historical credential-pattern scan, preserve both histories.
-- [ ] Push and verify deployment/online page.
+- [x] Publish allowlist: 8 runtime files + 60 fonts, relative paths validated.
+- [x] Full tests 38/38; historical credential-pattern scan zero matches; both histories preserved.
+- [x] Push 4815644; Pages run 33950935490 successful; public lesson and digital/analog switch verified, no console errors.
