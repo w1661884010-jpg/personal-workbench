@@ -58,7 +58,7 @@ test("the kind switcher is one shared sliding track with fixed labels", async ()
   assert.match(html, /id="kindSwitcher"[\s\S]{0,80}class="kind-thumb"/, "the slider thumb rides in the switcher");
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="digital"[^>]*aria-controls="workbenchPanelDigital"/);
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="analog"[^>]*aria-controls="workbenchPanelAnalog"/);
-  assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,260}width:\s*44px/, "vertical independent bubble sits left of the workbench card");
+  assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,260}width:\s*56px/, "vertical independent bubble sits left of the workbench card");
   assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,380}transform:\s*translateY\(0\);[\s\S]{0,160}transition:\s*transform 180ms cubic-bezier\(\.22, 1, \.36, 1\)/);
   assert.doesNotMatch(styles, /\.kind-switch-button\.is-active\s*\{[\s\S]{0,80}background/, "active state must not repaint the label, only the thumb slides");
   assert.match(styles, /\.kind-switcher\.is-instant \.kind-thumb\s*\{\s*transition:\s*none;\s*\}/);

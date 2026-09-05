@@ -89,7 +89,7 @@
 .workbench-stage {
   min-width: 0;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: flex-start;
   opacity: 1;
   transition: opacity 140ms ease-out;
@@ -103,7 +103,7 @@
   flex: 0 0 auto;
   display: inline-grid;
   grid-template-rows: repeat(2, 1fr);
-  width: 44px;
+  width: 56px;
   padding: 4px;
   margin: 0;
   border-radius: 12px;
@@ -129,7 +129,7 @@
 .kind-switch-button {
   position: relative;
   min-height: 36px;
-  padding: 0 9px;
+  padding: 0 12px;
   border: 0;
   border-radius: 9px;
   background: transparent;
