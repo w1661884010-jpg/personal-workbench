@@ -128,6 +128,6 @@ test("wide workbench controls spend space on controls instead of empty fixed col
   assert.ok(wideStart >= 0, "missing the wide workbench density layout");
   assert.ok(wideStart > styles.indexOf(".workbench-root .cw-storage-bar > :nth-child(8)"), "the desktop grouping must override the base storage placement");
   const wideOverride = styles.slice(wideStart);
-  assert.match(wideOverride, /grid-template-areas:\s*"head strip" "storage storage" "main main"/, "storage should have its own full-width row instead of forcing all three groups to share a height");
+  assert.match(wideOverride, /grid-template-areas:\s*"pad head strip"\s*"pad storage storage"\s*"main main main"/, "storage should have its own full-width row (with the switcher pad column) instead of forcing all three groups to share a height");
   assert.match(wideOverride, /\.cw-storage-bar > :nth-child\(n\)\s*\{ grid-area: auto;/, "old cell positions must not create extra storage rows");
 });

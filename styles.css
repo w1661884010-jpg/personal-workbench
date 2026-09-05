@@ -1312,15 +1312,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .shell.is-workbench .content { padding: 8px 12px 12px; }
 
 @media (min-width: 901px) {
-  /* 工作台 = 视口高应用（原 93px 外框 + 48px 分段切换区） */
+  /* 工作台 = 视口高应用（顶部 88 + 气泡 80 + 底部 20；首列 72px 为切换气泡让位） */
   .workbench-root .circuit-workbench {
     height: calc(100vh - 100px);
     display: grid;
     grid-template-areas:
-      "head strip storage"
-      "main main   main";
+      "pad head strip storage"
+      "pad main main   main";
     grid-template-rows: auto minmax(0, 1fr);
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.05fr);
+    grid-template-columns: 72px auto minmax(0, 1fr) minmax(0, 1.05fr);
     row-gap: 10px;
     column-gap: 0;   /* 顶部三区无间隙：共享边框拼成单气泡 */
     overflow-y: auto;
@@ -1411,12 +1411,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* 电路工作台整体：行距 14 → 10（列距由媒体块中的 column-gap: 0 决定，顶部三区分区竖线无缝） */
 .workbench-root .circuit-workbench { row-gap: 10px; }
-
-/* 顶部切换气泡覆盖在卡片左上（气泡宽 64 + 8 间距）：仅头部三区分区左移让位，
-   主区（元件/画布/检查器）保持全宽，不留左侧空位 */
-.workbench-root .cw-heading,
-.workbench-root .cw-experiment-strip,
-.workbench-root .cw-storage-bar { margin-left: 72px; }
 
 /* 标题行：只保留主标题（隐藏 eyebrow 与副标题说明） */
 .workbench-root .cw-eyebrow,
@@ -1667,8 +1661,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* 桌面：仿真与实验同行，存档整行排列，操作按用途相邻。 */
 @media (min-width: 1200px) {
   .workbench-root .circuit-workbench {
-    grid-template-areas: "head strip" "storage storage" "main main";
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "pad head strip"
+      "pad storage storage"
+      "main main main";
+    grid-template-columns: 72px auto minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     row-gap: 0;
   }
