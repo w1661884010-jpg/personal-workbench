@@ -213,3 +213,9 @@
 - app.js：`practiceDemoStates[experiment.id]` 内存持久化六处演示 state（tab 切换会重建 DOM，此前参数编辑态在切 tab 后丢失——新测试先暴露该行为，按用户“缩放+切换不回滚”要求修复；页面刷新清零，与 practiceShown 同生命周期）；rows 第三元素 "wide"（信号观察「峰值时间」、卷积验证「支撑区间」）→ `demo-metric is-wide`，六处渲染块改 `row[2]==="wide"` 条件类名，未用 nth-child。
 - 测试 tests/narrow-practice-layout.test.mjs 6 项（真实浏览器）：390 两列+输入 40-44+标签完整、560/620/621/760 两列+1440 五参数单行不变、结果两列+is-wide 满行（先误用演示卡宽比较导致 298 vs 322 失败，改与 .demo-metrics 宽比较后过）、参数修改→缩放→切 tab→回滚校验值+默认结果对照（0.5 s / 10 个样点）、8 视口×6 演练无横向溢出、≤620 留白压缩+返回紧凑。修复前 5/6 失败，修复后 6/6 通过。
 - 阶段 A 完整套件 75/75（69 旧 + 6 新）；node --check app.js 通过；未改打包入口未重建 bundle；阶段 B 未开始（刻度/单位/画布核验留到 B）。截图 `%TEMP%\practice-pre-{390,560,760,1440}-{1..6}.png` / `practice-postA-*.png`。
+## 2026-09-05：演练页窄窗口布局优化（阶段 B 实施完成）
+- 根因确认：六段 draw 中信号观察/混叠各画 6 个 X 刻度、FIR/方差各 5 个；单位标签（t / s、样本 n）textAlign right 画在 width-14，与末端刻度同位——桌面 1440 同样存在“1.5 被单位遮住”的重叠（截图证据），不只在窄屏。
+- 实施（只改刻度显示，采样 400 点/数据/参数/计算全不变）：4 处刻度循环改为 `labelEvery = plotW < 480 ? 2 : 1` + 循环上界减一（让位单位标签）；卷积（3 个手工标签、无单位）与 LTI（0 与 n）本就无重叠，未动。宽图（plotW≥480）显示 0…4/5 段标签（与修复前可见状态一致，1.5 不再被遮）；窄图（390px plotW≈244）显示 0 / 0.6 / 1.2 三个 + 单位，间距充足。
+- Canvas 核验：`canvas.width = round(rect.width × dpr) && setTransform(dpr)` 本就正确（六演练 × 390/760/1440 属性==CSS×DPR 相差 ≤1px、CSS 高 240/340 未压扁）；图例为画布下方文档流 flex-wrap（不遮曲线）；本轮未改。
+- 测试 tests/narrow-practice-chart.test.mjs 4 项：fillText 打点法（page 内 monkey-patch CanvasRenderingContext2D.prototype.fillText + 触发 resize 重绘）实测“单位与末端刻度水平距离 <14px 即重叠”——修复前 390 重叠 12 处、1440 重叠（1.5 被遮）失败；修复后 0 处且窄图单位行刻度 ≤4。踩坑记录：切 tab 重建 DOM 时旧画布被移除前会以宽度坍缩为 100px 再画一次（杂散 fillText 记录误报重叠）——打点记录附带 canvas.clientWidth，过滤 <200px 的瞬态绘制后稳定；另记录器重复装裱会双录，测试内以 __textPatch 一次性安装。
+- 阶段 B 完整套件 79/79（75 + 4）；node --check app.js、git diff --check 通过；未改打包入口。截图 `%TEMP%\practice-postB-{390,560,760,1440}-{1..6}.png`（与 pre/postA 同视口对照）。

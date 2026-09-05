@@ -1328,10 +1328,11 @@
       }
       ctx.restore();
 
-      /* X 轴刻度 */
+      /* X 轴刻度：按绘图区宽度自适应 —— 窄图隔一格标注；末端（gxt === 5）让位给单位标签，避免重叠 */
       ctx.fillStyle = gridText;
       ctx.textAlign = "center";
-      for (var gxt = 0; gxt <= 5; gxt += 1) {
+      var labelEvery = plotW < 480 ? 2 : 1;
+      for (var gxt = 0; gxt < 5; gxt += labelEvery) {
         var tx = margin.left + (plotW * gxt) / 5;
         ctx.fillText(formatNumber((T * gxt) / 5), tx, height - 8);
       }
@@ -1540,10 +1541,11 @@
         ctx.restore();
       });
 
-      /* X 轴刻度（共用最后一行） */
+      /* X 轴刻度（共用最后一行）：按绘图区宽度自适应，末端让位给单位标签，避免重叠 */
       ctx.fillStyle = gridText;
       ctx.textAlign = "center";
-      for (var gxt = 0; gxt <= 5; gxt += 1) {
+      var labelEvery = plotW < 480 ? 2 : 1;
+      for (var gxt = 0; gxt < 5; gxt += labelEvery) {
         var tx = margin.left + (plotW * gxt) / 5;
         ctx.fillText(formatNumber((T * gxt) / 5), tx, height - 4);
       }
@@ -2165,11 +2167,12 @@
       ctx.stroke();
       ctx.restore();
 
-      /* 轴刻度 */
+      /* 轴刻度：按绘图区宽度自适应，末端让位给单位标签，避免重叠 */
       ctx.fillStyle = gridText;
       ctx.font = "11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      for (var gxt = 0; gxt <= 4; gxt += 1) {
+      var labelEvery = plotW < 480 ? 2 : 1;
+      for (var gxt = 0; gxt < 4; gxt += labelEvery) {
         var tx = margin.left + (plotW * gxt) / 4;
         ctx.fillText(formatNumber(T * gxt / 4), tx, height - 8);
       }
@@ -2384,11 +2387,12 @@
       ctx.stroke();
       ctx.restore();
 
-      /* 轴刻度 */
+      /* 轴刻度：按绘图区宽度自适应，末端让位给单位标签，避免重叠 */
       ctx.fillStyle = gridText;
       ctx.font = "11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      for (var gxt = 0; gxt <= 4; gxt += 1) {
+      var labelEvery = plotW < 480 ? 2 : 1;
+      for (var gxt = 0; gxt < 4; gxt += labelEvery) {
         var tx = margin.left + (plotW * gxt) / 4;
         ctx.fillText(String(Math.round((shown * gxt) / 4)), tx, height - 8);
       }
