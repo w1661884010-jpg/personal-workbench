@@ -300,7 +300,8 @@
   color: var(--ink-soft);
 }
 
-.demo-field input {
+.demo-field input,
+.demo-field select {
   width: 100%;
   min-width: 0;
   padding: 7px 9px;

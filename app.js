@@ -950,12 +950,13 @@
     /* 参数控件 */
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { amplitude: 2, frequency: 2, sampleRate: 20, duration: 1.5 };
+    var state = { amplitude: 2, frequency: 2, sampleRate: 20, duration: 1.5, phase: 0 };
     var fields = [
       ["amplitude", "幅值 A / V", 0.1, 10, 0.1],
       ["frequency", "频率 f / Hz", 0.1, 20, 0.1],
       ["sampleRate", "采样率 fs / Hz", 5, 200, 1],
-      ["duration", "时长 T / s", 0.5, 5, 0.1]
+      ["duration", "时长 T / s", 0.5, 5, 0.1],
+      ["phase", "相位 φ / °", 0, 360, 15]
     ];
     var inputs = {};
     fields.forEach(function (field) {
@@ -1026,6 +1027,7 @@
       var A = state.amplitude;
       var f = state.frequency;
       var fs = state.sampleRate;
+      var phiRad = (state.phase * Math.PI) / 180;
       /* 固定 ±2V 刻度：波形高度随 A 真实变化（A=1 半高、A=3 超界裁剪），相对大小可见 */
       var vScale = (plotH / 2) * 0.9 / 2;
 
@@ -1062,7 +1064,7 @@
       for (var i = 0; i <= samples; i += 1) {
         var t = (T * i) / samples;
         var px = margin.left + (t / T) * plotW;
-        var py = zeroY - Math.cos(2 * Math.PI * f * t) * A * vScale;
+        var py = zeroY - Math.cos(2 * Math.PI * f * t - phiRad) * A * vScale;
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.stroke();
@@ -1075,7 +1077,7 @@
       for (var k = 0; k <= n; k += 1) {
         var tk = k / fs;
         var sx = margin.left + (tk / T) * plotW;
-        var sy = zeroY - Math.cos(2 * Math.PI * f * tk) * A * vScale;
+        var sy = zeroY - Math.cos(2 * Math.PI * f * tk - phiRad) * A * vScale;
         ctx.beginPath(); ctx.moveTo(sx, zeroY); ctx.lineTo(sx, sy); ctx.stroke();
         ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2);
         ctx.fillStyle = accentInk; ctx.fill();
@@ -1092,17 +1094,21 @@
       ctx.textAlign = "right";
       ctx.fillText("t / s", width - margin.right, height - 8);
 
-      /* 测量：连续周期 + 峰间隔（样点） */
+      /* 测量：连续周期 + 峰间隔（样点）。相位为零时沿用原有峰值时刻表达；
+         相位非零时峰值时刻 = φ/(360f) + k·T₀（记录：原公式 1/(2f)+k·T₀ 实为负峰时刻） */
       var continuousPeriod = 1 / f;
       var samplesPerPeriod = fs / f;
       var samplePeakCount = 0;
       /* 峰值间距检测：取连续峰值时刻折半取样点做自适应验证 */
       var intervalSamples = samplesPerPeriod;
       metrics.textContent = "";
+      var peakFirst = state.phase === 0
+        ? 1 / (2 * f)
+        : state.phase / (360 * f);
       var rows = [
         ["连续周期 T₀", formatNumber(continuousPeriod) + " s"],
         ["采样率对应样点周期", formatNumber(intervalSamples) + " 个样点"],
-        ["峰值时间", "t = " + formatNumber(1 / (2 * f)) + " + k·" + formatNumber(continuousPeriod) + " s"]
+        ["峰值时间", "t = " + formatNumber(peakFirst) + " + k·" + formatNumber(continuousPeriod) + " s"]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
@@ -1139,12 +1145,13 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { frequency: 7, rateLow: 10, rateHigh: 20, duration: 1 };
+    var state = { frequency: 7, rateLow: 10, rateHigh: 20, duration: 1, amplitude: 1 };
     var fields = [
       ["frequency", "信号频率 f / Hz", 0.5, 50, 0.5],
       ["rateLow", "低采样率 fs₁ / Hz", 4, 200, 1],
       ["rateHigh", "高采样率 fs₂ / Hz", 4, 200, 1],
-      ["duration", "时长 T / s", 0.2, 2, 0.1]
+      ["duration", "时长 T / s", 0.2, 2, 0.1],
+      ["amplitude", "信号幅值 A / V", 0.5, 2, 0.1]
     ];
     fields.forEach(function (field) {
       var label = document.createElement("label");
@@ -1216,6 +1223,7 @@
       var rowH = (height - margin.top - margin.bottom) / rows;
       var plotW = width - margin.left - margin.right;
       var vScale = (rowH / 2) * 0.85;
+      var A = state.amplitude;
 
       rates.forEach(function (fs, rowIndex) {
         var rowTop = margin.top + rowIndex * rowH;
@@ -1248,7 +1256,7 @@
         for (var i = 0; i <= 400; i += 1) {
           var t = (T * i) / 400;
           var px = margin.left + (t / T) * plotW;
-          var py = midY - Math.cos(2 * Math.PI * f * t) * vScale;
+          var py = midY - Math.cos(2 * Math.PI * f * t) * vScale * A;
           if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
         }
         ctx.stroke();
@@ -1260,7 +1268,7 @@
         for (var j = 0; j <= 400; j += 8) {
           var tj = (T * j) / 400;
           var pxj = margin.left + (tj / T) * plotW;
-          var pyj = midY - Math.cos(2 * Math.PI * fAlias * tj) * vScale;
+          var pyj = midY - Math.cos(2 * Math.PI * fAlias * tj) * vScale * A;
           ctx.moveTo(pxj + 1.5, pyj);
           ctx.arc(pxj, pyj, 1.6, 0, Math.PI * 2);
         }
@@ -1273,7 +1281,7 @@
         for (var k = 0; k <= n; k += 1) {
           var tk = k / fs;
           var sx = margin.left + (tk / T) * plotW;
-          var sy = midY - Math.cos(2 * Math.PI * f * tk) * vScale;
+          var sy = midY - Math.cos(2 * Math.PI * f * tk) * vScale * A;
           ctx.beginPath(); ctx.moveTo(sx, midY); ctx.lineTo(sx, sy); ctx.stroke();
           ctx.beginPath(); ctx.arc(sx, sy, 2.6, 0, Math.PI * 2);
           ctx.fillStyle = accentInk; ctx.fill();
@@ -1338,9 +1346,10 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { width: 1, dt: 0.02 };
+    var state = { width1: 1, width2: 1, dt: 0.02 };
     var fields = [
-      ["width", "脉冲宽度 w / s", 0.2, 3, 0.1],
+      ["width1", "脉冲 1 宽度 w₁ / s", 0.2, 3, 0.1],
+      ["width2", "脉冲 2 宽度 w₂ / s", 0.2, 3, 0.1],
       ["dt", "数值步长 dt / s", 0.005, 0.1, 0.005]
     ];
     fields.forEach(function (field) {
@@ -1382,13 +1391,19 @@
       return String(Math.round(value * 1000) / 1000);
     }
 
-    /* 单位矩形脉冲 x(t)=1, 0≤t≤w */
+    /* 单位矩形脉冲：x(t)=1, 0≤t≤w */
     function rect(t, w) { return (t >= 0 && t <= w) ? 1 : 0; }
 
-    /* 解析卷积：两等宽矩形 → 三角，峰 w、支撑 [0, 2w] */
-    function analyticConvolution(t, w) {
-      if (t <= 0 || t >= 2 * w) return 0;
-      return t <= w ? t : 2 * w - t;
+    /* 解析卷积：两矩形 [0,w₁]、[0,w₂] 卷积 → 分段梯形
+       （等宽时退化为三角）：t≤min 线性上升、中间持平 min(w₁,w₂)、
+       t>max 线性下降，支撑 [0, w₁+w₂]，峰值 min(w₁,w₂) */
+    function analyticConvolution(t, w1, w2) {
+      if (t <= 0 || t >= w1 + w2) return 0;
+      var lo = Math.min(w1, w2);
+      var hi = Math.max(w1, w2);
+      if (t <= lo) return t;
+      if (t <= hi) return lo;
+      return w1 + w2 - t;
     }
 
     function draw() {
@@ -1410,12 +1425,13 @@
       var margin = { left: 40, right: 14, top: 10, bottom: 24 };
       var plotW = width - margin.left - margin.right;
       var plotH = height - margin.top - margin.bottom;
-      var w = state.width;
+      var w1 = state.width1;
+      var w2 = state.width2;
       var dt = state.dt;
-      var maxY = w;                 /* 峰值 = w */
+      var maxY = Math.min(w1, w2);      /* 峰值 = min(w₁, w₂) */
       var scaleY = (plotH / 2) * 0.92 / maxY;
       var zeroY = margin.top + plotH / 2;
-      var T = 2 * w;                /* 显示到支撑终点 */
+      var T = w1 + w2;                  /* 显示到支撑终点 */
 
       /* 网格 + 零轴 */
       ctx.strokeStyle = gridSoft;
@@ -1439,9 +1455,9 @@
       ctx.rect(margin.left, margin.top, plotW, plotH);
       ctx.clip();
 
-      /* 数值卷积：离散矩形序列，y[n] = dt · Σ x[k]·x[n-k] */
+      /* 数值卷积：离散矩形序列，y[n] = dt · Σ x₁[k]·x₂[n−k] */
       ctx.fillStyle = accentInk;
-      var N = Math.ceil(2 * w / dt);
+      var N = Math.ceil((w1 + w2) / dt);
       var y = [];
       var maxAbsError = 0;
       for (var n = 0; n <= N; n += 1) {
@@ -1449,10 +1465,10 @@
         var sum = 0;
         for (var k = 0; k <= N; k += 1) {
           var tk = k * dt;
-          sum += rect(tk, w) * rect(t - tk, w) * dt;
+          sum += rect(tk, w1) * rect(t - tk, w2) * dt;
         }
         y.push(sum);
-        var analytic = analyticConvolution(t, w);
+        var analytic = analyticConvolution(t, w1, w2);
         var err = Math.abs(sum - analytic);
         if (err > maxAbsError) maxAbsError = err;
         var px = margin.left + (t / T) * plotW;
@@ -1468,26 +1484,27 @@
       for (var i = 0; i <= 600; i += 1) {
         var ti = (T * i) / 600;
         var px2 = margin.left + (ti / T) * plotW;
-        var py2 = zeroY - analyticConvolution(ti, w) * scaleY;
+        var py2 = zeroY - analyticConvolution(ti, w1, w2) * scaleY;
         if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
       }
       ctx.stroke();
 
-      /* 支撑区间标记 [0, 2w] */
+      /* 支撑区间标记 [0, w₁+w₂] */
       ctx.fillStyle = gridText;
       ctx.textAlign = "center";
       ctx.fillText("0", margin.left, height - 8);
-      ctx.fillText(formatNumber(2 * w), margin.left + plotW, height - 8);
-      ctx.fillText(formatNumber(w), margin.left + plotW / 2, height - 8);
+      ctx.fillText(formatNumber(w1 + w2), margin.left + plotW, height - 8);
+      ctx.fillText(formatNumber(Math.min(w1, w2)), margin.left + Math.min(w1, w2) / T * plotW, height - 8);
       ctx.restore();
 
-      /* 测量 */
+      /* 测量：标注支撑区间与两脉冲宽度 */
       metrics.textContent = "";
       var rows = [
-        ["解析峰值（t=w）", formatNumber(w)],
-        ["数值峰值", formatNumber(y[Math.round(w / dt)] || 0)],
+        ["解析峰值 t=min(w₁,w₂)", formatNumber(maxY)],
+        ["数值峰值", formatNumber(y[Math.round(Math.min(w1, w2) / dt)] || 0)],
         ["最大绝对误差", formatNumber(maxAbsError)],
-        ["支撑区间", "[0, " + formatNumber(2 * w) + "] s"]
+        ["支撑区间", "[0, " + formatNumber(w1 + w2) + "] s"],
+        ["脉冲宽度", formatNumber(w1) + " / " + formatNumber(w2) + " s"]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
@@ -1522,10 +1539,11 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { a: 0.5, length: 20 };
+    var state = { a: 0.5, length: 20, input: "step", initial: 0 };
     var fields = [
-      ["a", "递推系数 a", 0.1, 0.9, 0.05],
-      ["length", "序列长度 N", 5, 40, 1]
+      ["a", "递推系数 a", 0.05, 0.95, 0.05],
+      ["length", "序列长度 N", 5, 40, 1],
+      ["initial", "初始值 y[−1]", 0, 5, 0.5]
     ];
     var inputs = {};
     fields.forEach(function (field) {
@@ -1548,6 +1566,19 @@
       label.appendChild(input);
       controls.appendChild(label);
     });
+    /* 输入类型：单位阶跃 / 单位冲激 */
+    var kindLabel = document.createElement("label");
+    kindLabel.className = "demo-field";
+    kindLabel.appendChild(document.createTextNode("输入信号"));
+    var kindSelect = document.createElement("select");
+    kindSelect.innerHTML = '<option value="step">单位阶跃 u[n]</option><option value="impulse">单位冲激 δ[n]</option>';
+    kindSelect.value = state.input;
+    kindSelect.addEventListener("change", function () {
+      state.input = kindSelect.value;
+      draw();
+    });
+    kindLabel.appendChild(kindSelect);
+    controls.appendChild(kindLabel);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
@@ -1589,26 +1620,31 @@
       var plotH = height - margin.top - margin.bottom;
       var a = state.a;
       var N = Math.round(state.length);
-      var steady = 1 / (1 - a);
+      var y0 = state.initial;
+      var impulse = state.input === "impulse";
+      var steady = impulse ? 0 : 1 / (1 - a);
 
-      /* 序列：x[n]=1 (n≥0)，递推 y[n]=x[n]+a·y[n−1]，卷积 y2=Σ x[k]·h[n−k] */
+      /* 序列：x[n]=u[n] 或 δ[n]；递推 y[n]=x[n]+a·y[n−1]（y[−1]=y0）；
+         卷积核对 y2[n]=Σ x[k]·h[n−k] + y0·a^(n+1)（零输入响应分量） */
       var x = [], y = [], y2 = [], h = [];
       for (var n = 0; n < N; n += 1) {
-        x.push(1);
-        y.push(n === 0 ? 1 : x[n] + a * y[n - 1]);
+        x.push(impulse ? (n === 0 ? 1 : 0) : 1);
+        y.push(n === 0 ? x[0] + a * y0 : x[n] + a * y[n - 1]);
         h.push(Math.pow(a, n));
       }
       for (var n2 = 0; n2 < N; n2 += 1) {
         var sum = 0;
         for (var k = 0; k <= n2; k += 1) sum += x[k] * h[n2 - k];
-        y2.push(sum);
+        y2.push(sum + y0 * Math.pow(a, n2 + 1));
       }
       var maxErr = 0;
       for (var n3 = 0; n3 < N; n3 += 1) {
         var e3 = Math.abs(y[n3] - y2[n3]);
         if (e3 > maxErr) maxErr = e3;
       }
-      var maxY = steady * 1.1;
+      var yMax = 0;
+      for (var n8 = 0; n8 < N; n8 += 1) if (y[n8] > yMax) yMax = y[n8];
+      var maxY = Math.max(yMax, steady, 1) * 1.1;
       var scaleY = plotH / maxY;
       var zeroY = margin.top + plotH;
       var step = plotW / Math.max(N - 1, 1);
@@ -1689,7 +1725,7 @@
         ["递推输出 y[" + (N - 1) + "]", formatNumber(y[N - 1])],
         ["卷积输出 y[" + (N - 1) + "]", formatNumber(y2[N - 1])],
         ["两种算法最大差", formatNumber(maxErr)],
-        ["理论稳态 1/(1−a)", formatNumber(steady)]
+        ["理论稳态 y[∞]", impulse ? "0（瞬态衰减）" : formatNumber(steady)]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");
@@ -1722,11 +1758,12 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { f1: 2, f2: 20, window: 5 };
+    var state = { f1: 2, f2: 20, window: 5, ratio: 0.6, win: "rect" };
     var fields = [
       ["f1", "低频信号 f₁ / Hz", 0.5, 10, 0.5],
       ["f2", "高频扰动 f₂ / Hz", 5, 60, 1],
-      ["window", "平均窗口 M", 3, 9, 2]
+      ["window", "平均窗口 M", 3, 11, 2],
+      ["ratio", "高频振幅比", 0.1, 1, 0.1]
     ];
     var inputs = {};
     fields.forEach(function (field) {
@@ -1749,6 +1786,19 @@
       label.appendChild(input);
       controls.appendChild(label);
     });
+    /* 窗型：矩形 / 三角（Bartlett）/ 汉宁，归一化后幅频响应随窗型变化 */
+    var winLabel = document.createElement("label");
+    winLabel.className = "demo-field";
+    winLabel.appendChild(document.createTextNode("窗型"));
+    var winSelect = document.createElement("select");
+    winSelect.innerHTML = '<option value="rect">矩形窗</option><option value="tri">三角窗</option><option value="hann">汉宁窗</option>';
+    winSelect.value = state.win;
+    winSelect.addEventListener("change", function () {
+      state.win = winSelect.value;
+      draw();
+    });
+    winLabel.appendChild(winSelect);
+    controls.appendChild(winLabel);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
@@ -1790,30 +1840,44 @@
       var plotH = height - margin.top - margin.bottom;
       var f1 = state.f1, f2 = state.f2;
       var M = Math.round(state.window);
+      var ratio = state.ratio;
       var fs = 200;
       var T = 1;
       var N = Math.round(fs * T);
       var zeroY = margin.top + plotH / 2;
       var amp = 1.6; /* ±1.6 满幅：1 + 0.6 高频占比 */
 
+      /* 窗系数（归一化 Σbₖ=1） */
+      var coeff = [];
+      for (var m = 0; m < M; m += 1) {
+        var c;
+        if (state.win === "tri") c = M > 1 ? 1 - Math.abs(2 * m - (M - 1)) / (M - 1) : 1;
+        else if (state.win === "hann") c = M > 1 ? 0.5 * (1 - Math.cos((2 * Math.PI * m) / (M - 1))) : 1;
+        else c = 1;
+        coeff.push(c);
+      }
+      var coeffSum = coeff.reduce(function (s, v) { return s + v; }, 0);
+      var b = coeff.map(function (v) { return v / coeffSum; });
+
       var x = [], y = [], u = 0;
       for (var n = 0; n < N; n += 1) {
         var t = n / fs;
-        x.push(Math.sin(2 * Math.PI * f1 * t) + 0.6 * Math.sin(2 * Math.PI * f2 * t));
-        /* 因果 M 点平均：y[n] = (x[n−M+1]+…+x[n])/M */
-        u += x[n];
-        if (n >= M) u -= x[n - M];
-        y.push(u / M);
+        x.push(Math.sin(2 * Math.PI * f1 * t) + ratio * Math.sin(2 * Math.PI * f2 * t));
+        /* 因果 M 点窗平均：y[n] = Σ bₖ·x[n−k] */
+        var acc = 0;
+        for (var kb = 0; kb < M && n - kb >= 0; kb += 1) acc += b[kb] * x[n - kb];
+        y.push(acc);
       }
 
-      /* 幅频响应 |H(ω)| 在 f1/f2 处（线性相位移动平均） */
+      /* 幅频响应 |H(ω)| 在 f1/f2 处（数值计算，随窗型变化） */
       function gainAt(f) {
         var w = 2 * Math.PI * f / fs;
-        var num = M * w / 2;
-        var den = w / 2;
-        if (Math.abs(den) < 1e-9) return 1;
-        var h = Math.sin(num) / (M * Math.sin(den));
-        return Math.abs(h);
+        var re = 0, im = 0;
+        for (var m2 = 0; m2 < M; m2 += 1) {
+          re += b[m2] * Math.cos(-w * m2);
+          im += b[m2] * Math.sin(-w * m2);
+        }
+        return Math.sqrt(re * re + im * im);
       }
       var gainLow = gainAt(f1);
       var gainHigh = gainAt(f2);
@@ -1906,10 +1970,11 @@
 
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = { count: 100000, variance: 9 };
+    var state = { count: 100000, variance: 9, window: 3, dist: "gauss" };
     var fields = [
       ["count", "样本数 N", 1000, 500000, 1000],
-      ["variance", "噪声方差 σ²", 1, 25, 1]
+      ["variance", "噪声方差 σ²", 1, 25, 1],
+      ["window", "平均点数 L", 1, 15, 1]
     ];
     var inputs = {};
     fields.forEach(function (field) {
@@ -1932,6 +1997,19 @@
       label.appendChild(input);
       controls.appendChild(label);
     });
+    /* 噪声分布：高斯（Box–Muller）/ 均匀 */
+    var distLabel = document.createElement("label");
+    distLabel.className = "demo-field";
+    distLabel.appendChild(document.createTextNode("噪声分布"));
+    var distSelect = document.createElement("select");
+    distSelect.innerHTML = '<option value="gauss">高斯</option><option value="uniform">均匀</option>';
+    distSelect.value = state.dist;
+    distSelect.addEventListener("change", function () {
+      state.dist = distSelect.value;
+      draw();
+    });
+    distLabel.appendChild(distSelect);
+    controls.appendChild(distLabel);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
@@ -1985,17 +2063,27 @@
       var plotH = height - margin.top - margin.bottom;
       var N = Math.round(state.count);
       var sigma = Math.sqrt(state.variance);
+      var L = Math.round(state.window);
+      var half = Math.floor(L / 2);
 
-      /* Box–Muller 高斯样本（均值 0、方差 σ²），丢弃首尾暂态后做三点平均 */
+      /* 噪声样本（均值 0、方差 σ²）：高斯由 Box–Muller，均匀映射为 ±√(3σ²) 区间 */
       var rand = makeRandom(12345);
       var x = [], y = [];
       for (var n = 0; n < N; n += 1) {
-        var u1 = rand() || 1e-12;
-        var u2 = rand();
-        x.push(sigma * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2));
+        if (state.dist === "uniform") {
+          var uu = rand() * 2 - 1;
+          x.push(sigma * Math.sqrt(3) * uu);
+        } else {
+          var u1 = rand() || 1e-12;
+          var u2 = rand();
+          x.push(sigma * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2));
+        }
       }
-      for (var n2 = 1; n2 < N - 1; n2 += 1) {
-        y.push((x[n2 - 1] + x[n2] + x[n2 + 1]) / 3);
+      /* L 点移动平均（中心对称，丢弃首尾暂态） */
+      for (var n2 = half; n2 < N - (L - 1 - half); n2 += 1) {
+        var acc = 0;
+        for (var k = n2 - half; k <= n2 - half + L - 1; k += 1) acc += x[k];
+        y.push(acc / L);
       }
       var sumX = 0, sumX2 = 0, sumY = 0, sumY2 = 0;
       for (var n3 = 0; n3 < N; n3 += 1) {
@@ -2069,7 +2157,7 @@
         ["输入样本均值", formatNumber(meanX)],
         ["输入样本方差", formatNumber(varX)],
         ["输出样本方差", formatNumber(varY)],
-        ["理论输出方差 σ²/3", formatNumber(state.variance / 3)]
+        ["理论输出方差 σ²/L", formatNumber(state.variance / L)]
       ];
       rows.forEach(function (row) {
         var item = document.createElement("div");

@@ -307,7 +307,8 @@ test("LTI / FIR / variance experiments render interactive demos with correct bas
       canvas: Boolean(document.querySelector(".demo-canvas")),
       placeholder: Boolean(document.querySelector(".practice-placeholder")),
       metrics: Array.from(document.querySelectorAll(".demo-metric-value")).map((el) => el.textContent.trim()),
-      fields: Array.from(document.querySelectorAll(".demo-field")).map((el) => el.querySelector("input").value),
+      numericFields: Array.from(document.querySelectorAll(".demo-field input")).map((el) => el.value),
+      selects: Array.from(document.querySelectorAll(".demo-field select")).map((el) => el.value),
     }));
 
   await switchTo(3); // LTI
@@ -315,24 +316,27 @@ test("LTI / FIR / variance experiments render interactive demos with correct bas
   assert.equal(s.demo, true, "LTI has a demo panel");
   assert.equal(s.placeholder, false, "LTI placeholder replaced");
   assert.deepEqual(s.metrics.slice(0, 4), ["2", "2", "0", "2"], "LTI defaults: both algorithms 2, zero error, steady state 2");
-  assert.deepEqual(s.fields, ["0.5", "20"]);
+  assert.deepEqual(s.numericFields, ["0.5", "20", "0"], "LTI defaults a/N/y[-1]");
+  assert.deepEqual(s.selects, ["step"]);
 
   await switchTo(4); // FIR
   s = await state();
   assert.equal(s.demo, true, "FIR has a demo panel");
   assert.equal(s.metrics[0], "-3.779 dB", "FIR default high-freq attenuation at fs=200, f2=20, M=5");
   assert.equal(s.metrics[1], "2 个样点", "FIR group delay (M-1)/2");
-  assert.deepEqual(s.fields, ["2", "20", "5"]);
+  assert.deepEqual(s.numericFields, ["2", "20", "5", "0.6"]);
+  assert.deepEqual(s.selects, ["rect"]);
 
   await switchTo(5); // variance
   s = await state();
   assert.equal(s.demo, true, "variance has a demo panel");
-  assert.deepEqual(s.fields, ["100000", "9"]);
+  assert.deepEqual(s.numericFields, ["100000", "9", "3"]);
+  assert.deepEqual(s.selects, ["gauss"]);
   const inVar = Number(s.metrics[1]);
   const outVar = Number(s.metrics[2]);
   assert.ok(Math.abs(inVar - 9) < 0.2, `input variance ≈ 9 (got ${inVar})`);
   assert.ok(Math.abs(outVar - 3) < 0.15, `output variance ≈ 3 (got ${outVar})`);
-  assert.equal(s.metrics[3], "3", "theoretical σ²/3");
+  assert.equal(s.metrics[3], "3", "theoretical σ²/L with L=3");
 
   /* LTI 参数互动：a=0.3 → 稳态 1.429 */
   await switchTo(3);
@@ -345,5 +349,42 @@ test("LTI / FIR / variance experiments render interactive demos with correct bas
   s = await state();
   assert.equal(s.metrics[0], "1.429", "LTI recursion output updates with a");
   assert.equal(s.metrics[3], "1.429", "theoretical steady state 1/(1-a)");
+
+  /* LTI 冲激输入：输出降为零并标注瞬态衰减 */
+  await page.evaluate(() => {
+    const select = document.querySelector(".demo-field select");
+    select.value = "impulse";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForTimeout(150);
+  s = await state();
+  assert.ok(s.metrics[3].includes("瞬态"), "impulse input labels transient decay");
+
+  /* FIR 汉宁窗：高频衰减改变（主瓣变宽 → 大于矩形窗的 −3.78 dB） */
+  await switchTo(4);
+  await page.evaluate(() => {
+    const select = document.querySelector(".demo-field select");
+    select.value = "hann";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForTimeout(150);
+  s = await state();
+  assert.equal(s.metrics[0], "-0.872 dB", "Hann window attenuation differs from rect");
+  assert.equal(s.metrics[1], "2 个样点", "group delay unchanged by window type");
+
+  /* 方差：L=5 + 均匀分布 → 输出方差 ≈ σ²/L = 1.8 */
+  await switchTo(5);
+  await page.evaluate(() => {
+    const inputs = Array.from(document.querySelectorAll(".demo-field input"));
+    inputs[2].value = "5";
+    inputs[2].dispatchEvent(new Event("input", { bubbles: true }));
+    const select = document.querySelector(".demo-field select");
+    select.value = "uniform";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+  s = await state();
+  assert.equal(s.metrics[3], "1.8", "theoretical σ²/L with L=5");
+  assert.ok(Math.abs(Number(s.metrics[2]) - 1.8) < 0.1, `uniform output variance ≈ 1.8 (got ${s.metrics[2]})`);
   await page.close();
 });
