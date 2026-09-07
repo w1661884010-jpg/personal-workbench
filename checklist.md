@@ -136,3 +136,7 @@
 - [x] 真实浏览器回归测试先失败：课程页直开 390/405/820/821/900/1440 `#workbenchStage` 计算样式应为 none、无尺寸、不可聚焦；各视图往返无残留；说明图标 hidden 正确；停留页面跨断点缩放；重新进入正常。
 - [x] 修复：`.workbench-stage[hidden], .workbench-stage .limit-tip-button[hidden] { display: none; }`（特异性高于显示规则，无 !important）。
 - [x] 完整测试 + git diff --check + 修复前后同尺寸截图；单 fix 提交；先本地验收不推送。
+# 2026-09-07 移动端顶栏
+- [x] 读取相关样式、HTML、滚动处理与基线；明确只提交本地。
+- [x] 新测试 5/5 先失败、修复后 5/5 通过；完整套件 90/90，构建/语法/diff-check 通过，截图检查完成。
+- [x] 本轮提交仅限 3010 本地，禁止推送；提交后检查工作区与 ahead 状态。

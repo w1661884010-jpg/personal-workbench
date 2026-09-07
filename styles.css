@@ -1398,13 +1398,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* 移动端：科目与章节改为横向列表 */
 @media (max-width: 760px) {
   .topbar {
+    position: sticky;
     flex-wrap: wrap;
     gap: 8px;
     padding: 12px;
+    border-bottom: 1px solid var(--hairline);
   }
 
-  /* 移动端顶栏四行（品牌/搜索/科目/工具）：分隔线位置同步 */
-  .topbar-divider { top: 208px; }
+  /* 手机端保持单一吸顶层；正文由真实顶栏高度占位，避免固定层与留白动画脱节。 */
+  .topbar, .topbar.is-hidden { transform: none; transition: none; }
+  .topbar-divider { display: none; }
+  .shell, .shell.has-topbar-hidden { padding-top: 0; }
 
   .subject-tabs, .topbar-actions { width: 100%; overflow-x: auto; }
 
@@ -1414,7 +1418,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
   .shell {
     grid-template-columns: 1fr;
-    padding-top: 208px;   /* 移动端顶栏：4 行气泡（品牌/搜索/科目/工具）+ 12px 内边距 */
   }
 
   .shell.is-panel-collapsed { grid-template-columns: minmax(0, 1fr); }

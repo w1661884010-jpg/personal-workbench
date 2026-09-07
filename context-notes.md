@@ -225,3 +225,10 @@
 - 回归测试 tests/workbench-hidden-visibility.test.mjs 6 项（真实浏览器）：A 课程页直开（390/405/820/821/900/1440）computed none + 零尺寸 + 不可聚焦（focus() 不生效）；B 数字台→教材停留 700ms 无残留；C 模拟台→教材/工作台→演练/工作台→错题均无切换器/图标/占位；D 重进正常（≤820 stage flex、横向切换动画路径 translateX(100%)）；E 图标 hidden=true 隐藏、需要说明时 600ms 后显示；F 停留课程页跨 820 断点缩放保持隐藏。修复前 5/6 失败（390 报“实际 flex”与根因一致），修复后 6/6。
 - 重要发现：既有 narrow-workbench-layout 的 4 项“说明图标同行”测试**依赖 bug 状态**（openDigital 后 400ms 快照，此时 updateWorkbenchLimit(600ms) 未运行、tip 仍 hidden=true，但旧显示规则让它“可见”）——修复后改为 waitForFunction 等待 tip 取消 hidden 再断言。完整套件 85/85。
 - 截图：`%TEMP%\hidden-pre-{390-light,390-dark,1440-light}.png` / `hidden-post-*`（390 深色对照用户截图的同尺寸全页图，修复后正文底部无切换器）。
+# 2026-09-07 移动端顶栏布局
+- 采用移动端 sticky 正常流占位，去除 208px 硬编码和收起时正文 padding 变化，减少固定合成层；桌面保持原交互。
+- 手机截图重影未在本机同款 WebView 复现，不将几何测试通过等同真机渲染已验证。
+- 只提交 3010 本地，不推送、不修改 3000。
+- 在改变品牌行高的隔离测试中复现 header.bottom=240、正文 top=222 的 18px 遮挡；原始默认字体未复现截图中的 WebView 绘制残影。
+- 新增 5 项测试先全部失败，修复后全部通过；桌面滚动测试首次使用短工作台页面无法到达阈值，改用长教材正文后验证原有收起行为。完整套件 90/90；node --check app.js、node build-pages.mjs、git diff --check 通过。
+- 已检查临时目录 mobile-header-workbench-after.png、mobile-header-mistakes-after.png：393px 深色截图无顶栏下缘叠层。未测试真机微信内核。

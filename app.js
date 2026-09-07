@@ -229,8 +229,15 @@
   /* 顶栏：下滚收起、上滚恢复；章节栏跟随顶栏移动，顶栏收起后置顶。
      死区 2px 以兼容触控板平滑滚动的小增量；接近页面顶部时强制恢复。 */
   var lastY = window.scrollY;
+  var mobileTopbar = window.matchMedia("(max-width: 760px)");
   window.addEventListener("scroll", function () {
     var y = window.scrollY;
+    if (mobileTopbar.matches) {
+      topbar.classList.remove("is-hidden");
+      shell.classList.remove("has-topbar-hidden");
+      lastY = y;
+      return;
+    }
     if (y > lastY && y > 140) {
       topbar.classList.add("is-hidden");
       shell.classList.add("has-topbar-hidden");
