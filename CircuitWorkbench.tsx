@@ -8,7 +8,8 @@ import type { ChapterExperiment, CourseDefinition } from "../personal-workbench-
 import { simulateAnalogTransient, solveAnalogDc, type AnalogDcResult, type AnalogTransientResult } from "../personal-workbench-sites-3000/app/lib/circuit/analog-simulator";
 import { deleteCircuit, listCircuits, loadCircuit, saveCircuit } from "../personal-workbench-sites-3000/app/lib/circuit/circuit-storage";
 import { evaluateDigitalCircuit, generateTruthTable, sampleDigitalCircuit, type DigitalRuntime, type DigitalSimulationResult, type DigitalTraceSample, type TruthTableRow } from "../personal-workbench-sites-3000/app/lib/circuit/digital-simulator";
-import { findAvailablePosition, getComponentSize, getPortGeometry, separateOverlappingComponents } from "../personal-workbench-sites-3000/app/lib/circuit/geometry";
+import { getComponentSize, getPortGeometry } from "../personal-workbench-sites-3000/app/lib/circuit/geometry";
+import { findAvailablePosition, separateOverlappingComponents } from "./circuit-placement";
 import { addComponent, buildNetlist, connect, copyCircuit, createCircuit, createComponent, disconnect, moveComponent, removeComponent, resetCircuit, transformComponent, updateComponentParameters } from "../personal-workbench-sites-3000/app/lib/circuit/graph";
 import { componentPorts, terminalKey, type AnalogComponentKind, type CircuitComponent, type CircuitComponentKind, type CircuitDocument, type CircuitEndpoint, type CircuitKind, type DigitalComponentKind, type LogicValue } from "../personal-workbench-sites-3000/app/lib/circuit/types";
 import "../personal-workbench-sites-3000/app/components/sandbox/workbench.css";
@@ -119,6 +120,8 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   const [selectedExperimentId, setSelectedExperimentId] = useState(initialExperimentId ?? "");
   const [dragging, setDragging] = useState<{ componentId: string; offsetX: number; offsetY: number } | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [canvasRatio, setCanvasRatio] = useState(canvasWidth / canvasHeight);
+  const [paletteQuery, setPaletteQuery] = useState("");
   const svgRef = useRef<SVGSVGElement>(null);
   const circuitRef = useRef(circuit);
   const digitalRuntimeRef = useRef<DigitalRuntime | undefined>(undefined);
@@ -130,6 +133,8 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   const selectedExperiment = experiments.find((item) => item.experiment.id === selectedExperimentId) ?? experiments[0] ?? null;
   const selectedPreset = getCircuitPreset(selectedExperiment?.experiment.presetId);
   const palette = kind === "digital" ? digitalPalette : analogPalette;
+  const query = paletteQuery.trim().toLowerCase();
+  const filteredPalette = palette.filter((item) => `${item.label} ${item.kind}`.toLowerCase().includes(query));
   const selectedComponent = selectedComponentId ? circuit.components[selectedComponentId] ?? null : null;
   const connectedTerminals = useMemo(() => {
     const terminals = new Set<string>();
@@ -140,10 +145,20 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
     return terminals;
   }, [circuit.connections]);
   const viewBox = useMemo(() => {
-    const width = canvasWidth / zoom;
-    const height = canvasHeight / zoom;
+    const width = Math.max(canvasWidth, canvasHeight * canvasRatio) / zoom;
+    const height = width / canvasRatio;
     return { x: (canvasWidth - width) / 2, y: (canvasHeight - height) / 2, width, height };
-  }, [zoom]);
+  }, [zoom, canvasRatio]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setCanvasRatio(width / height);
+    });
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, []);
   const netlist = useMemo(() => buildNetlist(circuit), [circuit]);
   const analogTraceNets = useMemo(() => {
     const selected = probeTerminals.map((terminal) => netlist.terminalToNet[terminal]).filter(Boolean);
@@ -222,12 +237,10 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
   }, [selectedComponentId]);
 
   function canvasPoint(clientX: number, clientY: number) {
-    const bounds = svgRef.current?.getBoundingClientRect();
-    if (!bounds) return { x: 120, y: 100 };
-    return {
-      x: viewBox.x + ((clientX - bounds.left) / bounds.width) * viewBox.width,
-      y: viewBox.y + ((clientY - bounds.top) / bounds.height) * viewBox.height,
-    };
+    const matrix = svgRef.current?.getScreenCTM();
+    if (!matrix) return { x: 120, y: 100 };
+    const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    return { x: point.x, y: point.y };
   }
 
   function placeComponent(componentKind: CircuitComponentKind, point?: { x: number; y: number }) {
@@ -503,7 +516,9 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
         <aside className="cw-palette">
           <div className="cw-panel-title"><h2>元件</h2><span>{palette.length}</span></div>
           <p>点击放置，或拖到画布。</p>
-          <div className="cw-palette-list">{palette.map((item) => <button type="button" draggable key={item.kind} onClick={() => placeComponent(item.kind)} onDragStart={(event) => event.dataTransfer.setData("application/x-circuit-component", item.kind)}><span>{item.kind.toUpperCase()}</span>{item.label}</button>)}</div>
+          <input type="search" className="cw-palette-search" aria-label="查找元件" placeholder="搜索名称 / 类型" value={paletteQuery} onChange={(event) => setPaletteQuery(event.target.value)} />
+          <div className="cw-palette-list">{filteredPalette.map((item) => <button type="button" draggable key={item.kind} onClick={() => placeComponent(item.kind)} onDragStart={(event) => event.dataTransfer.setData("application/x-circuit-component", item.kind)}><span>{item.kind.toUpperCase()}</span>{item.label}</button>)}</div>
+          {!filteredPalette.length ? <div role="status">没有匹配的元件</div> : null}
         </aside>
 
         <section className="cw-canvas-panel">
@@ -517,7 +532,7 @@ function CircuitWorkbenchSession({ kind, initialExperimentId, courses, onOpenCha
           <p className="cw-canvas-help">双击元件保持选中；拖动会自动避开其他元件。使用缩放按钮，或按住 Ctrl/⌘ 滚动。</p>
           <svg ref={svgRef} className="cw-canvas" viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`} role="application" aria-label="可自由搭建的电路画布" onWheel={handleCanvasWheel} onPointerMove={handlePointerMove} onPointerUp={() => setDragging(null)} onDragOver={(event) => event.preventDefault()} onDrop={(event: DragEvent<SVGSVGElement>) => { event.preventDefault(); const componentKind = event.dataTransfer.getData("application/x-circuit-component") as CircuitComponentKind; if (componentLabels[componentKind]) placeComponent(componentKind, canvasPoint(event.clientX, event.clientY)); }} onClick={(event) => { if (event.target === event.currentTarget) setSelectedComponentId(null); }}>
             <defs><pattern id={`cw-grid-${kind}`} width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" className="cw-grid-line" /></pattern></defs>
-            <rect width={canvasWidth} height={canvasHeight} fill={`url(#cw-grid-${kind})`} onClick={() => setSelectedComponentId(null)} />
+            <rect x={viewBox.x} y={viewBox.y} width={viewBox.width} height={viewBox.height} fill={`url(#cw-grid-${kind})`} onClick={() => setSelectedComponentId(null)} />
             {Object.values(circuit.connections).map((connection) => {
               const from = circuit.components[connection.from.componentId]; const to = circuit.components[connection.to.componentId];
               if (!from || !to) return null;

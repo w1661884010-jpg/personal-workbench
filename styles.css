@@ -1576,6 +1576,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   }
 }
 
+/* 移动端增大工作区；viewBox 根据容器比例扩展，网格不留空带。 */
+@media (max-width: 900px) {
+  .workbench-root .cw-canvas {
+    height: clamp(400px, 65svh, 720px);
+    min-height: 0;
+    max-height: none;
+  }
+}
+
 /* 电路工作台整体：行距 14 → 10（列距由媒体块中的 column-gap: 0 决定，顶部三区分区竖线无缝） */
 .workbench-root .circuit-workbench { row-gap: 10px; }
 
@@ -1966,5 +1975,30 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     width: 100%;
     min-width: 0;
     max-width: none;
+  }
+}
+
+.workbench-root .cw-palette-search { width: 100%; min-width: 0; min-height: 40px; margin-top: 4px; }
+@media (max-width: 900px) {
+  .workbench-root .cw-palette-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+    max-height: 150px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .workbench-root .cw-palette-list button { min-width: 0; min-height: 48px; padding: 6px; }
+  .workbench-root .cw-canvas-toolbar { padding: 8px; gap: 6px; }
+  .workbench-root .cw-canvas-toolbar button { min-height: 40px; padding: 6px 8px; }
+  .workbench-root .cw-canvas-toolbar > div:first-child { order: 0; }
+  .workbench-root .cw-canvas-toolbar .cw-zoom-controls { order: 1; margin-left: auto; }
+  .workbench-root .cw-canvas-toolbar .cw-zoom-controls button { min-width: 40px; }
+  .workbench-root .cw-canvas-toolbar .cw-transform-controls,
+  .workbench-root .cw-canvas-toolbar > button { order: 2; }
+  .workbench-root .cw-canvas-toolbar .cw-transform-controls:has(button:disabled),
+  .workbench-root .cw-canvas-toolbar > button:disabled { display: none; }
+  .workbench-root .cw-canvas-toolbar > span {
+    order: 3; min-width: 0; flex-basis: 100%;
+    font-size: .65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 }
