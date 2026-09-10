@@ -45,6 +45,9 @@
 :root[data-theme="light"] .subject-tab:not(.is-active),
 :root[data-theme="light"] .tool-button:not(.is-active) { border-color: color-mix(in srgb, var(--ink) 14%, transparent); }
 
+/* 浅色下选中胶囊的描边与填充胶囊同色系（与改动前的选中态保持一致） */
+:root[data-theme="light"] .subject-thumb { border-color: var(--line); }
+
 :root[data-theme="light"] .global-search { box-shadow: 0 1px 2px rgba(30, 35, 42, 0.04); }
 :root[data-theme="dark"] { color-scheme: dark; }
 
@@ -65,6 +68,11 @@
   --accent-contrast: light-dark(#ffffff, #181a1e);
   --mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --sans: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  /* 分段控件动效 token：顶栏科目滑块与数字/模拟切换器共用同一时长与曲线。
+     像素位移都小于一个控件宽度，属于"短距离到达"，用减速曲线 + 极轻回弹（位移结束即稳定，
+     不做二次振荡）；两处若各写一套时长会显得其中一个发飘。 */
+  --seg-duration: 240ms;
+  --seg-ease: cubic-bezier(.34, 1.32, .64, 1);
 }
 
 /* 工作台视图：原站全局 h1/h2/p 排版（骨架无全局 h1 规则；仅作用域在工作台内） */
@@ -94,7 +102,8 @@
 }
 
 /* 数字/模拟切换：覆盖在工作台卡片顶部左侧预留空位上的独立气泡（不挤压卡片），
-   上下方向滑动；数字在上、模拟在下，只过渡 transform。 */
+   上下方向滑动；数字在上、模拟在下。滑块与顶栏科目滑块同一套做法：
+   位置与尺寸都由 JS 现场测量（见 app.js syncKindSwitcher），这里只给落位基准与外观。 */
 .workbench-stage .kind-switcher {
   position: absolute;
   left: 0;
@@ -111,15 +120,19 @@
 
 .kind-thumb {
   position: absolute;
-  top: 4px;
+  top: 4px;              /* 基准 = 首个分段的左上角（即切换器内边距），数字态即 translate(0, 0) */
   left: 4px;
-  width: calc(100% - 8px);
+  width: calc(100% - 8px);    /* JS 落位前的兜底尺寸，与实测值一致 */
   height: calc(50% - 4px);
-  border: 1px solid var(--ink-faint);
+  border: 1.5px solid var(--line-strong);
   border-radius: 9px;
-  background: light-dark(#c9ced6, #3a4048);
-  transform: translateY(0);
-  transition: transform 180ms cubic-bezier(.22, 1, .36, 1);
+  /* 与顶栏科目胶囊同一套取色逻辑：描边 + 页面底色（--bg），看起来像"从气泡里挖出来"的一格 */
+  background: var(--bg);
+  will-change: transform, width, height;
+  transform: translate(0, 0);
+  transition: transform var(--seg-duration) var(--seg-ease),
+              width var(--seg-duration) var(--seg-ease),
+              height var(--seg-duration) var(--seg-ease);
 }
 
 /* 键盘触发切换：滑块即时归位（一帧后恢复缓动） */
@@ -134,10 +147,13 @@
   background: transparent;
   color: var(--ink-soft);
   font-weight: 750;
-  transition: color 120ms;
+  /* 文字色跟随滑块（同一 token），按下时用 transform 做反馈：不改变布局尺寸，无抖动 */
+  transition: color var(--seg-duration) ease-out, transform 90ms ease-out;
 }
 
 .kind-switch-button:hover { color: var(--ink); }
+
+.kind-switch-button:active { transform: scale(.96); }
 
 .kind-switch-button.is-active { color: var(--ink); }
 
@@ -775,7 +791,29 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-weight: 800;
 }
 
-.subject-tabs { display: flex; flex: 0 0 auto; gap: 8px; }
+/* 科目切换：滑动指示器。三枚胶囊在视觉上分成三层——
+   ① 按钮自身的填充底色（非定位元素，画在最下）
+   ② .subject-thumb（绝对定位，横穿时盖住经过胶囊的底色）
+   ③ .subject-tab > span 文字层（抬到滑块之上，滑动全程三个科目名都可读）
+   这样滑块可以整段滑过顶栏，而不会把经过的科目文字压掉或出现"挖洞"感。 */
+.subject-tabs { position: relative; display: flex; flex: 0 0 auto; gap: 8px; }
+
+.subject-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;            /* 明确的分层：按钮填充（静态，z 0）< 滑块 1 < 科目文字 2 */
+  height: 40px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  pointer-events: none;
+  will-change: transform, width;
+  transition: transform var(--seg-duration) var(--seg-ease), width var(--seg-duration) var(--seg-ease);
+}
+
+/* 初始化 / 断点变化 / 字体替换后重新落位：滑块即时就位，不做横穿动画 */
+.subject-tabs.is-instant .subject-thumb { transition: none; }
 
 /* 科目字体（与面板标题一致）：加粗放大，三科统一；默认填充胶囊，均带透明描边占位。
    padding 上 8 下 6：CJK 字形墨迹偏上，视觉重心下移 1px 补偿（盒高仍 40px） */
@@ -786,14 +824,28 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   height: 40px;
   padding: 6px 12px 8px;   /* 上 6 下 8：文本重心上移 1px（盒高仍 40px） */
   border: 1.5px solid transparent;
-  transition: background-color 140ms ease-out, color 140ms ease-out, border-color 140ms ease-out;
+  transition: color 140ms ease-out;
 }
 
-/* 选中科目 = 描边胶囊（参考图）：底色与顶栏同色，仅以描边与相邻填充胶囊区分 */
-.subject-tab.is-active {
-  background: var(--bg);
-  border-color: var(--line-strong);
+/* 科目文字层：抬到滑块之上 */
+.subject-tab > span { position: relative; z-index: 2; }
+
+/* 选中科目 = 描边胶囊（参考图）：底色与顶栏同色、以描边与相邻填充胶囊区分——
+   现在这枚胶囊由 .subject-thumb 提供，按钮自身不再画底色/描边，避免出现两套指示器。
+   选择器带 .subject-tabs 前缀是为了压过浅色主题里 `:root[data-theme="light"] .subject-tab` 的描边规则 */
+.subject-tabs .subject-tab.is-active {
+  background: transparent;
+  border-color: transparent;
   color: var(--ink);
+}
+
+/* 减少动效：科目滑块与数字/模拟滑块一律不滑动（只保留文字色变化）。
+   这一块必须排在 .subject-thumb / .kind-switch-button 基础规则之后——两者同权重，
+   靠源码顺序取胜；放在文件上方会被后面的基础规则覆盖掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .subject-thumb { transition: none; }
+  .subject-tab,
+  .kind-switch-button { transition: color 140ms ease-out; }
 }
 
 /* 右侧功能按钮：胶囊形（图二风格） */
@@ -1569,7 +1621,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     min-height: 0;
   }
 
+  /* 画布钉在最后一行（弹性行）。中间那行提示 <p> 被上面的规则隐藏后不参与自动排布，
+     画布原本会被排进 auto 行、按 viewBox 的 5:3 固有比例定高（1150×982 实测 706×423.5），
+     而弹性行空着 → 面板底部剩下一整条"看着像画布、实际不可交互"的死区（245px）。
+     占满弹性行后，画布宽高比交给面板；bundle 的 ResizeObserver 会据此重算视图矩形与网格，
+     于是无论怎么缩放，网格与有效坐标始终铺满整块画布——缩放只改变可见的平面范围。 */
   .workbench-root .cw-canvas {
+    grid-row: 3 / -1;
     height: 100%;
     min-height: 0;
     max-height: none;
@@ -1892,6 +1950,134 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .workbench-root .cw-canvas-toolbar button[aria-pressed] { border-radius: 999px; }
 .workbench-root .cw-canvas-toolbar button[aria-pressed="true"] { background: var(--bg); color: var(--ink); border-color: var(--ink-faint); }
 .workbench-root .cw-canvas-toolbar { padding: 10px 12px; gap: 10px; }
+
+/* 连线 / 探针 两个等宽分段（各 66×32，容器 = 两段 + 4px 间隙）做成滑动胶囊：
+   与顶栏科目、工作台数字/模拟同一套观感（描边 + 页面底色 + 共用动效 token）。
+   滑块用「容器伪元素 + :has() 判定选中项」实现，纯 CSS，不往 React 管理的 DOM 里插节点。 */
+.workbench-root .cw-canvas-toolbar > div:first-child { position: relative; }
+
+.workbench-root .cw-canvas-toolbar > div:first-child::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;   /* 伪元素不受全局 * 选择器影响：不写会变 content-box，位移百分比多算 3px 边框 */
+  width: calc(50% - 2px);
+  height: 100%;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 999px;
+  background: var(--bg);
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform var(--seg-duration) var(--seg-ease);
+}
+
+/* 选中第二段（探针）：位移 = 自身宽度 + 4px 间隙 */
+.workbench-root .cw-canvas-toolbar > div:first-child:has(> button:nth-child(2).is-active)::before,
+.workbench-root .cw-canvas-toolbar > div:first-child:has(> button:nth-child(2)[aria-pressed="true"])::before {
+  transform: translateX(calc(100% + 4px));
+}
+
+/* 两段自身不再画底色/描边（胶囊由滑块提供），文字抬到滑块之上 */
+.workbench-root .cw-canvas-toolbar > div:first-child > button {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+
+.workbench-root .cw-canvas-toolbar > div:first-child > button.is-active,
+.workbench-root .cw-canvas-toolbar > div:first-child > button[aria-pressed="true"] { color: var(--ink); }
+
+.workbench-root .cw-canvas-toolbar > div:first-child > button:not(:disabled):hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink);
+}
+
+/* 缩放控件只保留百分比读数（点它 = 回到 100% 并把平移一并归零）。
+   逐步缩放的 − / + 按钮隐藏：滚轮已经取代它们，且两者共用同一条路径
+   （app.js 的滚轮处理就是点这两个按钮），所以缩放的上下限照旧生效。 */
+.workbench-root .cw-zoom-controls button[aria-label="缩小"],
+.workbench-root .cw-zoom-controls button[aria-label="放大"] { display: none; }
+
+/* 画布中心提示：bundle 把它画成 SVG <text>（16 用户单位），会随缩放一起变小、
+   并直接压在网格线上。这里隐藏原文字，改用固定字号的 HTML 胶囊浮层
+   （底色 + 描边 + 背景模糊，与网格有隔离；字号不随缩放变化）。
+   显示条件仍完全跟随 bundle 的 .cw-empty-canvas（见 app.js syncCanvasEmptyHint）。 */
+.workbench-root .cw-empty-canvas { display: none; }
+
+.canvas-empty-hint {
+  position: fixed;
+  z-index: 6;
+  margin: 0;                /* 绝对/固定定位的 top/left 对齐的是外边距边：不清零会被 p 的默认外边距顶下去 */
+  max-width: min(88vw, 420px);
+  padding: 9px 15px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  backdrop-filter: blur(7px);
+  color: var(--ink-soft);
+  font-size: .78rem;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.canvas-empty-hint.is-visible { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-empty-hint { transition: none; }
+}
+
+/* ===== 画布元件的选中反馈（拖动交互见 app.js 的"画布元件交互"一段） =====
+   光标沿用 bundle 的 grab / grabbing（元件可抓取），单击即选中并保持。
+   中键平移画布时，整块画布显示抓取中的光标。 */
+body.is-canvas-panning .workbench-root .cw-canvas { cursor: grabbing; }
+
+/* 选中效果只保留一个：bundle 的 .is-selected 是实线 3px，而 :focus-visible 会再叠一圈
+   虚线 2px（鼠标点选后组件同时获得焦点时两圈并存）。这里在选中态下取消虚线，
+   只留实线胶囊；未选中但键盘聚焦时仍有虚线框，键盘可达性不受影响。
+   outline 一并清掉：Chrome 会给 tabindex 的 SVG 元素额外画一圈 UA 焦点环，那也是"第二个效果"。 */
+.workbench-root .cw-component:focus { outline: none; }
+
+.workbench-root .cw-component.is-selected > rect {
+  stroke-dasharray: none;
+  stroke-width: 3;
+  /* 单圈的强化：选中元件带一层很轻的主色光晕，一眼可辨但不产生第二套轮廓 */
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+/* 画布工具栏的提示文字（"N 条连线 · 点击两个端口连线；双击连线删除"）：
+   它在 flex 行里是唯一可变宽的项目，而中文的 min-content 只有一个字宽，
+   于是窗口收窄时会被压成"一字一列"的竖排（940px 下实测 27×188，工具栏被撑到 251px 高）。
+   这里按"够宽就同行、不够就换到独立整行、任何时候都不竖排"处理：
+   flex-basis:auto 让它在有富余时按整句宽度同行显示；min-width 设成约一整句的宽度，
+   低于这个值就交给 flex-wrap 换行（换行后 flex-grow 会把它拉满整行、居中显示）。 */
+.workbench-root .cw-canvas-toolbar > span {
+  flex: 1 1 auto;
+  min-width: 24em;          /* ≈整句的宽度：低于它就换到独立整行，而不是用省略号把话截断 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 工具栏不够宽时，让"提示文字"先让位，而不是把按钮挤到第二行：
+   提示在 DOM 里排在变换按钮与缩放按钮之间，所以空间不足时是它后面的缩放/删除被挤下去。
+   在放不下"按钮整排（约 431px）+ 整句提示（约 265px）"的宽度区间里，把提示排到最后
+   （order 5）—— 按钮先占满第一行；提示若能同行就落在行尾，放不下就整块换到第二行。
+   面板宽度 ≈ 视口 − 444，临界点约 1240px（更宽时提示留在中间同行，原样不变）。 */
+@media (min-width: 901px) and (max-width: 1240px) {
+  .workbench-root .cw-canvas-toolbar > span { order: 5; }
+}
 .workbench-root .cw-meter-grid > div,
 .workbench-root .cw-live-values > div { border-radius: 10px; background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) {

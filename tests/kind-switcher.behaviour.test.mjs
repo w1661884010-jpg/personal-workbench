@@ -62,13 +62,33 @@ function sessionState(page, kind) {
 }
 
 function switcherState(page) {
-  return page.evaluate(() => ({
-    thumb: document.querySelector(".kind-thumb").style.transform,
-    dSel: document.querySelector("#kindTabDigital").getAttribute("aria-selected"),
-    aSel: document.querySelector("#kindTabAnalog").getAttribute("aria-selected"),
-    dTab: document.querySelector("#kindTabDigital").getAttribute("tabindex"),
-    aTab: document.querySelector("#kindTabAnalog").getAttribute("tabindex"),
-  }));
+  return page.evaluate(() => {
+    const thumb = document.querySelector(".kind-thumb");
+    const segments = {
+      digital: document.querySelector("#kindTabDigital"),
+      analog: document.querySelector("#kindTabAnalog"),
+    };
+    const box = (el) => {
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+    };
+    const thumbBox = box(thumb);
+    /* 按几何判定滑块压在哪一格上：不依赖 transform 的写法（百分比 / px / matrix 都可） */
+    const onSegment = Object.entries(segments).find(([, el]) => {
+      const b = box(el);
+      return Math.abs(b.x - thumbBox.x) <= 2 && Math.abs(b.y - thumbBox.y) <= 2
+        && Math.abs(b.w - thumbBox.w) <= 2 && Math.abs(b.h - thumbBox.h) <= 2;
+    });
+    return {
+      thumb: thumb.style.transform,
+      thumbOn: onSegment ? onSegment[0] : "off",
+      thumbBox,
+      dSel: document.querySelector("#kindTabDigital").getAttribute("aria-selected"),
+      aSel: document.querySelector("#kindTabAnalog").getAttribute("aria-selected"),
+      dTab: document.querySelector("#kindTabDigital").getAttribute("tabindex"),
+      aTab: document.querySelector("#kindTabAnalog").getAttribute("tabindex"),
+    };
+  });
 }
 
 test("instrument bridge must not change toolbar geometry during entry or switching", async () => {
@@ -228,7 +248,7 @@ test("mount failure keeps content and rolls back slider, aria and retry succeeds
   assert.equal(d.hidden, false, "digital content preserved after failure");
   assert.equal(d.opacity, "1");
   assert.equal(a.hidden, true, "failed target stays hidden");
-  assert.equal(ui.thumb, "translateY(0px)", "thumb rolled back to digital");
+  assert.equal(ui.thumbOn, "digital", "thumb rolled back to digital");
   assert.equal(ui.dSel, "true");
   assert.equal(ui.aSel, "false");
 
@@ -243,7 +263,7 @@ test("mount failure keeps content and rolls back slider, aria and retry succeeds
     { timeout: 4000 },
   );
   const ui2 = await switcherState(page);
-  assert.equal(ui2.thumb, "translateY(100%)");
+  assert.equal(ui2.thumbOn, "analog");
   assert.equal(ui2.aSel, "true");
   await page.close();
 });
@@ -266,7 +286,7 @@ test("rapid switching settles on the last choice with no half-faded residue", as
   assert.equal(a.hidden, true);
   assert.ok(!d.className.includes("cw-switching"), "no lingering transition class");
   assert.ok(!a.className.includes("cw-switching"), "no lingering transition class on the hidden panel");
-  assert.equal(ui.thumb, "translateY(0px)");
+  assert.equal(ui.thumbOn, "digital");
   assert.equal(ui.dSel, "true");
   assert.equal(ui.aSel, "false");
   await page.close();
@@ -315,7 +335,7 @@ test("Enter, Space, arrows, Home and End switch instantly", async () => {
     const ui = await switcherState(page);
     assert.equal(state.hidden, false, `${key} shows ${after}`);
     assert.equal(state.opacity, "1", `${key} completes within 40ms (instant)`);
-    assert.equal(ui.thumb, after === "analog" ? "translateY(100%)" : "translateY(0px)");
+    assert.equal(ui.thumbOn, after);
   };
 
   await page.evaluate(() => document.querySelector("#kindTabDigital").focus());
@@ -428,7 +448,7 @@ test("during transition old panel is inert but the switcher stays responsive", a
   assert.equal(d.hidden, false, "switcher click during transition takes effect");
   assert.equal(d.opacity, "1");
   assert.equal(d.inert, false, "settled panel is interactive");
-  assert.equal(ui.thumb, "translateY(0px)");
+  assert.equal(ui.thumbOn, "digital");
   await page.close();
 });
 
@@ -438,9 +458,13 @@ test("session state (probe mode, zoom) survives a kind round-trip", async () => 
 
   const probeBtn = page.locator('.cw-canvas-toolbar button', { hasText: "探针模式" });
   await probeBtn.click();
-  const zoomIn = page.locator('.cw-canvas-toolbar button[aria-label="放大"]');
-  await zoomIn.click();
-  await zoomIn.click();
+  /* 缩放入口已统一为滚轮（−/+ 按钮已隐藏）：在画布上向上滚两格 = 放大到 120% */
+  const canvasBox = await page.locator(".cw-canvas:visible").boundingBox();
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  for (let step = 0; step < 2; step += 1) {
+    await page.mouse.wheel(0, -120);
+    await page.waitForTimeout(120);
+  }
   await page.waitForTimeout(80);
 
   const readState = () =>

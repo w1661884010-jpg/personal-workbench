@@ -35,6 +35,8 @@
   var topbar = document.getElementById("topbar");
   var themeToggle = document.getElementById("themeToggle");
   var subjectTabs = Array.prototype.slice.call(document.querySelectorAll(".subject-tab"));
+  var subjectTabsNav = document.getElementById("subjectTabs");
+  var subjectThumb = document.getElementById("subjectThumb");
   var chapterList = document.getElementById("chapterList");
   var panelTitle = document.getElementById("chapterPanelTitle");
   var lessonTitle = document.getElementById("lessonTitle");
@@ -832,8 +834,9 @@
       currentSubject = target;
       currentChapter = chapterId || subjects[currentSubject].current;
       subjectTabs.forEach(function (other) {
-        other.classList.toggle("is-active", other.dataset.subject === target);
+        if (other.dataset.subject === target) selectSubjectTab(other);
       });
+      syncSubjectThumb();
       renderChapters();
       if (panelCollapsed) renderChapterRail();
       lesson.style.opacity = 1;
@@ -851,9 +854,425 @@
       /* 工作台打开时点科目 = 退工作台（即使目标就是当前科目） */
       if (activeWorkbench && typeof setView === "function") setView(null);
       if (target === currentSubject) return;
+      /* 指示器先行：先落选中态并让滑块起步，正文 150ms 淡出后到位（避免"内容换了滑块才追"） */
+      selectSubjectTab(tab);
+      syncSubjectThumb();
       switchSubject(target, null);
     });
   });
+
+  /* 选中态只在这里改，滑块与按钮状态始终同源 */
+  function selectSubjectTab(tab) {
+    if (!tab) return;
+    subjectTabs.forEach(function (other) {
+      other.classList.toggle("is-active", other === tab);
+    });
+  }
+
+  /* 科目滑块：只吃 transform 与 width 两件事，位置/宽度全部现场测量。
+     因此不依赖 transitionend 之类的动画事件——快速连点或中途打断时，
+     下一次测量直接把滑块落到最终位置（轨迹自然接管，不需要清理）。 */
+  function syncSubjectThumb(instant) {
+    if (!subjectThumb) return;
+    var active = null;
+    for (var i = 0; i < subjectTabs.length; i += 1) {
+      if (subjectTabs[i].classList.contains("is-active")) { active = subjectTabs[i]; break; }
+    }
+    if (!active) return;
+    if (instant) subjectTabsNav.classList.add("is-instant");
+    subjectThumb.style.width = active.offsetWidth + "px";
+    subjectThumb.style.transform = "translateX(" + active.offsetLeft + "px)";
+    if (instant) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { subjectTabsNav.classList.remove("is-instant"); });
+      });
+    }
+  }
+
+  /* 尺寸变化（窗口/断点/字体替换）后，两块分段控件都按当前选中项重新落位：
+     科目滑块与工作台切换器共用这一条通路，不做动画，避免横着飞一段 */
+  var segmentThumbRaf = 0;
+  function resyncSegmentThumbs() {
+    if (segmentThumbRaf) cancelAnimationFrame(segmentThumbRaf);
+    segmentThumbRaf = requestAnimationFrame(function () {
+      segmentThumbRaf = 0;
+      syncSubjectThumb(true);
+      /* 工作台未打开时切换器是隐藏的（测量值为 0），此时不落位 */
+      if (typeof isCircuitWorkbench === "function" && isCircuitWorkbench(activeWorkbench)) syncKindSwitcher(true);
+      scheduleCanvasEmptyHint();
+    });
+  }
+  window.addEventListener("resize", resyncSegmentThumbs);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(resyncSegmentThumbs);
+
+  /* 画布中心提示：文字内容与显示条件都跟着 bundle 的 .cw-empty-canvas 走
+     （空画布时才渲染），但改用固定字号的 HTML 胶囊浮层呈现：不随缩放变小，
+     底色/描边把它与网格隔离开。浮层挂在 body 上（不在 React 管理的子树里）。 */
+  var canvasEmptyHint = null;
+  var canvasHintRaf = 0;
+  var observedCanvas = null;
+  /* 画布尺寸会随面板、断点、缩放与 bundle 自身的 ResizeObserver 变化：
+     盯住画布元素本身，尺寸一变就把浮层重新居中。 */
+  var canvasResizeObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(function () { scheduleCanvasEmptyHint(); })
+    : null;
+
+  function syncCanvasEmptyHint() {
+    if (!canvasEmptyHint) {
+      canvasEmptyHint = document.createElement("p");
+      canvasEmptyHint.className = "canvas-empty-hint";
+      canvasEmptyHint.setAttribute("role", "status");
+      document.body.appendChild(canvasEmptyHint);
+    }
+    var canvas = document.querySelector(".workbench-stage:not([hidden]) .cw-canvas");
+    if (canvasResizeObserver && canvas && canvas !== observedCanvas) {
+      if (observedCanvas) canvasResizeObserver.unobserve(observedCanvas);
+      canvasResizeObserver.observe(canvas);
+      observedCanvas = canvas;
+    }
+    /* bundle 只在"画布上没有元件"时才渲染 .cw-empty-canvas 这个节点，所以判断它是否存在即可；
+       它自身被 CSS 隐藏（display:none），不能再拿它的 display 当条件。 */
+    var source = canvas ? canvas.querySelector(".cw-empty-canvas") : null;
+    if (!source) {
+      canvasEmptyHint.classList.remove("is-visible");
+      return;
+    }
+    if (canvasEmptyHint.textContent !== source.textContent) canvasEmptyHint.textContent = source.textContent;
+    var rect = canvas.getBoundingClientRect();
+    canvasEmptyHint.style.left = Math.round(rect.left + rect.width / 2) + "px";
+    canvasEmptyHint.style.top = Math.round(rect.top + rect.height / 2) + "px";
+    canvasEmptyHint.classList.add("is-visible");
+  }
+
+  /* 画布元件交互（bundle 里是"双击选中、按下即拖动"，这里补三件事）：
+       · 单击 = 选中并保持：抬起时若元件没被真正移动过，就补发一次 dblclick
+         （bundle 的选中入口正挂在 dblclick 上）；
+       · 按下后 4px 死区：手指抖动不会挪动元件，一旦超过就立即放行 —— 拖动没有任何
+         时间门槛，快速拖动同样跟手（真实 pointerdown 已让 bundle 记下锚点，
+         放行后是 1:1 跟随，不会跳）；
+       · 拖动期间自己判定重叠：bundle 的 ta() 在位置重叠时会做 24 单位环状搜索，
+         指针每动一下环序就变，元件于是反复回弹。这里用同一套 AABB + 20 间隔判定，
+         只把"不与任何元件重叠"的位置放给它（贴住时沿墙滑动，滑不动就停住），
+         ta() 因此永远走 free 分支，环状搜索不再触发。
+     只拦 pointermove 的传播，不 preventDefault：焦点、click、端口连线都不受影响。 */
+  var DRAG_START_DISTANCE = 4;   /* 超过这个累计位移就认为用户在拖，立刻放行 */
+  var CLICK_MAX_DISTANCE = 8;    /* 抬起时位移不超过这里，按"单击选中"处理 */
+  var COMPONENT_GAP = 20;        /* 与 bundle 的 ch 常数一致（每个盒各外扩一半） */
+  var press = null;
+
+  function componentFromEvent(event) {
+    var target = event.target;
+    if (!target || typeof target.closest !== "function") return null;
+    if (target.closest("[data-port]")) return null;   /* 端口的点击归 bundle（连线） */
+    return target.closest(".cw-component");
+  }
+
+  function selectComponent(component) {
+    component.dispatchEvent(new MouseEvent("dblclick", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      detail: 2,
+    }));
+  }
+
+  /* 元件的逻辑坐标盒：rect 的 x/y/width/height 就是 bundle 的 AABB（已含旋转后的宽高互换） */
+  function componentBox(element) {
+    var rect = element.querySelector(":scope > rect");
+    if (!rect) return null;
+    return {
+      x: rect.x.baseVal.value,
+      y: rect.y.baseVal.value,
+      width: rect.width.baseVal.value,
+      height: rect.height.baseVal.value,
+    };
+  }
+
+  function toLogicalPoint(svg, clientX, clientY) {
+    return new DOMPoint(clientX, clientY).matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  function toClientPoint(svg, x, y) {
+    return new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
+  }
+
+  function overlapsOther(cx, cy, size, other, gap) {
+    var half = gap / 2;
+    var left = cx - size.width / 2 - half;
+    var right = cx + size.width / 2 + half;
+    var top = cy - size.height / 2 - half;
+    var bottom = cy + size.height / 2 + half;
+    return left < other.x + other.width + half
+      && right > other.x - half
+      && top < other.y + other.height + half
+      && bottom > other.y - half;
+  }
+
+  function positionIsFree(state, x, y) {
+    for (var i = 0; i < state.others.length; i += 1) {
+      if (overlapsOther(x, y, state.size, state.others[i], COMPONENT_GAP)) return false;
+    }
+    return true;
+  }
+
+  /* 拖动真正开始时采集几何：元件尺寸、按下点的锚点偏移、其他元件的盒 */
+  function beginDrag(state) {
+    var svg = document.querySelector(".workbench-stage:not([hidden]) .cw-canvas");
+    var own = state.component && componentBox(state.component);
+    if (!svg || !svg.getScreenCTM || !own) return false;
+    var center = { x: own.x + own.width / 2, y: own.y + own.height / 2 };
+    var start = toLogicalPoint(svg, state.startX, state.startY);
+    state.canvas = svg;
+    state.size = { width: own.width, height: own.height };
+    state.offset = { x: start.x - center.x, y: start.y - center.y };
+    state.last = center;
+    state.others = Array.prototype.slice
+      .call(svg.querySelectorAll(".cw-component"))
+      .filter(function (node) { return node !== state.component; })
+      .map(componentBox)
+      .filter(Boolean);
+    return true;
+  }
+
+  /* 沿墙滑动：用合成 pointermove 把元件送到"保持一个轴不动"的位置（合成的只有 move，
+     不会碰到 bundle 的 setPointerCapture，所以是安全的） */
+  function slideTo(state, position) {
+    var client = toClientPoint(state.canvas, position.x + state.offset.x, position.y + state.offset.y);
+    state.applying = true;
+    state.canvas.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      pointerId: state.pointerId,
+      pointerType: state.pointerType || "mouse",
+      isPrimary: true,
+      button: -1,
+      buttons: 1,
+      clientX: client.x,
+      clientY: client.y,
+    }));
+    state.applying = false;
+  }
+
+  document.addEventListener("pointerdown", function (event) {
+    if (!event.isPrimary || event.button !== 0) return;
+    var component = componentFromEvent(event);
+    if (!component) return;
+    press = {
+      component: component,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: 0,
+      dragging: false,
+      unchecked: false,
+    };
+  }, true);
+
+  document.addEventListener("pointermove", function (event) {
+    if (!press || event.pointerId !== press.pointerId) return;
+    if (press.applying) return;                                  /* 自己合成的滑动事件 */
+    var distance = Math.abs(event.clientX - press.startX) + Math.abs(event.clientY - press.startY);
+    if (distance > press.moved) press.moved = distance;
+    if (!press.dragging) {
+      if (press.moved <= DRAG_START_DISTANCE) { event.stopPropagation(); return; }
+      press.dragging = true;
+      /* 量不到几何（理论上不会）就退化为原样放行，绝不因为过滤而卡住拖动 */
+      press.unchecked = !beginDrag(press);
+    }
+    if (press.unchecked) return;
+
+    var pointer = toLogicalPoint(press.canvas, event.clientX, event.clientY);
+    var desired = { x: pointer.x - press.offset.x, y: pointer.y - press.offset.y };
+    if (positionIsFree(press, desired.x, desired.y)) {
+      press.last = desired;
+      return;                                                    /* 空位：照常交给 bundle */
+    }
+    /* 被邻居挡住：先按主要移动方向尝试沿墙滑动，滑不动就停在原地（不喂重叠位置） */
+    var dx = desired.x - press.last.x;
+    var dy = desired.y - press.last.y;
+    var slides = Math.abs(dx) >= Math.abs(dy)
+      ? [{ x: desired.x, y: press.last.y }, { x: press.last.x, y: desired.y }]
+      : [{ x: press.last.x, y: desired.y }, { x: desired.x, y: press.last.y }];
+    for (var i = 0; i < slides.length; i += 1) {
+      if (slides[i].x === press.last.x && slides[i].y === press.last.y) continue;
+      if (positionIsFree(press, slides[i].x, slides[i].y)) {
+        event.stopPropagation();
+        slideTo(press, slides[i]);
+        press.last = slides[i];
+        return;
+      }
+    }
+    event.stopPropagation();
+  }, true);
+
+  document.addEventListener("pointerup", function (event) {
+    if (!press || event.pointerId !== press.pointerId) return;
+    var state = press;
+    press = null;
+    /* 没有真正移动过（单击，或按下后只抖了几像素）就按单击处理：选中并保持 */
+    if (!state.dragging && state.moved <= CLICK_MAX_DISTANCE) selectComponent(state.component);
+  }, true);
+
+  document.addEventListener("pointercancel", function (event) {
+    if (press && event.pointerId === press.pointerId) press = null;
+  }, true);
+
+  /* ===== 画布缩放与平移 =====
+     滚轮：bundle 只认 Ctrl/⌘+滚轮（每次 10% 步进）。这里把普通滚轮也接过来 ——
+       拦掉页面滚动，然后点它自己的"放大/缩小"按钮（走官方路径，避免被动监听器里
+       preventDefault 的告警，也自动尊重缩放的上下限）。
+     中键拖动：bundle 的视图矩形是以基准画布为中心的（没有平移量），所以在最外层叠加
+       一个平移量：把 viewBox 与"网格矩形"一起平移。网格矩形就是可见有效区域，
+       跟着一起走，画布上不会露出没有网格、点不到的空带；
+       坐标换算走 getScreenCTM()，所以平移后落点/拖动依然精确。 */
+  var pan = { x: 0, y: 0 };
+  var panApplied = { svg: null, base: null, viewBox: null };
+  var middleDrag = null;
+  var wheelAccum = 0;
+  var wheelStepAt = 0;
+  var WHEEL_STEP_DELTA = 24;   /* 累计滚动量达到这个值走一步（兼容触控板的小 delta） */
+  var WHEEL_STEP_MS = 90;
+
+  function activeCanvas() {
+    return document.querySelector(".workbench-stage:not([hidden]) .cw-canvas");
+  }
+
+  /* 把平移量叠加到 viewBox 与网格矩形上；React 重写基准后（缩放/尺寸变化）会自动重算 */
+  function syncPan() {
+    var svg = activeCanvas();
+    if (!svg) return;
+    if (panObserver && svg !== panApplied.svg) {
+      if (panApplied.svg) panObserver.disconnect();
+      panObserver.observe(svg, { subtree: true, attributes: true, attributeFilter: ["viewBox", "x", "y", "width", "height"] });
+      panApplied.svg = svg;
+      panApplied.base = null;
+      panApplied.viewBox = null;
+    }
+    var current = svg.getAttribute("viewBox");
+    if (!current) return;
+    if (current !== panApplied.viewBox) panApplied.base = current.split(/\s+/).map(Number);
+    var base = panApplied.base;
+    if (!base || base.length !== 4) return;
+
+    var next = (base[0] - pan.x) + " " + (base[1] - pan.y) + " " + base[2] + " " + base[3];
+    if (current !== next) {
+      panApplied.viewBox = next;
+      svg.setAttribute("viewBox", next);
+    }
+    var grid = svg.querySelector('rect[fill^="url(#cw-grid"]');
+    if (grid) {
+      var gx = String(base[0] - pan.x);
+      var gy = String(base[1] - pan.y);
+      if (grid.getAttribute("x") !== gx) grid.setAttribute("x", gx);
+      if (grid.getAttribute("y") !== gy) grid.setAttribute("y", gy);
+    }
+  }
+
+  var panObserver = typeof MutationObserver === "function"
+    ? new MutationObserver(function () { syncPan(); })
+    : null;
+
+  function unitsPerPixel(svg) {
+    var box = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    var width = svg.getBoundingClientRect().width;
+    return width > 0 ? box[2] / width : 1;
+  }
+
+  document.addEventListener("wheel", function (event) {
+    var svg = activeCanvas();
+    if (!svg || !event.target || typeof svg.contains !== "function" || !svg.contains(event.target)) return;
+    /* 画布上的滚轮统一由这里处理（含 Ctrl/⌘+滚轮这个旧手势）：拦下页面滚动，
+       也不让 bundle 自己那条 Ctrl/⌘ 分支再插一手，缩放入口只剩这一个。 */
+    event.preventDefault();
+    event.stopPropagation();
+    var now = Date.now();
+    wheelAccum += event.deltaY;
+    if (Math.abs(wheelAccum) < WHEEL_STEP_DELTA) return;
+    if (now - wheelStepAt < WHEEL_STEP_MS) return;
+    var zoomOut = wheelAccum > 0;
+    wheelAccum = 0;
+    wheelStepAt = now;
+    var panel = svg.closest(".cw-canvas-panel");
+    var button = panel && panel.querySelector(zoomOut ? '.cw-zoom-controls button[aria-label="缩小"]' : '.cw-zoom-controls button[aria-label="放大"]');
+    if (button && !button.disabled) button.click();         /* 走 bundle 自己的缩放入口 */
+  }, { capture: true, passive: false });
+
+  document.addEventListener("pointerdown", function (event) {
+    if (event.button !== 1) return;
+    var svg = activeCanvas();
+    if (!svg || !event.target || typeof svg.contains !== "function" || !svg.contains(event.target)) return;
+    event.preventDefault();                                /* 阻止中键的自动滚动 */
+    middleDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, svg: svg };
+    document.body.classList.add("is-canvas-panning");
+  }, true);
+
+  document.addEventListener("pointermove", function (event) {
+    if (!middleDrag || event.pointerId !== middleDrag.pointerId) return;
+    event.preventDefault();
+    var scale = unitsPerPixel(middleDrag.svg);
+    pan.x += (event.clientX - middleDrag.x) * scale;
+    pan.y += (event.clientY - middleDrag.y) * scale;
+    /* 限位：最多把基准区域的边推到视图中心，避免一拖就迷失 */
+    var base = panApplied.base;
+    if (base && base.length === 4) {
+      var maxX = base[2] / 2;
+      var maxY = base[3] / 2;
+      pan.x = Math.max(-maxX, Math.min(maxX, pan.x));
+      pan.y = Math.max(-maxY, Math.min(maxY, pan.y));
+    }
+    middleDrag.x = event.clientX;
+    middleDrag.y = event.clientY;
+    syncPan();
+  }, true);
+
+  document.addEventListener("pointerup", function (event) {
+    if (!middleDrag || event.pointerId !== middleDrag.pointerId) return;
+    middleDrag = null;
+    document.body.classList.remove("is-canvas-panning");
+  }, true);
+
+  /* 点"重置缩放"（100%）时把平移也归零，一键回到原点 */
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target || typeof target.closest !== "function") return;
+    var button = target.closest('.cw-zoom-controls button[aria-label="重置缩放"]');
+    if (!button) return;
+    pan.x = 0;
+    pan.y = 0;
+    syncPan();
+  }, true);
+
+  /* bundle 的可访问名写的是"双击选中"，交互改了以后跟着改，避免读屏拿到过期说明 */
+  function syncComponentAria() {
+    var nodes = document.querySelectorAll('.workbench-stage .cw-component[aria-label*="双击选中"]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      nodes[i].setAttribute("aria-label", nodes[i].getAttribute("aria-label").replace("双击选中", "单击选中"));
+    }
+  }
+
+  /* DOM 变动/滚动/尺寸变化后按帧节流统一同步（拖拽元件时会频繁触发，避免反复量布局） */
+  function scheduleCanvasEmptyHint() {
+    if (canvasHintRaf) return;
+    canvasHintRaf = requestAnimationFrame(function () {
+      canvasHintRaf = 0;
+      syncCanvasEmptyHint();
+      syncComponentAria();
+    });
+  }
+
+  window.addEventListener("scroll", scheduleCanvasEmptyHint, true);
+  var canvasHintHost = document.getElementById("workbenchStage");
+  if (canvasHintHost && typeof MutationObserver === "function") {
+    new MutationObserver(scheduleCanvasEmptyHint).observe(canvasHintHost, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["hidden", "class", "style"],
+    });
+  }
 
   /* ===== 全局搜索：移植自原站点（AppShell 的 .global-search + LearningWorkbench 的 searchResults/onSearchSelect） ===== */
   var searchInput = document.getElementById("globalSearchInput");
@@ -2537,6 +2956,10 @@
       }
       var entering = viewElement(wbKind);
       entering.offsetHeight;   /* 强制回流：透明度过渡在元素显示后才启动 */
+      /* 舞台此刻才真正参与布局：在这里再落一次工作台滑块（此前 hidden 状态下测量值全是 0），
+         并同步画布中心提示的位置 */
+      if (isCircuitWorkbench(wbKind)) syncKindSwitcher(true);
+      scheduleCanvasEmptyHint();
       entering.style.opacity = 1;
       if (wbKind === "notebook") {
         window.scrollTo({ top: 0, behavior: "auto" });
@@ -2586,18 +3009,32 @@
 
   function syncKindSwitcher(instant) {
     if (instant) kindSwitcher.classList.add("is-instant");
-    var activeKind = null;
+    var activeButton = null;
     kindSwitchButtons.forEach(function (button) {
       var active = button.dataset.kind === activeWorkbench;
-      if (active) activeKind = button.dataset.kind;
+      if (active) activeButton = button;
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
       button.setAttribute("tabindex", active ? "0" : "-1");
     });
-    /* 数字/模拟滑块方向随断点变化：≤820px 横向分段控件走 X 轴，桌面竖向气泡走 Y 轴。
-       写入时只保留当前选中态这一个 transform，跨断点后按新的方向重新计算，不互相覆盖。 */
-    var axis = window.matchMedia("(max-width: 820px)").matches ? "translateX" : "translateY";
-    kindThumb.style.transform = axis + "(" + (activeKind === "analog" ? "100%" : "0") + ")";
+    /* 与顶栏科目滑块同一套做法：位置与尺寸全部现场测量（不再假设"位移 = 滑块自身尺寸的 100%"）。
+       基准取首个分段的左上角，所以数字态依旧是 translate(0, 0)；切换器在断点间从竖向变横向时，
+       同一份代码按新几何重新落位，不需要按轴分支，也不互相覆盖。 */
+    var first = kindSwitchButtons[0];
+    var baseX = first ? first.offsetLeft : 0;
+    var baseY = first ? first.offsetTop : 0;
+    /* 切换器还没参与布局（在 hidden 的 stage 里）时测量值全是 0：这时不写死尺寸，
+       交回 CSS 兜底，等舞台显示后由 setView 再同步一次真正落位 */
+    var rendered = kindSwitcher.offsetParent !== null;
+    if (!rendered) {
+      kindThumb.style.removeProperty("width");
+      kindThumb.style.removeProperty("height");
+      kindThumb.style.removeProperty("transform");
+    } else if (activeButton) {
+      kindThumb.style.width = activeButton.offsetWidth + "px";
+      kindThumb.style.height = activeButton.offsetHeight + "px";
+      kindThumb.style.transform = "translate(" + (activeButton.offsetLeft - baseX) + "px, " + (activeButton.offsetTop - baseY) + "px)";
+    }
     if (instant) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () { kindSwitcher.classList.remove("is-instant"); });
@@ -2691,5 +3128,6 @@
     if (targetCourseId) switchSubject(targetCourseId, chapterId);
   }
 
+  syncSubjectThumb(true);   /* 首帧就按当前科目落位，不从 0 位置飞入 */
   renderChapters();
 })();

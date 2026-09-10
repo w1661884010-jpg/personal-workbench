@@ -170,8 +170,14 @@ test("D：重新进入工作台——切换器正常显示、数字/模拟切换
     await page.evaluate(() => document.querySelector('.kind-switch-button[data-kind="analog"]').dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
     await page.waitForSelector('.prototype-workbench-session[data-kind="analog"] .circuit-workbench', { state: "visible", timeout: 8000 });
     await page.waitForTimeout(400);
-    const tr = await page.evaluate(() => document.querySelector(".kind-thumb").style.transform);
-    assert.match(tr, /translateX\(100%\)/, `模拟态滑块应横向位移（实际 ${tr}）`);
+    /* 动画路径切换：数字 → 模拟，thumb 应落到模拟分段上（按几何判定，写法无关） */
+    const tr = await page.evaluate(() => {
+      const thumb = document.querySelector(".kind-thumb").getBoundingClientRect();
+      const seg = document.querySelector("#kindTabAnalog").getBoundingClientRect();
+      return Math.abs(thumb.x - seg.x) <= 2 && Math.abs(thumb.y - seg.y) <= 2
+        && Math.abs(thumb.width - seg.width) <= 2 && Math.abs(thumb.height - seg.height) <= 2;
+    });
+    assert.equal(tr, true, "模拟态滑块应落在模拟分段上");
   } finally { await page.context().close(); }
 });
 

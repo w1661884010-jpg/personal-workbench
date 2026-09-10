@@ -59,7 +59,10 @@ test("the kind switcher is one shared sliding track with fixed labels", async ()
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="digital"[^>]*aria-controls="workbenchPanelDigital"/);
   assert.match(html, /class="kind-switch-button" role="tab" data-kind="analog"[^>]*aria-controls="workbenchPanelAnalog"/);
   assert.match(styles, /\.kind-switcher\s*\{[\s\S]{0,260}width:\s*64px/, "vertical independent bubble overlays the reserved card slot");
-  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,380}transform:\s*translateY\(0\);[\s\S]{0,160}transition:\s*transform 180ms cubic-bezier\(\.22, 1, \.36, 1\)/);
+  assert.match(styles, /:root\s*\{[\s\S]{0,900}--seg-duration:\s*240ms;[\s\S]{0,120}--seg-ease:\s*cubic-bezier\(/, "the segmented-control motion tokens are declared once");
+  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,700}transform:\s*translate\(0, 0\);[\s\S]{0,260}transition:\s*transform var\(--seg-duration\) var\(--seg-ease\),\s*width var\(--seg-duration\) var\(--seg-ease\)/, "the thumb slides and resizes on the shared segmented-control tokens");
+  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,700}border:\s*1\.5px solid var\(--line-strong\)/, "the workbench thumb borrows the subject capsule look");
+  assert.match(styles, /\.kind-thumb\s*\{[\s\S]{0,700}background:\s*var\(--bg\)/, "the thumb is punched out of the switcher surface, same as the subject capsule");
   assert.doesNotMatch(styles, /\.kind-switch-button\.is-active\s*\{[\s\S]{0,80}background/, "active state must not repaint the label, only the thumb slides");
   assert.match(styles, /\.kind-switcher\.is-instant \.kind-thumb\s*\{\s*transition:\s*none;\s*\}/);
 });

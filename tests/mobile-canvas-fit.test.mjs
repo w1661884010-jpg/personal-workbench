@@ -34,7 +34,11 @@ for (const [width, height] of [[320, 740], [375, 852], [393, 852], [760, 1024], 
         }), true, '背景网格覆盖整个有效坐标范围');
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         if (width === 393 && kind === 'Digital') await page.locator('.cw-canvas-panel:visible').screenshot({ path: join(tmpdir(), 'mobile-canvas-fit-after.png') });
-        await page.locator('.cw-canvas-panel:visible').getByRole('button', { name: '放大', exact: true }).click();
+        /* 缩放入口已统一为滚轮（逐步缩放的 −/+ 按钮已隐藏）：在画布上向上滚一格 = 放大 10% */
+        const canvasBox = await svg.boundingBox();
+        await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+        await page.mouse.wheel(0, -120);
+        await page.waitForTimeout(250);
         assert.equal(await svg.evaluate(e => {
           const r = e.getBoundingClientRect(), v = e.viewBox.baseVal, m = e.getScreenCTM();
           return Math.abs(m.a * v.width - r.width) < 1 && Math.abs(m.d * v.height - r.height) < 1;
