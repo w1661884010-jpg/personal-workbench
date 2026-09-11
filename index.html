@@ -27,18 +27,22 @@
         <input id="globalSearchInput" type="search" placeholder="搜索课程、章节、知识讲解或实验" autocomplete="off" />
       </div>
       <nav class="topbar-actions" aria-label="功能入口">
-        <button id="workbenchToggle" type="button" class="tool-button workbench-button" data-tip="电路工作台：进入后切换数字与模拟电路">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 1.2v2M8 1.2v2M10.5 1.2v2M5.5 12.8v2M8 12.8v2M10.5 12.8v2M1.2 5.5h2M1.2 8h2M1.2 10.5h2M12.8 5.5h2M12.8 8h2M12.8 10.5h2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          <span>工作台</span>
-        </button>
-        <button id="practiceToggle" type="button" class="tool-button workbench-button" data-tip="实验演练：信号课实验的交互演示">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8c1.2-3.4 2.6-3.4 3.8 0s2.6 3.4 3.8 0 2.6-3.4 3.8 0 1.7 1.7 3.6 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          <span>演练</span>
-        </button>
-        <button id="mistakeToggle" type="button" class="tool-button" data-tip="错题：检验答错自动收录，可标记已掌握或移除">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
-          <span>错题</span>
-        </button>
+        <!-- 三个视图入口（工作台 / 演练 / 错题）共用一个滑动指示器；外观按钮在组外，不参与 -->
+        <div class="view-switch" id="viewSwitch">
+          <span class="view-thumb" id="viewThumb" aria-hidden="true"></span>
+          <button id="workbenchToggle" type="button" class="tool-button workbench-button" data-tip="电路工作台：进入后切换数字与模拟电路">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 1.2v2M8 1.2v2M10.5 1.2v2M5.5 12.8v2M8 12.8v2M10.5 12.8v2M1.2 5.5h2M1.2 8h2M1.2 10.5h2M12.8 5.5h2M12.8 8h2M12.8 10.5h2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span>工作台</span>
+          </button>
+          <button id="practiceToggle" type="button" class="tool-button workbench-button" data-tip="实验演练：信号课实验的交互演示">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8c1.2-3.4 2.6-3.4 3.8 0s2.6 3.4 3.8 0 2.6-3.4 3.8 0 1.7 1.7 3.6 1.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span>演练</span>
+          </button>
+          <button id="mistakeToggle" type="button" class="tool-button" data-tip="错题：检验答错自动收录，可标记已掌握或移除">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.8" r="0.8" fill="currentColor"/></svg>
+            <span>错题</span>
+          </button>
+        </div>
         <button type="button" class="tool-button" id="themeToggle" data-tip="外观模式：跟随系统。点击切换" aria-label="外观模式：跟随系统。点击切换">
           <span id="themeIcon" aria-hidden="true"></span>
           <span id="themeLabel">系统</span>

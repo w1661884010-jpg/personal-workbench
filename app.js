@@ -37,6 +37,8 @@
   var subjectTabs = Array.prototype.slice.call(document.querySelectorAll(".subject-tab"));
   var subjectTabsNav = document.getElementById("subjectTabs");
   var subjectThumb = document.getElementById("subjectThumb");
+  var viewSwitch = document.getElementById("viewSwitch");
+  var viewThumb = document.getElementById("viewThumb");
   var chapterList = document.getElementById("chapterList");
   var panelTitle = document.getElementById("chapterPanelTitle");
   var lessonTitle = document.getElementById("lessonTitle");
@@ -889,14 +891,40 @@
     }
   }
 
-  /* 尺寸变化（窗口/断点/字体替换）后，两块分段控件都按当前选中项重新落位：
-     科目滑块与工作台切换器共用这一条通路，不做动画，避免横着飞一段 */
+  /* 顶栏三个视图入口（工作台 / 演练 / 错题）的滑动指示器：
+     与科目滑块同一套做法 —— 位置与尺寸现场测量，不依赖动画事件；
+     三个都不选中（退回教材正文）时淡出，选中项变化时滑过去。 */
+  function syncViewThumb(instant) {
+    if (!viewSwitch || !viewThumb) return;
+    var buttons = [workbenchButton, practiceButton, mistakeButton];
+    var active = null;
+    for (var i = 0; i < buttons.length; i += 1) {
+      if (buttons[i] && buttons[i].classList.contains("is-active")) { active = buttons[i]; break; }
+    }
+    if (!active) {
+      viewSwitch.classList.remove("has-active");
+      return;
+    }
+    if (instant) viewSwitch.classList.add("is-instant");
+    viewThumb.style.width = active.offsetWidth + "px";
+    viewThumb.style.transform = "translateX(" + active.offsetLeft + "px)";
+    viewSwitch.classList.add("has-active");
+    if (instant) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { viewSwitch.classList.remove("is-instant"); });
+      });
+    }
+  }
+
+  /* 尺寸变化（窗口/断点/字体替换）后，各分段控件都按当前选中项重新落位：
+     科目滑块、工作台切换器、视图入口共用这一条通路，不做动画，避免横着飞一段 */
   var segmentThumbRaf = 0;
   function resyncSegmentThumbs() {
     if (segmentThumbRaf) cancelAnimationFrame(segmentThumbRaf);
     segmentThumbRaf = requestAnimationFrame(function () {
       segmentThumbRaf = 0;
       syncSubjectThumb(true);
+      syncViewThumb(true);
       /* 工作台未打开时切换器是隐藏的（测量值为 0），此时不落位 */
       if (typeof isCircuitWorkbench === "function" && isCircuitWorkbench(activeWorkbench)) syncKindSwitcher(true);
       scheduleCanvasEmptyHint();
@@ -2975,7 +3003,8 @@
     }, 150);
   }
 
-  /* 顶栏工作台/演练/错题按钮选中态：数字与模拟工作台共用一个入口；演练用 notebook 视图 */
+  /* 顶栏工作台/演练/错题按钮选中态：数字与模拟工作台共用一个入口；演练用 notebook 视图。
+     选中态一变，三个入口共用的滑动指示器就跟着滑动（三个都不选中时淡出）。 */
   function syncWorkbenchButton() {
     var active = isCircuitWorkbench(activeWorkbench);
     workbenchButton.classList.toggle("is-active", active);
@@ -2984,6 +3013,7 @@
     practiceButton.setAttribute("aria-pressed", activeWorkbench === "notebook" ? "true" : "false");
     mistakeButton.classList.toggle("is-active", activeWorkbench === "mistakes");
     mistakeButton.setAttribute("aria-pressed", activeWorkbench === "mistakes" ? "true" : "false");
+    syncViewThumb();
   }
 
   /* 工作台内部类型切换：滑块立即动，内容过渡由 bundle 管理；
@@ -3129,5 +3159,6 @@
   }
 
   syncSubjectThumb(true);   /* 首帧就按当前科目落位，不从 0 位置飞入 */
+  syncViewThumb(true);      /* 视图入口指示器同理（首帧无选中项则保持隐藏） */
   renderChapters();
 })();

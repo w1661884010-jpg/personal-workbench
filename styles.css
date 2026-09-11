@@ -46,7 +46,8 @@
 :root[data-theme="light"] .tool-button:not(.is-active) { border-color: color-mix(in srgb, var(--ink) 14%, transparent); }
 
 /* 浅色下选中胶囊的描边与填充胶囊同色系（与改动前的选中态保持一致） */
-:root[data-theme="light"] .subject-thumb { border-color: var(--line); }
+:root[data-theme="light"] .subject-thumb,
+:root[data-theme="light"] .view-thumb { border-color: var(--line); }
 
 :root[data-theme="light"] .global-search { box-shadow: 0 1px 2px rgba(30, 35, 42, 0.04); }
 :root[data-theme="dark"] { color-scheme: dark; }
@@ -883,6 +884,51 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 .tool-button svg { flex: 0 0 auto; }
+
+/* 三个视图入口（工作台 / 演练 / 错题）共用一枚滑动胶囊：与科目、数字-模拟、连线-探针同一套观感
+   （描边 + 页面底色 + 共用动效 token）。位置与尺寸现场测量（见 app.js syncViewThumb）；
+   退出到教材正文（三个都不选中）时指示器淡出。外观按钮在组外，不参与。 */
+.view-switch { position: relative; display: flex; flex: 0 0 auto; gap: 6px; }
+
+.view-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  height: 40px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(0);
+  transition: transform var(--seg-duration) var(--seg-ease),
+              width var(--seg-duration) var(--seg-ease),
+              opacity 140ms ease-out;
+}
+
+.view-switch.has-active .view-thumb { opacity: 1; }
+
+/* 初始化 / 断点变化后重新落位：指示器即时就位，不做横穿动画 */
+.view-switch.is-instant .view-thumb { transition: none; }
+
+/* 组内按钮：图标与文字抬到指示器之上，自身不再画胶囊（改由指示器提供） */
+.view-switch > .tool-button {
+  position: relative;
+  z-index: 1;
+}
+
+.view-switch > .tool-button.is-active {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink);
+}
+
+/* 减少动效：指示器不滑动，直接落位。
+   必须排在 .view-thumb 基础规则之后 —— 两者同权重，靠源码顺序取胜（写在前面会被压掉）。 */
+@media (prefers-reduced-motion: reduce) {
+  .view-thumb { transition: none; }
+}
 
 /* 悬停提示：由 JS 挂到 body 的固定定位浮层（顶栏 overflow 会裁剪伪元素方案） */
 .page-tip {
