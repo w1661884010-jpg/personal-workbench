@@ -256,3 +256,11 @@
 - 三张图共 312809 字节；构建与完整 135/135 测试通过，零跳过。未发布或核验远端 README 渲染。
 - REMIND 按用户此前语境解释为公开站点 README。截图使用干净浏览器上下文，不使用私人存档；只编辑文档和图片，不提交推送。
 - Browser plugin not available；用现有 Playwright 实拍。本次不新增浏览器依赖。
+# 同步工具与构建输入（2026-09-11）
+- `sync.mjs` 跑在 3020（该目录没有 git），因此版本记录改为两处：归档副本 `3010/tools/sync.mjs`（git 跟踪，`git log -- tools/sync.mjs` 即历史）与文件头的 SYNC_VERSION + 变更记录；两者与 3020 运行副本不一致时工具会告警。
+- v1.1.0 新增 `--build-inputs`：同步完整构建输入（`circuit-source/`、`package.json`、`package-lock.json`、`build-workbench.mjs`、`build-katex.mjs`、`build-pages.mjs`、`katex-entry.js`、`workbench-entry.tsx`、`CircuitWorkbench.tsx`、`circuit-placement.ts`）。默认范围不变（运行组件 + fonts + workbench-entry.tsx，tests 仍需 --tests）。
+- 永不参与同步：`node_modules/`、`.git/`、`.env*`、`*.pem/*.key`、`dist-pages/`、`dist-isolation-check/`、`.playwright-cli/`（代码里用 FORBIDDEN 双保险过滤）。
+- 推送前检查 3010 的未提交改动（`git status --porcelain --untracked-files=all`），有则停止；仅豁免本工具自己的归档副本 `tools/sync.mjs`。工具打印的下一步提示也改为逐文件 `git add -- <path>`，不再建议 `git add -A`。
+- `tests/workbench-space.test.mjs` 的截图路径从写死的 `C:/Users/Lenovo/AppData/Local/Temp/...` 改为 `tmpdir()`（此前每次跑测试都会在该用户临时目录留下 `workbench-expanded-after.png`）。
+- 本轮流程：dry-run 确认差异 → 受控演练确认 `--build-inputs` 能识别 `circuit-placement.ts` → 推送（仅 1 个文件）→ 3010 `npm run build`（重建后运行文件与已提交版本逐字节一致）→ 两棵树全量测试。
+

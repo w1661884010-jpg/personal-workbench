@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const { chromium } = require('C:/Users/Lenovo/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright');
 
@@ -47,6 +49,6 @@ test('手机画布优先：工具栏紧凑，元件可搜索且边缘拖动坐�
     await page.mouse.up();
     const after = await component.locator(':scope > rect').boundingBox();
     assert.ok(Math.abs(after.x - before.x + 30) < 2 && Math.abs(after.y - before.y + 25) < 2);
-    await page.locator('.cw-canvas-panel:visible').screenshot({ path: 'C:/Users/Lenovo/AppData/Local/Temp/workbench-expanded-after.png' });
+    await page.locator('.cw-canvas-panel:visible').screenshot({ path: join(tmpdir(), 'workbench-expanded-after.png') });
   } finally { await browser.close(); }
 });
