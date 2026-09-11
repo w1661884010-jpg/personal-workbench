@@ -1,5 +1,5 @@
-import { componentsOverlap } from "../personal-workbench-sites-3000/app/lib/circuit/geometry";
-import type { CircuitComponent, CircuitDocument, CircuitPoint } from "../personal-workbench-sites-3000/app/lib/circuit/types";
+import { componentsOverlap } from "./circuit-source/lib/circuit/geometry";
+import type { CircuitComponent, CircuitDocument, CircuitPoint } from "./circuit-source/lib/circuit/types";
 
 // 沿用原有邻近避让搜索，但工作区已可扩展，不能再夹紧到 1200×720。
 export function findAvailablePosition(circuit: CircuitDocument, component: CircuitComponent, desired: CircuitPoint): CircuitPoint {

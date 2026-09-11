@@ -87,7 +87,7 @@ node serve.mjs 3010
 
 ### 修改源码之前，请先了解依赖
 
-**能独立预览，不代表能独立重新构建全部源码。** 当前工作台、公式及课程数据的部分构建入口仍依赖同级 `personal-workbench-sites-3000` 项目的源码和 `node_modules`；只克隆本仓库无法直接完成这些重打包步骤。历史目录名 `3010` / `3000` 属于维护约定，普通在线使用不需要了解它们。
+工作台与公式构建已独立：在本目录执行 `npm ci` 安装锁定版本的依赖，再执行 `npm run build`。电路源码位于 `circuit-source/`，无需同级旧站点仓库。`courses.js` 保留现有课程数据产物，本轮未新增课程生成器。
 
 主要文件：
 
@@ -98,8 +98,9 @@ node serve.mjs 3010
 - `tests/`：测试；其中浏览器测试依赖本地 3010 服务、系统 Chrome 和测试文件指定的 Playwright 路径，不是开箱即用的跨机器测试环境。
 
 ```sh
-# 具备同级项目与依赖后，重新打包工作台
-node build-workbench.mjs
+# 安装依赖，重新打包工作台、公式及发布目录
+npm ci
+npm run build
 
 # 完整测试（需先满足上述测试环境要求）
 node --test tests/*.test.mjs

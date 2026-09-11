@@ -1,0 +1,16 @@
+{
+  "name": "personal-workbench",
+  "private": true,
+  "scripts": {
+    "build": "node build-workbench.mjs && node build-katex.mjs && node build-pages.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "katex": "0.18.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}
