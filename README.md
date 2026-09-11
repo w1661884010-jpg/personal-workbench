@@ -105,7 +105,7 @@ cd personal-workbench
 node serve.mjs 3010
 ```
 
-然后打开 **http://localhost:3010/**。仓库已包含运行所需的打包文件，本地预览不需要先执行 `npm install`。建议通过本地服务器访问，而不是双击 HTML 文件。
+然后打开 ** http://localhost:3010/ **。仓库已包含运行所需的打包文件，本地预览不需要先执行 `npm install`。建议通过本地服务器访问，而不是双击 HTML 文件。
 
 ### 修改源码之前，请先了解依赖
 
