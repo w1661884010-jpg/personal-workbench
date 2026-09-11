@@ -2070,13 +2070,19 @@ body.is-canvas-panning .workbench-root .cw-canvas { cursor: grabbing; }
   text-overflow: ellipsis;
 }
 
-/* 工具栏不够宽时，让"提示文字"先让位，而不是把按钮挤到第二行：
-   提示在 DOM 里排在变换按钮与缩放按钮之间，所以空间不足时是它后面的缩放/删除被挤下去。
-   在放不下"按钮整排（约 431px）+ 整句提示（约 265px）"的宽度区间里，把提示排到最后
-   （order 5）—— 按钮先占满第一行；提示若能同行就落在行尾，放不下就整块换到第二行。
-   面板宽度 ≈ 视口 − 444，临界点约 1240px（更宽时提示留在中间同行，原样不变）。 */
-@media (min-width: 901px) and (max-width: 1240px) {
+/* 提示文字的显隐与换行一律不许推动按钮：
+   ① 提示永远排在所有按钮之后（order 5）。它在 DOM 里本来夹在变换按钮与缩放按钮之间，
+      一旦宽度变化或换行，后面的缩放/删除就被推着走 —— 这正是"按键位置跳变"的来源；
+   ② 按钮组一律不收缩（flex-shrink: 0）。否则行内空间不够时它们会先被压窄、换行后再弹回。
+   于是按钮的尺寸与位置在任何宽度、任何提示文案下都完全一致；只有提示自己在
+   "行尾（有富余时占满剩余空间）"与"第二行整行"之间切换，且是否切换只取决于可用宽度
+   （min-width 让短文案也按整句宽度参与换行判定），与文案长短无关。
+   这两条只作用于桌面宽度：≤900px 由移动端规则另行排布（那里允许工具栏自身横向滚动）。 */
+@media (min-width: 901px) {
   .workbench-root .cw-canvas-toolbar > span { order: 5; }
+
+  .workbench-root .cw-canvas-toolbar > div,
+  .workbench-root .cw-canvas-toolbar > button { flex-shrink: 0; }
 }
 .workbench-root .cw-meter-grid > div,
 .workbench-root .cw-live-values > div { border-radius: 10px; background: var(--panel-2); }
