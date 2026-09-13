@@ -46,6 +46,8 @@ export interface ChapterDefinition {
   number: string;
   title: string;
   counted: boolean;
+  /** 绪论章：课程导读（教材版本、完成规则、配套资料说明）只在这一章渲染一次 */
+  intro?: boolean;
   sourceStatus: SourceStatus;
   objectives: readonly string[];
   prerequisites: readonly string[];

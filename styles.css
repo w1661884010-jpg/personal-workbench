@@ -1264,6 +1264,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   margin-top: 18px;
 }
 
+/* 课程导读只在绪论章出现（其余章节由 app.js 设 hidden）。
+   注意：上面的 display: block 会盖掉 [hidden] 的 UA 样式，必须显式补一条。 */
+.lesson-guide[hidden] { display: none; }
+
 .lesson-guide summary { cursor: pointer; font-weight: 700; }
 
 .lesson-guide > div > p { margin: 8px 0 0; }

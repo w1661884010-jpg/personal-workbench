@@ -40,6 +40,7 @@ var CoursesData = (() => {
         number: "0",
         title: "绪论",
         counted: true,
+        intro: true,
         sourceStatus: "verified_local",
         objectives: ["了解电子技术及半导体元器件的发展脉络", "区分模拟信号和数字信号并说明模拟电路的基本任务", "说明电子信息系统的组成以及本课程的学习方法"],
         prerequisites: ["电压、电流和电阻的基本概念", "基尔霍夫定律的直观认识"],
@@ -529,6 +530,7 @@ var CoursesData = (() => {
         number: "绪论",
         title: "信号分析与处理概览",
         counted: false,
+        intro: true,
         sourceStatus: "verified_local",
         objectives: [
           "区分信号、系统、分析与处理四个基本概念。",

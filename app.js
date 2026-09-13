@@ -43,6 +43,7 @@
   var panelTitle = document.getElementById("chapterPanelTitle");
   var lessonTitle = document.getElementById("lessonTitle");
   var lessonGuideContent = document.getElementById("lessonGuideContent");
+  var lessonGuide = document.querySelector(".lesson-guide");
   var lessonFocusList = document.getElementById("lessonFocusList");
   var lessonBody = document.getElementById("lessonBody");
   var lessonResources = document.getElementById("lessonResources");
@@ -645,13 +646,21 @@
     lessonBody.textContent = "";
     lessonResources.textContent = "";
 
-    lessonGuideContent.appendChild(textElement("p", "教材来源：" + course.textbook));
-    lessonGuideContent.appendChild(textElement(
-      "p",
-      chapter.counted
-        ? "完成规则：章节检验达到 60% 后标记完成，计入课程进度。"
-        : "导学单元，不计入课程完成进度。",
-    ));
+    /* 课程导读（教材版本、完成规则这类参考信息）只在绪论章出现一次；
+       其余章节整块收起，避免每章重复同一段版本/规则说明。
+       课程若没有绪论章（例如数电），由第一章承担这一次说明。 */
+    var isIntro = !!chapter.intro || (course.chapters[0] && course.chapters[0].id === chapter.id);
+    if (lessonGuide) lessonGuide.hidden = !isIntro;
+    if (isIntro) {
+      lessonGuideContent.appendChild(textElement("p", "教材来源：" + course.textbook));
+      lessonGuideContent.appendChild(textElement(
+        "p",
+        chapter.counted
+          ? "完成规则：章节检验达到 60% 后标记完成，计入课程进度。"
+          : "导学单元，不计入课程完成进度。",
+      ));
+      lessonGuideContent.appendChild(textElement("p", "本页只给提纲、公式与自测；教材、课件与习题解析见课程资料目录。"));
+    }
 
     chapter.objectives.forEach(function (objective) {
       lessonFocusList.appendChild(textElement("li", objective));
