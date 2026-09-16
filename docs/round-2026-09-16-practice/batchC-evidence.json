@@ -1,0 +1,165 @@
+{
+ "consoleErrors": [
+  "[read] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3020/favicon.ico"
+ ],
+ "httpErrors": [],
+ "perf": {
+  "env": {
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+   "dpr": 1,
+   "canvasCss": "971x340",
+   "hardwareConcurrency": 32
+  },
+  "waveMax": {
+   "n": 25,
+   "median": 0.3,
+   "max": 0.8
+  },
+  "longTasksWave": [],
+  "fourierFirstDrawAtMaxN": [],
+  "fourierMax": {
+   "n": 15,
+   "median": 5.5,
+   "max": 26.8,
+   "medianWithForcedLayout": 5.9,
+   "maxWithForcedLayout": 27.2
+  },
+  "longTasksFourier": [
+   {
+    "at": 438,
+    "ms": 110
+   }
+  ]
+ },
+ "legend": {
+  "signals-ch1-waveform-transform": {
+   "legend": [
+    {
+     "text": "原波形 x(τ)",
+     "before": "\"—\""
+    },
+    {
+     "text": "变换后 y(t)",
+     "before": "\"│\""
+    },
+    {
+     "text": "对应特征点",
+     "before": "\"◆\""
+    }
+   ],
+   "metrics": [
+    "支撑区间=[0, 3]",
+    "支撑宽度 3/|a|=3 s",
+    "等价延迟 t₀ = −b/a=0 s",
+    "反折状态=不反折（a>0）"
+   ]
+  },
+  "signals-ch1-fourier-synthesis": {
+   "legend": [
+    {
+     "text": "目标方波",
+     "before": "\"│\""
+    },
+    {
+     "text": "部分和 x_N(t)",
+     "before": "\"—\""
+    },
+    {
+     "text": "谱点 T·c_k",
+     "before": "\"◆\""
+    }
+   ],
+   "metrics": [
+    "周期 T=2 s",
+    "基频 f₀ = 1/T=0.5 Hz",
+    "谐波阶数 N=5",
+    "谱点数（|f| ≤ 4 Hz，含零系数）=17 个（与 N 无关）",
+    "RMSE（一个周期 4096 中点）=0.1294"
+   ]
+  }
+ },
+ "layout": {
+  "signals-ch1-waveform-transform@390": {
+   "docScrollW": 390,
+   "viewport": 390,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 3,
+   "metricCount": 4,
+   "canvasW": 298
+  },
+  "signals-ch1-waveform-transform@620": {
+   "docScrollW": 620,
+   "viewport": 620,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 3,
+   "metricCount": 4,
+   "canvasW": 528
+  },
+  "signals-ch1-waveform-transform@1440": {
+   "docScrollW": 1440,
+   "viewport": 1440,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 1,
+   "metricCount": 4,
+   "canvasW": 971
+  },
+  "signals-ch1-fourier-synthesis@390": {
+   "docScrollW": 390,
+   "viewport": 390,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 4,
+   "metricCount": 5,
+   "canvasW": 298
+  },
+  "signals-ch1-fourier-synthesis@620": {
+   "docScrollW": 620,
+   "viewport": 620,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 4,
+   "metricCount": 5,
+   "canvasW": 528
+  },
+  "signals-ch1-fourier-synthesis@1440": {
+   "docScrollW": 1440,
+   "viewport": 1440,
+   "paramRows": 1,
+   "paramCount": 2,
+   "metricRows": 1,
+   "metricCount": 5,
+   "canvasW": 971
+  }
+ },
+ "theme": {
+  "signals-ch1-waveform-transform@390-light": "light",
+  "signals-ch1-waveform-transform@390-dark": "dark",
+  "signals-ch1-waveform-transform@760-light": "light",
+  "signals-ch1-waveform-transform@760-dark": "dark",
+  "signals-ch1-waveform-transform@1440-light": "light",
+  "signals-ch1-waveform-transform@1440-dark": "dark",
+  "signals-ch1-fourier-synthesis@390-light": "light",
+  "signals-ch1-fourier-synthesis@390-dark": "dark",
+  "signals-ch1-fourier-synthesis@760-light": "light",
+  "signals-ch1-fourier-synthesis@760-dark": "dark",
+  "signals-ch1-fourier-synthesis@1440-light": "light",
+  "signals-ch1-fourier-synthesis@1440-dark": "dark"
+ },
+ "shots": [
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-waveform-transform-1440-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-fourier-synthesis-1440-dark.png"
+ ]
+}

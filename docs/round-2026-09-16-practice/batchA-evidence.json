@@ -1,0 +1,102 @@
+{
+ "consoleErrors": [
+  "[rm] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3020/favicon.ico"
+ ],
+ "httpErrors": [],
+ "reducedMotion": {
+  "mediaMatches": true,
+  "canvasSamples": [
+   -1783483278,
+   968411571,
+   968411571,
+   968411571,
+   968411571,
+   968411571,
+   968411571,
+   968411571
+  ],
+  "canvasStableLast4": true,
+  "canvasRedrawsOnlyOnce": true,
+  "playLabelOnOpen": "▶ 播放",
+  "singleStep": {
+   "before": [
+    "-1 s",
+    "无交集",
+    "0",
+    "[0, 2] s",
+    "1"
+   ],
+   "after": [
+    "1.5 s",
+    "[0.5, 1] s",
+    "0.5",
+    "[0, 2] s",
+    "1"
+   ],
+   "changed": true
+  },
+  "playAdvances": true,
+  "pausedStaysFrozen": true
+ },
+ "timers": {
+  "startT": -1,
+  "afterResetT": -1,
+  "afterPlayT": 0.22830000000000142,
+  "advanced": true
+ },
+ "perf": {
+  "maxParams": {
+   "w1": "3",
+   "w2": "3"
+  },
+  "env": {
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+   "dpr": 1,
+   "canvasCss": "971x340",
+   "canvasPixels": "971x340",
+   "hardwareConcurrency": 32
+  },
+  "syncRedrawMs": {
+   "n": 61,
+   "median": 0.5,
+   "p95": 0.8,
+   "max": 1
+  },
+  "frameIntervalMs": {
+   "n": 480,
+   "median": 4.2,
+   "p95": 4.3,
+   "max": 4.6
+  },
+  "longTasks": []
+ },
+ "theme": {
+  "signals-ch1-convolution@390-light": "light",
+  "signals-ch1-convolution@390-dark": "dark",
+  "signals-ch1-convolution@760-light": "light",
+  "signals-ch1-convolution@760-dark": "dark",
+  "signals-ch1-convolution@1440-light": "light",
+  "signals-ch1-convolution@1440-dark": "dark",
+  "signals-ch2-aliasing@390-light": "light",
+  "signals-ch2-aliasing@390-dark": "dark",
+  "signals-ch2-aliasing@760-light": "light",
+  "signals-ch2-aliasing@760-dark": "dark",
+  "signals-ch2-aliasing@1440-light": "light",
+  "signals-ch2-aliasing@1440-dark": "dark",
+  "darkCanvasHash": 1910336250
+ },
+ "shots": [
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch1-convolution-1440-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-aliasing-1440-dark.png"
+ ]
+}

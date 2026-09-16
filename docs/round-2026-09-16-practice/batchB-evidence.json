@@ -1,0 +1,130 @@
+{
+ "consoleErrors": [
+  "[legend] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3020/favicon.ico"
+ ],
+ "httpErrors": [],
+ "perf": {
+  "env": {
+   "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+   "dpr": 1,
+   "canvasCss": "971x340",
+   "hardwareConcurrency": 32
+  },
+  "leakageDefault": {
+   "n": 25,
+   "median": 2.6,
+   "max": 3.2,
+   "medianWithForcedLayout": 2.9,
+   "maxWithForcedLayout": 3.6,
+   "measureStartAt": 140
+  },
+  "leakageMax": {
+   "n": 25,
+   "median": 8.4,
+   "max": 8.9,
+   "medianWithForcedLayout": 8.8,
+   "maxWithForcedLayout": 9.5,
+   "measureStartAt": 359
+  },
+  "longTasksLeakage": [
+   {
+    "at": 141,
+    "ms": 73
+   },
+   {
+    "at": 360,
+    "ms": 217
+   }
+  ],
+  "circularMax": {
+   "n": 25,
+   "median": 0.6,
+   "max": 0.8
+  },
+  "longTasksCircular": []
+ },
+ "legend": {
+  "signals-ch2-spectral-leakage": [
+   {
+    "text": "稠密 DTFT",
+    "before": "\"—\""
+   },
+   {
+    "text": "DFT 谱线",
+    "before": "\"│\""
+   },
+   {
+    "text": "第一旁瓣",
+    "before": "\"◆\""
+   }
+  ],
+  "signals-ch2-circular-convolution": [
+   {
+    "text": "线性结果 y_lin",
+    "before": "\"│\""
+   },
+   {
+    "text": "折回 n mod N",
+    "before": "\"◆\""
+   },
+   {
+    "text": "循环结果 y_circ",
+    "before": "\"—\""
+   }
+  ]
+ },
+ "layout": {
+  "390px": {
+   "docScrollW": 390,
+   "viewport": 390,
+   "layoutOverflow": -34,
+   "paramRows": 3,
+   "paramCount": 5,
+   "canvasW": 298
+  },
+  "620px": {
+   "docScrollW": 620,
+   "viewport": 620,
+   "layoutOverflow": -34,
+   "paramRows": 3,
+   "paramCount": 5,
+   "canvasW": 528
+  },
+  "1440px": {
+   "docScrollW": 1440,
+   "viewport": 1440,
+   "layoutOverflow": -44,
+   "paramRows": 1,
+   "paramCount": 5,
+   "canvasW": 971
+  }
+ },
+ "theme": {
+  "signals-ch2-spectral-leakage@390-light": "light",
+  "signals-ch2-spectral-leakage@390-dark": "dark",
+  "signals-ch2-spectral-leakage@760-light": "light",
+  "signals-ch2-spectral-leakage@760-dark": "dark",
+  "signals-ch2-spectral-leakage@1440-light": "light",
+  "signals-ch2-spectral-leakage@1440-dark": "dark",
+  "signals-ch2-circular-convolution@390-light": "light",
+  "signals-ch2-circular-convolution@390-dark": "dark",
+  "signals-ch2-circular-convolution@760-light": "light",
+  "signals-ch2-circular-convolution@760-dark": "dark",
+  "signals-ch2-circular-convolution@1440-light": "light",
+  "signals-ch2-circular-convolution@1440-dark": "dark"
+ },
+ "shots": [
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-spectral-leakage-1440-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-390-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-390-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-760-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-760-dark.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-1440-light.png",
+  "docs\\round-2026-09-16-practice\\screenshots\\ch2-circular-convolution-1440-dark.png"
+ ]
+}
