@@ -201,11 +201,23 @@ test("跨断点：760px 选中模拟 → 1440 → 回 760，滑块归位且状�
     await page.waitForSelector(`${sessionSel("analog")} .circuit-workbench`, { state: "visible", timeout: 8000 });
     await page.waitForTimeout(700);
     const expectedTransform = { 1440: /matrix\(1, 0, 0, 1, 0, 36\)/, 760: /matrix\(1, 0, 0, 1, 84, 0\)/ };
+    const expectedMatrix = { 1440: "matrix(1, 0, 0, 1, 0, 36)", 760: "matrix(1, 0, 0, 1, 84, 0)" };
     for (const width of [1440, 760, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(250);
+      /* 跨断点后切换器要按新几何重新落位（app 在 resize 的 rAF 里同步、并走"即时"路径）。
+         这里等的是【应用自报的目标状态】而不是固定时长：等不到就超时失败，
+         因此既不掩盖失败，也不依赖"250ms 一定够"这种时序假设。
+         下面的几何断言一字未改，仍然独立检查最终位置。 */
+      await page.waitForFunction(
+        (expected) => {
+          const thumb = document.querySelector(".kind-thumb");
+          return !!thumb && getComputedStyle(thumb).transform === expected;
+        },
+        expectedMatrix[width],
+        { timeout: 4000 },
+      );
       const s = await page.evaluate(snapScript);
-      assert.equal(s.thumbInsideSwitcher, true, `${width}px 下 thumb 应仍在轨道内`);
+      assert.equal(s.thumbInsideSwitcher, true, `${width}px 下 thumb 应仍在轨道内（thumb=${JSON.stringify(s.thumb)} switcher=${JSON.stringify(s.switcher)}）`);
       assert.equal(s.thumbOverlapsRun, false, `${width}px 下 thumb 不得覆盖运行按钮`);
       assert.match(s.thumbTransform, expectedTransform[width], `${width}px 下模拟态 thumb 应保持 ${width === 1440 ? "竖向 translateY(100%)" : "横向 translateX(100%)"}`);
       assert.equal(await page.evaluate(() => document.querySelector('[data-kind="analog"].kind-switch-button')?.getAttribute("aria-selected")), "true", `${width}px 下 aria-selected 保持在模拟`);
