@@ -106,9 +106,23 @@ test("进入/切换/退出视图时指示器精确落位、滑过去、再淡出
   assert.equal(initial.hasActive, false, "首屏在教材正文：不应有选中的视图入口");
   assert.equal(initial.thumbOpacity, "0", "无选中项时指示器不可见");
 
+  /* 等指示器的过渡真正跑完再测量。
+     指标缓动 --seg-ease 是 cubic-bezier(.34,1.32,.64,1)，带约 3px 的过冲；
+     固定 sleep 会在过渡起步被主线程阻塞时恰好采到过冲峰值（实测 1178 → 1181）。
+     这里先让过渡起步，再等它 finished，最后让出一帧，测量点与负载无关。 */
+  const settleThumb = async () => {
+    await page.waitForTimeout(120);
+    await page.evaluate(async () => {
+      const thumb = document.getElementById("viewThumb");
+      const running = thumb.getAnimations();
+      if (running.length) await Promise.all(running.map((a) => a.finished.catch(() => {})));
+    });
+    await page.waitForTimeout(60);
+  };
+
   const enter = async (id) => {
     await page.click(`#${id}`);
-    await page.waitForTimeout(500);
+    await settleThumb();
     return page.evaluate(thumbState);
   };
 
@@ -137,7 +151,14 @@ test("窄屏与减少动效下仍然成立", async () => {
   await narrow.goto(BASE);
   await narrow.waitForTimeout(300);
   await narrow.click("#mistakeToggle");
-  await narrow.waitForTimeout(500);
+  /* 同上：等过渡跑完再量，避开过冲区 */
+  await narrow.waitForTimeout(120);
+  await narrow.evaluate(async () => {
+    const thumb = document.getElementById("viewThumb");
+    const running = thumb.getAnimations();
+    if (running.length) await Promise.all(running.map((a) => a.finished.catch(() => {})));
+  });
+  await narrow.waitForTimeout(60);
   const state = await narrow.evaluate(thumbState);
   assert.equal(state.activeId, "mistakeToggle");
   assert.ok(Math.abs(state.thumb.x - state.active.x) <= 1 && Math.abs(state.thumb.w - state.active.w) <= 1, `窄屏指示器应与按钮重合：${JSON.stringify(state.thumb)} vs ${JSON.stringify(state.active)}`);
