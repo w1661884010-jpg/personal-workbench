@@ -45,6 +45,8 @@
   var lessonGuideContent = document.getElementById("lessonGuideContent");
   var lessonGuide = document.querySelector(".lesson-guide");
   var lessonFocusList = document.getElementById("lessonFocusList");
+  /* 「本章重点」整块（静态节点，缓存引用后搬进正文）：全章只出现一次，跟在第一节分组条之后 */
+  var lessonFocus = document.querySelector(".lesson-focus");
   var lessonBody = document.getElementById("lessonBody");
   var lessonResources = document.getElementById("lessonResources");
   var chapterPanel = document.getElementById("chapterPanel");
@@ -81,6 +83,7 @@
       var button = document.createElement("button");
       button.type = "button";
       button.className = "chapter-rail-item";
+      button.dataset.chapter = entry[0];
       button.textContent = chapterShortLabel(entry[1]);
       button.setAttribute("aria-label", entry[1]);
       if (entry[0] === currentChapter) {
@@ -259,13 +262,36 @@
 
   /* 切换章节（目录点击 / 上一章下一章共用）：
      正文淡出 → 自动回滚到章节顶 → 渲染新章 → 淡入（与科目切换同节奏 150ms） */
+  /* ===== 选中态先行 =====
+     切换章节时正文要淡出 150ms，但"选中了哪一章"是导航反馈，必须立刻可见，
+     否则会出现"点了没反应、过一会儿才跳"的慢一拍观感。
+     这里只改选中类（不重建 DOM、不换正文），正文仍由定时器负责。 */
+  function markCurrentChapter(chapterId) {
+    Array.prototype.forEach.call(chapterList.querySelectorAll(".chapter-item"), function (item) {
+      var isCurrent = item.dataset.chapter === chapterId;
+      item.classList.toggle("is-selected", isCurrent);
+      var button = item.querySelector(".chapter-button");
+      if (!button) return;
+      button.classList.toggle("is-selected", isCurrent);
+      if (isCurrent) button.setAttribute("aria-current", "true");
+      else button.removeAttribute("aria-current");
+    });
+    Array.prototype.forEach.call(chapterRail.querySelectorAll(".chapter-rail-item"), function (button) {
+      button.classList.toggle("is-selected", button.dataset.chapter === chapterId);
+    });
+  }
+
   function switchChapter(chapterId) {
     if (chapterId === currentChapter) return;
     clearTimeout(chapterTimer);
+    /* 选中态立刻落位；正文仍在 150ms 后替换 */
+    currentChapter = chapterId;
+    currentSectionId = null;
+    markCurrentChapter(chapterId);
+    markCurrentSection();
     var lesson = document.querySelector(".lesson");
     lesson.style.opacity = 0;
     chapterTimer = setTimeout(function () {
-      currentChapter = chapterId;
       renderChapters();
       if (panelCollapsed) renderChapterRail();
       window.scrollTo({ top: 0, behavior: "auto" });
@@ -639,6 +665,67 @@
     setView("mistakes");
   }
 
+  /* ===== 章节联系：把 <chapterId> / <sectionId> / <chapterId>#<sectionId> 变成可点击跳转 =====
+     小节 id 自带章节前缀，因此直接写小节 id 也能解析出所属章节（跨课程同样适用）。 */
+  function findChapterById(chapterId) {
+    for (var i = 0; i < courses.length; i += 1) {
+      for (var j = 0; j < courses[i].chapters.length; j += 1) {
+        if (courses[i].chapters[j].id === chapterId) return { course: courses[i], chapter: courses[i].chapters[j] };
+      }
+    }
+    return null;
+  }
+
+  function resolveTarget(target) {
+    var parts = String(target || "").split("#");
+    var head = parts[0];
+    var sectionId = parts[1] || "";
+    var found = findChapterById(head);
+    if (!found && !sectionId) {
+      for (var i = 0; i < courses.length && !found; i += 1) {
+        for (var j = 0; j < courses[i].chapters.length && !found; j += 1) {
+          var chapter = courses[i].chapters[j];
+          if ((chapter.sections || []).some(function (item) { return item.id === head; })) {
+            found = { course: courses[i], chapter: chapter };
+            sectionId = head;
+          }
+        }
+      }
+    }
+    return found ? { course: found.course, chapter: found.chapter, sectionId: sectionId } : null;
+  }
+
+  /* 目标显示名：小节优先，回落到章；跨课程时补上课程简称 */
+  function targetLabel(target) {
+    var resolved = resolveTarget(target);
+    if (!resolved) return String(target || "");
+    var prefix = resolved.course.id === currentSubject ? "" : resolved.course.shortTitle + " · ";
+    if (resolved.sectionId) {
+      var section = (resolved.chapter.sections || []).find(function (item) { return item.id === resolved.sectionId; });
+      if (section) return prefix + resolved.chapter.number + " " + section.title;
+    }
+    return prefix + resolved.chapter.number + " " + resolved.chapter.title;
+  }
+
+  function openTarget(target) {
+    var resolved = resolveTarget(target);
+    if (!resolved) return;
+    jumpToChapter(resolved.chapter.id);
+    if (!resolved.sectionId) return;
+    /* switchSubject 有 150ms 淡出，等新内容挂载后再滚到锚点 */
+    setTimeout(function () { scrollToSection(resolved.sectionId); }, 320);
+  }
+
+  function linkButton(link, className) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.appendChild(textElement("strong", targetLabel(link.to)));
+    button.appendChild(textElement("span", link.why));
+    button.addEventListener("click", function () { openTarget(link.to); });
+    return button;
+  }
+
   function renderLesson(course, chapter) {
     lessonTitle.textContent = chapter.title;
     lessonGuideContent.textContent = "";
@@ -676,15 +763,45 @@
       prerequisites.appendChild(tags);
     }
 
+    var lastGroup = null;
+    var focusPlaced = false;
+    /* 有分组的章：本章重点跟在第一节分组条之后（章标题、前置知识仍留在正文之上）；
+       无分组的章（数电、模电等尚未细分）：挂在正文最前。整块只出现这一次。 */
+    if (!chapter.sections.some(function (item) { return !!item.group; })) {
+      lessonBody.appendChild(lessonFocus);
+      focusPlaced = true;
+    }
+
     chapter.sections.forEach(function (section, sectionIndex) {
+      /* 节分组条：小节带 group 时，组一变就插一条。
+         数据侧保证同组小节连续且不跳回（由 tests/course-content.test.mjs 的分组守卫兜住）。 */
+      if (section.group && section.group !== lastGroup) {
+        lastGroup = section.group;
+        var groupBar = document.createElement("section");
+        groupBar.className = "lesson-group";
+        groupBar.appendChild(textElement("h2", section.group));
+        lessonBody.appendChild(groupBar);
+        if (!focusPlaced) {
+          lessonBody.appendChild(lessonFocus);
+          focusPlaced = true;
+        }
+      }
       var block = document.createElement("article");
       block.className = "learning-section importance-" + section.importance;
+      if (section.id) block.id = "section-" + section.id;   /* 章节联系跳转的锚点 */
       var heading = document.createElement("header");
       /* 小节标题：直接显示名称（序号徽标已按需求移除） */
       heading.appendChild(textElement("h2", section.title));
-      heading.appendChild(textElement("span", section.importance === "core" ? "主线必学" : "选择学习", "importance-label"));
+      /* 只给"选择学习"的小节打标；主线必学是默认状态，不再加字样（省掉每节都出现的冗余提示） */
+      if (section.importance !== "core") {
+        heading.appendChild(textElement("span", "选择学习", "importance-label"));
+      }
       block.appendChild(heading);
-      if (section.content) block.appendChild(textElement("p", section.content));
+      if (section.content) block.appendChild(textElement("p", section.content, "section-lead"));
+      /* 展开段（关键关系 / 量级算例 / 边界条件）：内容充实规划里正文的第二段起 */
+      (section.detail || []).forEach(function (paragraph) {
+        block.appendChild(textElement("p", paragraph, "section-detail"));
+      });
       if (section.formula) {
         /* KaTeX 渲染公式（与原站 MathFormula 同参数：displayMode + 不抛错） */
         var formulaCard = document.createElement("div");
@@ -716,8 +833,60 @@
         appendList(variables, section.variables, false);
         block.appendChild(variables);
       }
+      if (section.points && section.points.length) {
+        var sectionPoints = document.createElement("div");
+        sectionPoints.className = "section-points";
+        sectionPoints.appendChild(textElement("p", "要点", "section-subhead"));
+        appendList(sectionPoints, section.points, false);
+        block.appendChild(sectionPoints);
+      }
+      if (section.pitfalls && section.pitfalls.length) {
+        var sectionPitfalls = document.createElement("details");
+        sectionPitfalls.className = "section-pitfalls";
+        sectionPitfalls.appendChild(textElement("summary", "易混点（" + section.pitfalls.length + " 条）"));
+        appendList(sectionPitfalls, section.pitfalls, false);
+        block.appendChild(sectionPitfalls);
+      }
+      if (section.links && section.links.length) {
+        var sectionLinks = document.createElement("div");
+        sectionLinks.className = "section-links";
+        sectionLinks.appendChild(textElement("span", "相关", "section-links-label"));
+        section.links.forEach(function (link) {
+          sectionLinks.appendChild(linkButton(link, "section-link"));
+        });
+        block.appendChild(sectionLinks);
+      }
       lessonBody.appendChild(block);
     });
+
+    /* 章末「章节联系」：前置 / 后续 / 跨课程 三组，条目可点击跳到目标章或目标小节 */
+    if (chapter.connections && chapter.connections.length) {
+      var connectionGroup = appendContentGroup(lessonBody, "章节联系");
+      [
+        { kind: "prereq", label: "前置" },
+        { kind: "next", label: "后续" },
+        { kind: "cross", label: "跨课程" }
+      ].forEach(function (entry) {
+        var items = chapter.connections.filter(function (item) { return item.kind === entry.kind; });
+        if (!items.length) return;
+        var group = document.createElement("div");
+        group.className = "connection-group";
+        group.appendChild(textElement("span", entry.label, "connection-kind"));
+        var list = document.createElement("div");
+        list.className = "connection-list";
+        items.forEach(function (link) { list.appendChild(linkButton(link, "connection-item")); });
+        group.appendChild(list);
+        connectionGroup.appendChild(group);
+      });
+    }
+
+    if (chapter.sourceRef && chapter.sourceRef.length) {
+      var sourceNote = document.createElement("details");
+      sourceNote.className = "source-note";
+      sourceNote.appendChild(textElement("summary", "材料出处"));
+      appendList(sourceNote, chapter.sourceRef, false);
+      lessonBody.appendChild(sourceNote);
+    }
 
     if (chapter.examples.length) {
       var examples = appendContentGroup(lessonResources, "典型例题");
@@ -784,14 +953,185 @@
     }
   }
 
+  /* ===== 章节目录：一章一行 + 展开箭头（与面板收起按钮同款 .icon-toggle）；
+     展开后只列该章的「节」，节以下的小节不在这里铺开 =====
+     没有节划分的章（如绪论）不给展开入口。展开态互斥（手风琴），窄屏由样式隐藏入口。 */
+  var expandedChapterId = null;
+  /* chapterId → [{ label, sectionIds }]，渲染目录时顺手缓存，供"当前节高亮"使用 */
+  var chapterPartsByChapter = {};
+
+  /* 章 → 节：按 section.group 归并（同名的组合并成一条，数据侧保证同组连续） */
+  function chapterPartsOf(course, chapterId) {
+    var chapter = course && course.chapters.find(function (item) { return item.id === chapterId; });
+    var parts = [];
+    var byLabel = {};
+    ((chapter && chapter.sections) || []).forEach(function (section) {
+      if (!section.group) return;
+      if (!byLabel[section.group]) {
+        byLabel[section.group] = { label: section.group, sectionIds: [] };
+        parts.push(byLabel[section.group]);
+      }
+      byLabel[section.group].sectionIds.push(section.id);
+    });
+    return parts;
+  }
+
+  /* 目录里不标注"第几节"，只留节名 */
+  function partLabel(group) {
+    return String(group).replace(/^第[一二三四五六七八九十百千\d]+节[\s　]*/, "");
+  }
+
+  function scrollToSection(sectionId) {
+    var node = document.getElementById("section-" + sectionId);
+    if (!node) return;
+    /* 目录里点了哪一节，选中态就立刻落到哪一节——不等平滑滚动到达，
+       否则高亮要等滚动结束才动，看起来就是慢一拍 */
+    if (sectionId !== currentSectionId) {
+      currentSectionId = sectionId;
+      markCurrentSection();
+    }
+    lockSectionSync();
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* 点小节：先保证章已打开，再滚到小节锚点（switchChapter 有 150ms 淡出） */
+  function openSection(chapterId, sectionId) {
+    if (chapterId !== currentChapter) {
+      switchChapter(chapterId);
+      window.setTimeout(function () { scrollToSection(sectionId); }, 320);
+      return;
+    }
+    scrollToSection(sectionId);
+  }
+
+  function syncChapterExpansion() {
+    Array.prototype.forEach.call(chapterList.querySelectorAll(".chapter-item"), function (item) {
+      var isOpen = item.dataset.chapter === expandedChapterId;
+      item.classList.toggle("is-expanded", isOpen);
+      var toggle = item.querySelector(".chapter-toggle");
+      var panel = item.querySelector(".chapter-parts");
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        toggle.setAttribute("aria-label", isOpen ? "收起本章的节" : "展开本章的节");
+        toggle.setAttribute("title", isOpen ? "收起节目录" : "展开节目录");
+      }
+      if (panel) panel.hidden = !isOpen;
+    });
+  }
+
+  function toggleChapterExpansion(chapterId) {
+    expandedChapterId = expandedChapterId === chapterId ? null : chapterId;
+    syncChapterExpansion();
+  }
+
+  /* ===== 「当前节」高亮：节条目跟着阅读位置点亮 ===== */
+  var currentSectionId = null;
+  var sectionSyncQueued = false;
+  /* 程序化跳转（点目录里的节 / 点正文里的相关链接）期间挂起滚动侦测：
+     选中态已经由点击那一刻定好了，滚动途中再让侦测回写会来回闪。 */
+  var sectionLockUntil = 0;
+  var sectionLockTimer = null;
+
+  function lockSectionSync(duration) {
+    var ms = duration || 900;
+    sectionLockUntil = Date.now() + ms;
+    clearTimeout(sectionLockTimer);
+    sectionLockTimer = setTimeout(function () {
+      sectionLockUntil = 0;
+      syncCurrentSection(true);   /* 解锁后按最终滚动位置校正一次 */
+    }, ms + 40);
+  }
+
+  function markCurrentSection() {
+    var parts = chapterPartsByChapter[currentChapter] || [];
+    var activePart = -1;
+    for (var i = 0; i < parts.length; i += 1) {
+      if (parts[i].sectionIds.indexOf(currentSectionId) !== -1) { activePart = i; break; }
+    }
+    var scope = chapterList.querySelector('.chapter-item[data-chapter="' + currentChapter + '"]') || chapterList;
+    Array.prototype.forEach.call(scope.querySelectorAll(".chapter-part"), function (button) {
+      var isCurrent = activePart >= 0 && Number(button.dataset.part) === activePart;
+      button.classList.toggle("is-current", isCurrent);
+      if (isCurrent) button.setAttribute("aria-current", "true");
+      else button.removeAttribute("aria-current");
+    });
+  }
+
+  function syncCurrentSection(force) {
+    var lessonRoot = document.querySelector(".lesson");
+    /* 工作台/演练视图下正文不在布局里：全部 rect 会是 0，必须直接清空，否则会误判成最后一节 */
+    if (!lessonRoot || lessonRoot.offsetHeight === 0) {
+      if (currentSectionId !== null) {
+        currentSectionId = null;
+        markCurrentSection();
+      }
+      return;
+    }
+    var nodes = lessonBody.querySelectorAll(".learning-section[id]");
+    if (!nodes.length) return;
+    var threshold = 140;   /* 吸顶栏下方的判定线 */
+    var active = null;
+    for (var i = 0; i < nodes.length; i += 1) {
+      if (nodes[i].getBoundingClientRect().top <= threshold) active = nodes[i];
+      else break;
+    }
+    var nextId = active ? active.id.replace(/^section-/, "") : null;
+    if (!force && nextId === currentSectionId) return;
+    currentSectionId = nextId;
+    markCurrentSection();
+    /* 目录列表自带滚动：当前节跑出可视区时轻推一下（block:nearest 只在需要时滚动） */
+    var current = chapterList.querySelector('.chapter-item[data-chapter="' + currentChapter + '"] .chapter-part.is-current');
+    if (current) current.scrollIntoView({ block: "nearest" });
+  }
+
+  window.addEventListener("scroll", function () {
+    if (sectionSyncQueued) return;
+    sectionSyncQueued = true;
+    window.requestAnimationFrame(function () {
+      sectionSyncQueued = false;
+      if (Date.now() < sectionLockUntil) return;   /* 程序化跳转途中不回写高亮 */
+      syncCurrentSection();
+    });
+  }, { passive: true });
+
   function renderChapters() {
     var subject = subjects[currentSubject];
     var course = courses.find(function (candidate) { return candidate.id === currentSubject; });
     panelTitle.textContent = courseLabel[currentSubject];
     chapterList.textContent = "";
+    /* 换科目后旧的展开章可能已不存在：自愈，避免箭头状态与内容对不上 */
+    if (expandedChapterId && !subject.chapters.some(function (entry) { return entry[0] === expandedChapterId; })) {
+      expandedChapterId = null;
+    }
     subject.chapters.forEach(function (entry) {
+      var item = document.createElement("div");
+      item.className = "chapter-item";
+      item.dataset.chapter = entry[0];
+
+      var parts = chapterPartsOf(course, entry[0]);
+      chapterPartsByChapter[entry[0]] = parts;
+
+      var row = document.createElement("div");
+      row.className = "chapter-row";
+
+      /* 展开箭头在胶囊左侧内部（DOM 顺序也在前，键盘 Tab 与视觉顺序一致）。
+         没有节划分的章（如绪论）不给箭头：展开也没有内容可给。 */
+      if (parts.length) {
+        var toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "icon-toggle chapter-toggle";
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "展开本章的节");
+        toggle.setAttribute("title", "展开节目录");
+        toggle.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">'
+          + '<path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        toggle.addEventListener("click", function () { toggleChapterExpansion(entry[0]); });
+        row.appendChild(toggle);
+      }
+
       var button = document.createElement("button");
       button.type = "button";
+      button.className = "chapter-button";
       /* 编号/标题分级排版（与信号课同步）：绪论章一律显示"绪"，数字显示为"第N章" */
       var match = /^(第\d+章|绪论|\d+)\s*(.*)$/.exec(entry[1]);
       if (match) {
@@ -811,6 +1151,7 @@
         button.textContent = entry[1];
       }
       if (entry[0] === currentChapter) {
+        item.classList.add("is-selected");
         button.classList.add("is-selected");
         button.setAttribute("aria-current", "true");
         var chapter = course && course.chapters.find(function (candidate) { return candidate.id === entry[0]; });
@@ -821,8 +1162,30 @@
         if (entry[0] === currentChapter) return;
         switchChapter(entry[0]);
       });
-      chapterList.appendChild(button);
+      row.appendChild(button);
+      item.appendChild(row);
+
+      /* 展开面板：只列「节」，点一条跳到该节的第一个小节（节以下不在目录里铺开） */
+      if (parts.length) {
+        var panel = document.createElement("div");
+        panel.className = "chapter-parts";
+        panel.hidden = true;
+        parts.forEach(function (part, partIndex) {
+          var partButton = document.createElement("button");
+          partButton.type = "button";
+          partButton.className = "chapter-part";
+          partButton.dataset.part = String(partIndex);
+          partButton.textContent = partLabel(part.label);
+          partButton.addEventListener("click", function () { openSection(entry[0], part.sectionIds[0]); });
+          panel.appendChild(partButton);
+        });
+        item.appendChild(panel);
+      }
+
+      chapterList.appendChild(item);
     });
+    syncChapterExpansion();
+    syncCurrentSection(true);   /* 列表重建后重新点亮当前小节 */
     /* 上一章/下一章禁用态 */
     var index = subject.chapters.findIndex(function (entry) { return entry[0] === currentChapter; });
     prevChapterButton.disabled = index <= 0;

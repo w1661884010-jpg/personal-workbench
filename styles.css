@@ -13,6 +13,10 @@
   --accent: light-dark(#737a84, #7f8791);       /* 原站 --teal：主按钮/徽标/焦点 */
   --accent-ink: light-dark(#34383e, #d2d5da);   /* 原站 --teal-dark：选中态强调文字 */
   --accent-soft: light-dark(#e1e3e6, #30343a);  /* 原站 --teal-soft：选中/悬停底 */
+  --selected-bg: light-dark(#c3c9d2, #4a525c);  /* 选中章底色：与 panel-2 拉开明显色差，避免"看不出选了哪一章" */
+  --selected-bar: light-dark(#5a616b, #aab3bd); /* 选中章左侧标记条 */
+  --selected-soft-bg: light-dark(#d7dbe1, #333941);  /* 当前节底色：明显更靠近底色一档，与"选中章"分级 */
+  --selected-soft-bar: light-dark(#a9b0b9, #6f7781); /* 当前节左侧标记条：更细更弱 */
   --warm: light-dark(#a45f25, #d59a63);         /* 原站 --orange：状态徽标/注意 */
   --warm-soft: light-dark(#f7eadf, #3a2d24);
 }
@@ -1035,7 +1039,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* 主体两栏：左目录悬浮卡片，中间正文 */
 .shell {
   display: grid;
-  grid-template-columns: 202px minmax(0, 1fr);
+  grid-template-columns: 230px minmax(0, 1fr);   /* 左栏加宽：减去胶囊内箭头占位后，章名仍比原来多容纳约一个汉字 */
   padding-top: 72px;   /* = 顶栏高度（16+40+16），分隔线在 72px 处单独固定 */
   min-height: 100vh;
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -1151,7 +1155,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex: 1;
   display: flex;
   flex-direction: column;
-  width: 186px;      /* 内容固定宽度：宽度动画中不重排，卡片高度稳定（下边界不抽搐） */
+  width: 214px;      /* 内容固定宽度：宽度动画中不重排，卡片高度稳定（下边界不抽搐） */
   padding: 10px;
   gap: 6px;
   font-size: .82rem;
@@ -1173,7 +1177,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   position: fixed;
   left: 14px;
   bottom: 10px;
-  width: 188px;
+  width: 216px;   /* 与章节面板同宽同左缘（面板 = 230 - 14 外边距） */
   z-index: 20;
   padding: 6px;
   border-radius: 14px;
@@ -1195,11 +1199,78 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chapter-panel.is-collapsed .chapter-list { display: none; }
 
 /* 章节条目排版分级（参考图 5）：编号弱化 + 标题加粗 */
-.chapter-list button {
+.chapter-list .chapter-button {
   display: flex;
   align-items: baseline;
   gap: 6px;
 }
+
+/* 章节行 = 章节按钮 + 展开箭头（与面板收起按钮同一套 .icon-toggle 图标风格）；
+   展开后在下方列出该章小节，点条目直接滚到对应小节锚点 */
+.chapter-item { display: flex; flex-direction: column; gap: 4px; }
+
+.chapter-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.chapter-row:hover { background: var(--accent-soft); }
+
+.chapter-toggle {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+.chapter-toggle:hover { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
+.chapter-toggle svg { transition: transform 160ms ease-out; }
+.chapter-item.is-expanded .chapter-toggle { color: var(--ink); }
+.chapter-item.is-expanded .chapter-toggle svg { transform: rotate(90deg); }
+
+/* 展开面板：只列「节」（节以下的小节不在目录里铺开）。
+   没有节划分的章不渲染这一块，也就不显示展开箭头。 */
+.chapter-parts { display: flex; flex-direction: column; gap: 2px; padding: 0 0 4px 6px; }
+.chapter-parts[hidden] { display: none; }
+
+/* 节条目：不标注"第几节"，只留节名 */
+.chapter-part {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: transparent;
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.chapter-part:hover { background: var(--accent-soft); color: var(--ink); }
+
+/* 当前正在读的节：同一套语汇但整体淡一档（底色更靠近底色、标记条更细更弱、字重略低），
+   这样"选中章"仍是目录里最重的那一层，两者一眼可分 */
+.chapter-part.is-current {
+  background: var(--selected-soft-bg);
+  box-shadow: inset 2px 0 0 0 var(--selected-soft-bar);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.chapter-part.is-current:hover { background: var(--selected-soft-bg); }
+
+/* 本章重点跟在第一节分组条之后：与分组条的间距比默认 18px 收一点 */
+.lesson-group + .lesson-focus { margin-top: 14px; }
 
 .ch-num {
   flex: 0 0 auto;
@@ -1214,22 +1285,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--ink);
 }
 
-.chapter-list button.is-selected .ch-num { color: var(--accent-ink); }
+.chapter-list .chapter-button.is-selected .ch-num { color: var(--accent-ink); font-weight: 700; }
 
-/* 章节条目基础样式 */
-.chapter-list button {
-  width: 100%;
+/* 章节气泡：整行是一颗胶囊（底色画在行上，两个内部按钮都透明）；
+   展开箭头在胶囊左侧内部，与面板收起按钮同一套 .icon-toggle 图标风格 */
+.chapter-list .chapter-button {
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: left;
   border-radius: 8px;
-  padding: 7px 9px;
+  padding: 7px 2px 7px 0;
+  background: transparent;
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.45;
 }
 
-.chapter-list button.is-selected {
-  background: var(--accent-soft);
+.chapter-list .chapter-button:hover { background: transparent; }
+
+/* 选中章：气泡底色明显深/亮一档 + 左侧标记条 + 标题加重 */
+.chapter-item.is-selected .chapter-row {
+  background: var(--selected-bg);
+  box-shadow: inset 3px 0 0 0 var(--selected-bar);
 }
+
+.chapter-item.is-selected .chapter-row:hover { background: var(--selected-bg); }
+
+.chapter-list .chapter-button.is-selected .ch-title { font-weight: 800; color: var(--ink); }
 
 /* 正文 */
 .content {
@@ -1242,6 +1324,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: 12px;
   padding: 20px 24px 26px;
   transition: opacity 140ms ease-out;   /* 科目切换淡出淡入 */
+  /* 正文里含较长的不可断数学串（如 X(s)=1/(3−s)=−1/(s−3)）：默认允许在必要时于词内断开，
+     否则它会把栅格列的 min-content 撑宽，整个页面出现横向滚动（窄屏实测溢出 163px） */
+  overflow-wrap: anywhere;
 }
 
 .lesson-heading {
@@ -1374,6 +1459,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 @media (max-width: 760px) {
   .formula-block { grid-template-columns: 1fr; }
+  /* 窄屏下公式卡里的行更宽：整体缩到 0.92em，避免 display 公式被卡片裁切（内部横向滚动看不全） */
+  .math-formula .katex { font-size: .92em; }
 }
 
 .variable-list ul { margin: 8px 0 0; padding-left: 22px; }
@@ -1548,7 +1635,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     overscroll-behavior-x: contain;
   }
 
-  .chapter-list button { width: auto; flex: 0 0 auto; min-height: 40px; white-space: nowrap; }
+  .chapter-list .chapter-button { width: auto; flex: 0 0 auto; min-height: 40px; white-space: nowrap; }
+  /* 窄屏章节栏是横向条：小节展开会破坏排布，小屏直接不提供（章节条本身仍可横向滚动）；
+     箭头隐藏后把胶囊左内边距补回来 */
+  .chapter-list .chapter-item { flex: 0 0 auto; }
+  .chapter-list .chapter-row { padding-left: 10px; }
+  .chapter-toggle, .chapter-parts { display: none; }
   .chapter-panel.is-collapsed .chapter-panel-head { padding: 12px 10px 8px; }
   .chapter-panel.is-collapsed .chapter-panel-head .chapter-panel-title { display: block; }
   .chapter-panel .icon-toggle svg { transform: rotate(90deg); }
@@ -2243,4 +2335,137 @@ body.is-canvas-panning .workbench-root .cw-canvas { cursor: grabbing; }
     order: 3; min-width: 0; flex-basis: 100%;
     font-size: .65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+}
+
+/* ===== 课程正文充实（2026-09-11）：小节要点 / 易混点 / 相关章节 + 章末章节联系 =====
+   数据来自 courses.js 的 section.detail / points / pitfalls / links 与 chapter.connections；
+   未写这些字段的旧章节不渲染任何新块，因此可以逐章灰度推进。 */
+
+.learning-section > p.section-detail { text-indent: 2em; margin-top: 8px; }
+
+/* 节分组条（第一节 / 第二节 …）：数据来自 section.group，一个组只出现一次且同组连续 */
+.lesson-group {
+  margin: 34px 0 2px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.lesson-group h2 {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--ink);
+}
+
+.lesson-group + .learning-section { margin-top: 14px; }
+
+.section-points {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.section-points .section-subhead {
+  margin: 0 0 6px;
+  text-indent: 0;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--ink-faint);
+}
+
+.section-points ul { margin: 0; padding-left: 20px; }
+.section-points li { color: var(--ink-soft); font-size: .92rem; }
+.section-points li + li { margin-top: 5px; }
+
+.section-pitfalls {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--line-strong);
+}
+
+.section-pitfalls > summary {
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 750;
+  color: var(--warm);
+}
+
+.section-pitfalls ul { margin: 8px 0 0; padding-left: 20px; }
+.section-pitfalls li { color: var(--ink-soft); font-size: .9rem; }
+.section-pitfalls li + li { margin-top: 5px; }
+
+.section-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.section-links-label,
+.connection-kind {
+  align-self: center;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--ink-faint);
+}
+
+.section-link,
+.connection-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  /* 全局 button 规则是 nowrap；这两类条目含整句说明，必须允许换行，
+     否则窄屏下 min-content 会撑宽 .shell 的 auto 栅格列，整页出现横向滚动 */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color var(--seg-duration) var(--seg-ease), border-color var(--seg-duration) var(--seg-ease);
+}
+
+.section-link strong,
+.connection-item strong { font-size: .84rem; font-weight: 750; }
+
+.section-link span,
+.connection-item span { font-size: .78rem; color: var(--ink-soft); }
+
+.section-link:hover,
+.connection-item:hover { background: var(--panel-2); }
+
+.section-link:focus-visible,
+.connection-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.connection-group + .connection-group { margin-top: 12px; }
+.connection-list { display: grid; gap: 6px; margin-top: 6px; }
+.connection-list .connection-item { width: 100%; }
+
+.source-note {
+  margin-top: 16px;
+  font-size: .8rem;
+  color: var(--ink-faint);
+}
+
+.source-note > summary { cursor: pointer; font-weight: 750; }
+.source-note ul { margin: 8px 0 0; padding-left: 20px; color: var(--ink-soft); }
+
+/* 章节联系跳转的锚点：避开吸顶栏 */
+.learning-section[id] { scroll-margin-top: 96px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .section-link,
+  .connection-item { transition: none; }
 }

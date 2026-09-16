@@ -8,11 +8,33 @@ export type MistakeOrigin = "example" | "check" | "manual";
 export interface LearningSection {
   id: string;
   title: string;
+  /** 节分组标题（如「第一节 连续信号的时域描述和分析」）：同组小节必须连续，组一变就渲染一条分组条 */
+  group?: string;
   importance: Importance;
   sourceStatus: SourceStatus;
   content: string;
+  /** 展开段：关键关系 / 量级算例 / 边界条件，与 content 一起构成小节正文 */
+  detail?: readonly string[];
   formula?: string;
   variables?: readonly string[];
+  /** 要点清单（3–6 条） */
+  points?: readonly string[];
+  /** 易混点、常见错误（1–4 条），界面默认折叠 */
+  pitfalls?: readonly string[];
+  /** 本节与其它章节的接口，条目在正文内可点击跳转 */
+  links?: readonly SectionLink[];
+}
+
+/** 章节引用的写法：`<chapterId>`、`<sectionId>`，或 `<chapterId>#<sectionId>` */
+export interface SectionLink {
+  to: string;
+  why: string;
+}
+
+export type ConnectionKind = "prereq" | "next" | "cross";
+
+export interface ChapterConnection extends SectionLink {
+  kind: ConnectionKind;
 }
 
 export interface WorkedExample {
@@ -57,6 +79,10 @@ export interface ChapterDefinition {
   check: readonly CheckQuestion[];
   summary: readonly string[];
   tags: readonly string[];
+  /** 章末「章节联系」：前置 / 后续 / 跨课程，每条给出目标章与理由 */
+  connections?: readonly ChapterConnection[];
+  /** 本章正文的材料出处（课件、个人笔记、开放讲义文件名） */
+  sourceRef?: readonly string[];
 }
 
 export interface CourseDefinition {
