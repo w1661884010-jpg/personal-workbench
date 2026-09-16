@@ -1299,6 +1299,9 @@
       syncViewThumb(true);
       /* 工作台未打开时切换器是隐藏的（测量值为 0），此时不落位 */
       if (typeof isCircuitWorkbench === "function" && isCircuitWorkbench(activeWorkbench)) syncKindSwitcher(true);
+      /* 演练章节滑块同样按当前选中章节重新落位（未打开演练视图时为空操作）。
+         放在既有各滑块之后：不改动它们原有的落位顺序。 */
+      syncPracticeChapterThumb(notebookRoot.querySelector(".practice-chapters"), true);
       scheduleCanvasEmptyHint();
     });
   }
@@ -1820,6 +1823,367 @@
      与 practiceShown 同生命周期（页面刷新清零）；仅布局/重绘不触碰它。 */
   var practiceDemoStates = {};
 
+  /* 演练数值计算接口（计算与绘制分离）：纯函数，供 tests/practice-*.test.mjs 直接调用，
+     避免测试复制产品算法自证。约定见 docs/round-2026-09-16-practice/context-notes.md D2。 */
+  var practiceCalc = {
+    /* 单位高度矩形：支撑内为 1，端点取半高——跳变点的标准取样约定，使梯形积分不偏向任一侧 */
+    rectValue: function (t, width) {
+      if (t < 0 || t > width) return 0;
+      if (t === 0 || t === width) return 0.5;
+      return 1;
+    },
+    /* 反折平移后的脉冲响应 h(t−τ)：自变量 u = t−τ */
+    hValue: function (u, width) { return practiceCalc.rectValue(u, width); },
+    /* 解析卷积：两矩形 [0,w₁]、[0,w₂] 的分段梯形（等宽退化为三角） */
+    convolutionAnalytic: function (t, w1, w2) {
+      if (!(t > 0) || !(t < w1 + w2)) return 0;
+      var lo = Math.min(w1, w2);
+      var hi = Math.max(w1, w2);
+      if (t <= lo) return t;
+      if (t <= hi) return lo;
+      return w1 + w2 - t;
+    },
+    /* 复合梯形数值积分 y(t)=∫x(τ)h(t−τ)dτ，步长 dtau */
+    convolutionNumeric: function (t, w1, w2, dtau) {
+      var step = (Number.isFinite(dtau) && dtau > 0) ? dtau : 0.005;
+      var from = -1;
+      var to = w1 + w2 + 1;
+      var n = Math.max(1, Math.ceil((to - from) / step));
+      var h = (to - from) / n;
+      var sum = 0;
+      for (var i = 0; i <= n; i += 1) {
+        var tau = from + i * h;
+        var value = practiceCalc.rectValue(tau, w1) * practiceCalc.rectValue(t - tau, w2);
+        sum += ((i === 0 || i === n) ? 0.5 : 1) * value;
+      }
+      return sum * h;
+    },
+    sinc: function (u) {
+      if (Math.abs(u) < 1e-12) return 1;
+      return Math.sin(Math.PI * u) / (Math.PI * u);
+    },
+    /* 折叠后观测频率：r = f_in mod fs，取 min(r, fs−r) */
+    aliasObserved: function (fin, fs) {
+      var r = ((fin % fs) + fs) % fs;
+      return Math.min(r, fs - r);
+    },
+    /* 三区间状态文案（等号是临界，依赖相位） */
+    aliasStatus: function (fin, fs) {
+      if (fs > 2 * fin) return "满足严格条件 fs > 2f_in";
+      if (fs === 2 * fin) return "临界：fs = 2f_in，依赖相位，不保证一般恢复";
+      return "混叠失真：fs < 2f_in";
+    },
+    /* 三种重建：sinc 理想低通插值 / 零阶保持 / 线性插值；样点取 n=−32…32 */
+    reconstruct: function (mode, fin, fs, t) {
+      var n0 = -32;
+      var n1 = 32;
+      var sample = function (n) { return Math.cos(2 * Math.PI * fin * (n / fs)); };
+      if (mode === "zoh") {
+        var hold = Math.floor(fs * t);
+        return sample(Math.min(n1, Math.max(n0, hold)));
+      }
+      if (mode === "linear") {
+        var kf = fs * t;
+        var k0 = Math.floor(kf);
+        var frac = kf - k0;
+        if (k0 < n0) return sample(n0);
+        if (k0 >= n1) return sample(n1);
+        return sample(k0) * (1 - frac) + sample(k0 + 1) * frac;
+      }
+      var sum = 0;
+      for (var n = n0; n <= n1; n += 1) sum += sample(n) * practiceCalc.sinc(fs * t - n);
+      return sum;
+    },
+    /* RMSE 按文档规定在 t_i = −0.5 + i/1000（i=0…1000）等权计算 */
+    rmse: function (mode, fin, fs) {
+      var sum = 0;
+      for (var i = 0; i <= 1000; i += 1) {
+        var t = -0.5 + i / 1000;
+        var diff = practiceCalc.reconstruct(mode, fin, fs, t) - Math.cos(2 * Math.PI * fin * t);
+        sum += diff * diff;
+      }
+      return Math.sqrt(sum / 1001);
+    },
+
+    /* —— 模块 5：频谱分析（观察时间 / 窗 / 补零）—— */
+    analysisFs: 64,
+    /* 窗：矩形恒为 1；对称 Hann w[n]=.5−.5cos(2πn/(L−1)) */
+    windowValue: function (kind, n, L) {
+      if (kind === "hann") return 0.5 - 0.5 * Math.cos((2 * Math.PI * n) / (L - 1));
+      return 1;
+    },
+    /* 场景：三个零相位余弦场景；flat 供窗自身频谱复用同一归一化 */
+    sceneValue: function (scene, n) {
+      var w = (2 * Math.PI * n) / practiceCalc.analysisFs;
+      if (scene === "single10") return Math.cos(10 * w);
+      if (scene === "single10.5") return Math.cos(10.5 * w);
+      if (scene === "flat") return 1;
+      return Math.cos(10 * w) + Math.cos(12 * w);
+    },
+    /* 预计算基：窗与场景只取决于 (scene, L, win)，与频率无关。
+       缓存后每个频点只剩 2 次三角函数，而不是重新求窗值与场景样点。 */
+    spectrumBasis: function (scene, L, win) {
+      var key = scene + "|" + L + "|" + win;
+      var cached = practiceCalc.basisCache[key];
+      if (cached) return cached;
+      var weighted = [];
+      var sumW = 0;
+      for (var n = 0; n < L; n += 1) {
+        var w = practiceCalc.windowValue(win, n, L);
+        sumW += w;
+        weighted.push(w * practiceCalc.sceneValue(scene, n));
+      }
+      var basis = { weighted: weighted, sumW: sumW };
+      practiceCalc.basisCache[key] = basis;
+      return basis;
+    },
+    basisCache: {},
+    /* 归一化频谱 |Σ w[n]x[n]e^{−j2πfn/fs}| / Σw[n]：不单边翻倍，单位幅度单音谱峰为 0.5 */
+    spectrumMagnitude: function (scene, L, win, f) {
+      var fs = practiceCalc.analysisFs;
+      var basis = practiceCalc.spectrumBasis(scene, L, win);
+      var re = 0, im = 0;
+      for (var n = 0; n < L; n += 1) {
+        var phase = (-2 * Math.PI * f * n) / fs;
+        re += basis.weighted[n] * Math.cos(phase);
+        im += basis.weighted[n] * Math.sin(phase);
+      }
+      return Math.sqrt(re * re + im * im) / basis.sumW;
+    },
+    /* Nfft 点 DFT 的第 k 根谱线，落在 f=k·fs/Nfft；与稠密 DTFT 同一尺度（补零不改同频率的值） */
+    dftMagnitude: function (scene, L, win, k, Nfft) {
+      return practiceCalc.spectrumMagnitude(scene, L, win, (k * practiceCalc.analysisFs) / Nfft);
+    },
+    /* [f0,f1] 内以 df 采样的局部极大（相邻三点比较，端点不计） */
+    localPeaks: function (scene, L, win, f0, f1, df) {
+      var out = [];
+      var prev = practiceCalc.spectrumMagnitude(scene, L, win, f0 - df);
+      var cur = practiceCalc.spectrumMagnitude(scene, L, win, f0);
+      var steps = Math.round((f1 - f0) / df);
+      for (var i = 1; i <= steps; i += 1) {
+        var f = f0 + i * df;
+        var next = practiceCalc.spectrumMagnitude(scene, L, win, f);
+        if (cur > prev && cur >= next) out.push([f - df, cur]);
+        prev = cur;
+        cur = next;
+      }
+      return out;
+    },
+    /* 窗自身归一化频谱：首次局部极小=主瓣边界，其后首个局部极大=第一旁瓣 */
+    windowLobe: function (win, L, df) {
+      var at = function (f) { return practiceCalc.spectrumMagnitude("flat", L, win, f); };
+      var prev = at(0);
+      var cur = at(df);
+      var edge = null, side = null;
+      var steps = Math.round(8 / df);
+      for (var i = 2; i <= steps; i += 1) {
+        var f = i * df;
+        var next = at(f);
+        if (edge === null) {
+          if (cur < prev && cur <= next) edge = f - df;
+        } else if (cur > prev && cur >= next) { side = f - df; break; }
+        prev = cur;
+        cur = next;
+      }
+      return { mainLobeEdge: edge, firstSidelobe: side };
+    },
+    windowMainLobeEdge: function (win, L, df) {
+      return practiceCalc.windowLobe(win, L, df).mainLobeEdge;
+    },
+    /* 第一旁瓣相对 DC 的 dB（负值，越小越低） */
+    windowFirstSidelobeDb: function (win, L, df) {
+      var lobe = practiceCalc.windowLobe(win, L, df);
+      return 20 * Math.log10(practiceCalc.spectrumMagnitude("flat", L, win, lobe.firstSidelobe));
+    },
+
+    /* —— 模块 6：循环卷积（从 0 开始的单位矩形序列）—— */
+    /* 线性卷积 y[n]，长度 L=N₁+N₂−1 */
+    linearConv: function (n1, n2) {
+      var out = [];
+      var i, j;
+      for (i = 0; i < n1 + n2 - 1; i += 1) out.push(0);
+      for (i = 0; i < n1; i += 1) {
+        for (j = 0; j < n2; j += 1) out[i + j] += 1;
+      }
+      return out;
+    },
+    /* 循环卷积：把线性结果按 n mod N 累加 */
+    circularConv: function (n1, n2, n) {
+      var lin = practiceCalc.linearConv(n1, n2);
+      var out = [];
+      var k;
+      for (k = 0; k < n; k += 1) out.push(0);
+      for (k = 0; k < lin.length; k += 1) out[k % n] += lin[k];
+      return out;
+    },
+    /* 折回样本数 max(0, L−N)：只对当前正值矩形成立 */
+    foldedSamples: function (n1, n2, n) {
+      return Math.max(0, n1 + n2 - 1 - n);
+    },
+    /* 受影响的桶数 min(N, max(0, L−N))：与折回样本数是两个不同的量 */
+    affectedBins: function (n1, n2, n) {
+      return Math.min(n, practiceCalc.foldedSamples(n1, n2, n));
+    },
+    /* 首 N 点误差 E：超出线性长度的循环值按 0 参与 */
+    circError: function (n1, n2, n) {
+      var lin = practiceCalc.linearConv(n1, n2);
+      var circ = practiceCalc.circularConv(n1, n2, n);
+      var sum = 0;
+      for (var k = 0; k < n; k += 1) {
+        sum += Math.abs(circ[k] - (k < lin.length ? lin[k] : 0));
+      }
+      return sum;
+    },
+    /* 把从 0 开始的单位矩形序列按模 N 折叠：x_N[k] = #{ i<N₁ : i ≡ k (mod N) } */
+    foldedRect: function (length, n) {
+      var out = [];
+      var k, i;
+      for (k = 0; k < n; k += 1) out.push(0);
+      for (i = 0; i < length; i += 1) out[i % n] += 1;
+      return out;
+    },
+    /* DFT 核对路线：两个输入都必须先按模 N 折叠，再做 N 点变换；
+       不能用会截断长输入的 N 点变换（截断会得到完全不同的结果）。 */
+    circularByDft: function (n1, n2, n) {
+      var dft = function (seq) {
+        var re = [], im = [];
+        for (var k = 0; k < n; k += 1) {
+          var sr = 0, si = 0;
+          for (var i = 0; i < n; i += 1) {
+            var phase = (-2 * Math.PI * k * i) / n;
+            sr += seq[i] * Math.cos(phase);
+            si += seq[i] * Math.sin(phase);
+          }
+          re.push(sr);
+          im.push(si);
+        }
+        return { re: re, im: im };
+      };
+      var fa = dft(practiceCalc.foldedRect(n1, n));
+      var fb = dft(practiceCalc.foldedRect(n2, n));
+      var pr = [], pi = [];
+      for (var k = 0; k < n; k += 1) {
+        pr.push(fa.re[k] * fb.re[k] - fa.im[k] * fb.im[k]);
+        pi.push(fa.re[k] * fb.im[k] + fa.im[k] * fb.re[k]);
+      }
+      var out = [];
+      for (var m = 0; m < n; m += 1) {
+        var sum = 0;
+        for (var t = 0; t < n; t += 1) {
+          var phase = (2 * Math.PI * t * m) / n;
+          sum += pr[t] * Math.cos(phase) - pi[t] * Math.sin(phase);
+        }
+        var value = sum / n;
+        out.push(Math.abs(value) < 1e-9 ? 0 : value);      /* 浮点归零阈值 1e-9 */
+      }
+      return out;
+    },
+
+    /* —— 模块 1：波形变换（梯形 x(τ)，y(t)=x(a·t+b)）—— */
+    /* 首版只用这一个梯形：特征点 (0,0)、(1,2)、(2,2)、(3,0) */
+    waveformValue: function (tau) {
+      if (tau < 0 || tau > 3) return 0;
+      if (tau < 1) return 2 * tau;
+      if (tau <= 2) return 2;
+      return 2 * (3 - tau);
+    },
+    waveformFeatures: [[0, 0], [1, 2], [2, 2], [3, 0]],
+    /* 新时刻 t 到旧波形上取值：y(t)=x(a·t+b) */
+    transformValue: function (t, a, b) { return practiceCalc.waveformValue(a * t + b); },
+    /* 特征点在新轴上的位置：t=(τ−b)/a */
+    transformTime: function (tau, a, b) { return (tau - b) / a; },
+    /* 新支撑区间：原支撑 [0,3] 两端映射后取小/大（a<0 时顺序翻转） */
+    transformSupport: function (a, b) {
+      var end1 = (0 - b) / a;
+      var end2 = (3 - b) / a;
+      return [Math.min(end1, end2), Math.max(end1, end2)];
+    },
+    /* 上下轴共用的横坐标范围：同时包含原支撑 [0,3] 与新支撑 */
+    viewRange: function (a, b) {
+      var support = practiceCalc.transformSupport(a, b);
+      return [Math.min(0, support[0]) - 0.5, Math.max(3, support[1]) + 0.5];
+    },
+    /* 压缩拉伸看 |a|：新支撑宽度 */
+    compressionWidth: function (a) { return 3 / Math.abs(a); },
+    /* 等价延迟 t₀=−b/a */
+    timeShift: function (a, b) { return -b / a; },
+    /* 反折只看 a 的符号 */
+    reflectionState: function (a) { return a < 0 ? "已反折（a<0）" : "不反折（a>0）"; },
+
+    /* —— 模块 3：傅里叶表示（单位高度、中心对称、脉宽 τ=1 的周期矩形）—— */
+    fourierPulseWidth: 1,
+    gibbsPeakValue: 1.08949,
+    mseSampleCount: 4096,
+    /* c_k=(τ/T)sinc(kτ/T) */
+    fourierCoefficient: function (k, T) {
+      var tau = practiceCalc.fourierPulseWidth;
+      return (tau / T) * practiceCalc.sinc((k * tau) / T);
+    },
+    /* x_N(t)=c₀+2Σ(k=1…N)c_k cos(2πkt/T) */
+    fourierPartialSum: function (t, T, N) {
+      var sum = practiceCalc.fourierCoefficient(0, T);
+      for (var k = 1; k <= N; k += 1) {
+        sum += 2 * practiceCalc.fourierCoefficient(k, T) * Math.cos((2 * Math.PI * k * t) / T);
+      }
+      return sum;
+    },
+    /* 目标周期矩形：周期内以 0 为中心、|t|<τ/2 时为 1 */
+    fourierTarget: function (t, T) {
+      var tau = practiceCalc.fourierPulseWidth;
+      var u = ((t % T) + T) % T;
+      if (u > T / 2) u -= T;
+      var d = Math.abs(u);
+      if (d < tau / 2) return 1;
+      if (d === tau / 2) return 0.5;
+      return 0;
+    },
+    /* |k/T| ≤ fMax 的全部谱点（含零系数）；纵轴取 T·c_k，与连续包络同尺度 */
+    spectrumPoints: function (T, fMax) {
+      var out = [];
+      var kMax = Math.ceil(fMax * T);
+      for (var k = -kMax; k <= kMax; k += 1) {
+        var f = k / T;
+        if (Math.abs(f) > fMax + 1e-12) continue;
+        out.push({ k: k, f: f, value: T * practiceCalc.fourierCoefficient(k, T) });
+      }
+      return out;
+    },
+    /* 连续包络 τ·sinc(τf) */
+    envelopeValue: function (f) {
+      return practiceCalc.fourierPulseWidth * practiceCalc.sinc(practiceCalc.fourierPulseWidth * f);
+    },
+    /* 跳变内侧局部峰值相对跳变幅度 1 的过冲百分数（细扫，只在测试与需要时调用） */
+    jumpOvershootPercent: function (T, N) {
+      var half = practiceCalc.fourierPulseWidth / 2;
+      var steps = 20000;
+      var best = -Infinity;
+      for (var i = 0; i <= steps; i += 1) {
+        var t = (half - 0.5) + (i / steps);
+        var value = practiceCalc.fourierPartialSum(t, T, N);
+        if (value > best) best = value;
+      }
+      return (best - 1) * 100;
+    },
+    /* MSE：一个周期 4096 个中点等权（返回均方根）；结果按 (T,N) 记忆，避免每次重绘重算 */
+    mseCache: {},
+    fourierMse: function (T, N) {
+      var key = T + "|" + N;
+      if (practiceCalc.mseCache[key] !== undefined) return practiceCalc.mseCache[key];
+      var count = practiceCalc.mseSampleCount;
+      var sum = 0;
+      for (var i = 0; i < count; i += 1) {
+        var t = -T / 2 + (T * (i + 0.5)) / count;
+        var diff = practiceCalc.fourierPartialSum(t, T, N) - practiceCalc.fourierTarget(t, T);
+        sum += diff * diff;
+      }
+      var value = Math.sqrt(sum / count);
+      practiceCalc.mseCache[key] = value;
+      return value;
+    },
+  };
+  window.__practiceCalc = practiceCalc;
+  window.__practiceState = function (id) { return practiceDemoStates[id]; };
+
   function collectPracticeExperiments() {
     var signalsCourse = courses.find(function (candidate) { return candidate.id === "signals"; });
     if (!signalsCourse) return;
@@ -1833,11 +2197,30 @@
   }
   collectPracticeExperiments();
 
+  /* 演练章节分组：同一个章节的实验归到一枚大气泡里。
+     顺序沿用课程顺序，不重排；每章给出一枚短标签（章节 number，如「绪论」「第1章」）。 */
+  var practiceChapters = [];
+  practiceExperiments.forEach(function (entry) {
+    var group = null;
+    for (var i = 0; i < practiceChapters.length; i += 1) {
+      if (practiceChapters[i].chapter.id === entry.chapter.id) { group = practiceChapters[i]; break; }
+    }
+    if (!group) {
+      group = { chapter: entry.chapter, entries: [] };
+      practiceChapters.push(group);
+    }
+    group.entries.push(entry);
+  });
+
   /* 演练导航短标题：实验 ID → 短标题的显式映射（与 courses.js 真实 id 一一对应） */
   var EXPERIMENT_SHORT_TITLES = {
     "signals-intro-notebook": "信号观察",
-    "signals-ch1-convolution": "卷积验证",
-    "signals-ch2-aliasing": "采样混叠",
+    "signals-ch1-waveform-transform": "波形变换",
+    "signals-ch1-convolution": "动态卷积",
+    "signals-ch1-fourier-synthesis": "傅里叶表示",
+    "signals-ch2-aliasing": "采样与重建",
+    "signals-ch2-spectral-leakage": "频谱分析",
+    "signals-ch2-circular-convolution": "循环卷积",
     "signals-ch3-first-order-lti": "LTI 系统",
     "signals-ch4-moving-average": "FIR 滤波",
     "signals-ch5-random-average": "方差验证"
@@ -1847,27 +2230,129 @@
     return EXPERIMENT_SHORT_TITLES[experiment.id] || experiment.title;
   }
 
+  /* —— 演练章节气泡（顶部）与实验大气泡（其下）——
+     切换逻辑与代码实现对齐科目间气泡切换：
+     ① 滑块位置/宽度现场测量，只吃 transform 与 width，不依赖动画事件；
+     ② 选中态只在一个地方改，滑块与按钮状态始终同源；
+     ③ 指示器先行：先落选中态让滑块起步，正文随后淡出换内容。 */
+
+  /* 章节滑块：与 syncSubjectThumb 同一套做法 */
+  function syncPracticeChapterThumb(nav, instant) {
+    if (!nav) return;
+    var thumb = nav.querySelector(".practice-chapter-thumb");
+    var active = nav.querySelector(".practice-chapter.is-active");
+    if (!thumb || !active) return;
+    if (instant) nav.classList.add("is-instant");
+    thumb.style.width = active.offsetWidth + "px";
+    thumb.style.transform = "translateX(" + active.offsetLeft + "px)";
+    if (instant) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { nav.classList.remove("is-instant"); });
+      });
+    }
+  }
+
+  /* 章节选中态只在这里改：同一时间只有一枚 is-active */
+  function selectPracticeChapter(nav, chapterId) {
+    if (!nav) return;
+    Array.prototype.forEach.call(nav.querySelectorAll(".practice-chapter"), function (button) {
+      var on = button.getAttribute("data-chapter-id") === chapterId;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  /* 内容淡入淡出：沿用章节正文那一套（opacity 过渡 + 150ms 后换内容再淡入）。
+     连续点击先清掉上一个计时器——只有最后一次点击真正换内容，不叠加、不闪回。 */
+  var practiceFadeTimer = 0;
+  function switchPracticeExperiment(experiment, chapter) {
+    if (practiceFadeTimer) { clearTimeout(practiceFadeTimer); practiceFadeTimer = 0; }
+    notebookRoot.style.opacity = 0;
+    practiceFadeTimer = setTimeout(function () {
+      practiceFadeTimer = 0;
+      openNotebookExperiment(experiment, chapter);
+      notebookRoot.style.opacity = 1;
+    }, 150);
+  }
+
   function renderNotebookView(course, chapter, experiment) {
+    /* 章节气泡行跨渲染复用同一个 DOM 节点：滑块才能在一次切换里连续滑到位，
+       而不是每换一次内容就换一枚新滑块、把动画掐断。 */
+    var chapterNav = notebookRoot.querySelector(".practice-chapters");
+    var reused = Boolean(chapterNav);
+
+    /* 重新渲染前先注销上一份 demo 的监听器与定时器：
+       否则每换一次实验就多留一份，resize 时会有多份旧 demo 同时重绘
+       （规划文档 §二：离开、重新渲染时注销旧 rAF/监听器）。 */
+    var outgoing = notebookRoot.querySelector(".notebook-demo");
+    if (outgoing && typeof outgoing.__cleanup === "function") outgoing.__cleanup();
+
     notebookRoot.textContent = "";
     var page = document.createElement("article");
     page.className = "notebook-page";
 
-    /* —— 顶部：紧凑短标题导航（当前实验高亮；完成标记 ✓ 保留）。
+    /* —— 顶部：章节气泡行 + 当前章节的实验大气泡 ——
        导航行放在正文卡片之外，以便贴住窗口边（预留固定边距） —— */
     var topbar = document.createElement("header");
     topbar.className = "practice-topbar";
 
+    if (!reused) {
+      chapterNav = document.createElement("nav");
+      chapterNav.className = "practice-chapters";
+      chapterNav.setAttribute("role", "tablist");
+      chapterNav.setAttribute("aria-label", "演练章节");
+      var chapterThumb = document.createElement("span");
+      chapterThumb.className = "practice-chapter-thumb";
+      chapterThumb.setAttribute("aria-hidden", "true");
+      chapterNav.appendChild(chapterThumb);
+      practiceChapters.forEach(function (group) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "practice-chapter";
+        button.setAttribute("role", "tab");
+        button.setAttribute("data-chapter-id", group.chapter.id);
+        button.setAttribute("title", group.chapter.number + " " + group.chapter.title);
+        /* 供按 ID 定位用：这一章里有哪些实验（芯片只渲染当前章节，测试需要先点章节） */
+        button.setAttribute("data-experiment-ids", group.entries.map(function (entry) {
+          return entry.experiment.id;
+        }).join(" "));
+        button.appendChild(textElement("span", group.chapter.number, "practice-chapter-title"));
+        button.addEventListener("click", function () {
+          /* 章节气泡跨渲染复用，处理函数不能闭包捕获某一次渲染的 chapter——
+             那会在切换过一次之后变成过期状态。当前章节一律从 DOM 上的选中态读。 */
+          var current = chapterNav.querySelector(".practice-chapter.is-active");
+          if (current && current.getAttribute("data-chapter-id") === group.chapter.id) return;
+          /* 指示器先行：先落选中态让滑块起步，正文 150ms 淡出后再换内容 */
+          selectPracticeChapter(chapterNav, group.chapter.id);
+          syncPracticeChapterThumb(chapterNav);
+          switchPracticeExperiment(group.entries[0].experiment, group.chapter);
+        });
+        chapterNav.appendChild(button);
+      });
+    } else {
+      /* 复用：节点与按钮都在，只要把选中态对齐到当前章节 */
+      selectPracticeChapter(chapterNav, chapter.id);
+    }
+    /* 首次构建也要落选中态：滑块只认 .is-active，缺了它就没有落位依据 */
+    selectPracticeChapter(chapterNav, chapter.id);
+    topbar.appendChild(chapterNav);
+
+    /* 大气泡：只装当前章节的实验标签 */
+    var bubble = document.createElement("div");
+    bubble.className = "practice-bubble";
     var tabs = document.createElement("nav");
     tabs.className = "practice-tabs";
     tabs.setAttribute("role", "tablist");
-    practiceExperiments.forEach(function (entry) {
+    var activeGroup = null;
+    for (var g = 0; g < practiceChapters.length; g += 1) {
+      if (practiceChapters[g].chapter.id === chapter.id) { activeGroup = practiceChapters[g]; break; }
+    }
+    (activeGroup ? activeGroup.entries : []).forEach(function (entry) {
       var tab = document.createElement("button");
       tab.type = "button";
       tab.className = "practice-tab";
       tab.setAttribute("role", "tab");
       tab.setAttribute("data-experiment-id", entry.experiment.id);
-      var states = notebookChecks[entry.experiment.id];
-      var doneCount = states ? states.filter(function (v) { return v; }).length : 0;
       tab.appendChild(textElement("span", experimentShortTitle(entry.experiment), "practice-tab-title"));
       if (entry.experiment.id === experiment.id) {
         tab.classList.add("is-active");
@@ -1876,12 +2361,13 @@
         tab.setAttribute("aria-selected", "false");
       }
       tab.addEventListener("click", function () {
-        if (entry.experiment.id === experiment.id || entry.experiment.id === practiceShown && activeWorkbench === "notebook" && entry.experiment.id === experiment.id) return;
-        openNotebookExperiment(entry.experiment, entry.chapter);
+        if (entry.experiment.id === experiment.id) return;
+        switchPracticeExperiment(entry.experiment, entry.chapter);
       });
       tabs.appendChild(tab);
     });
-    topbar.appendChild(tabs);
+    bubble.appendChild(tabs);
+    topbar.appendChild(bubble);
     page.appendChild(topbar);
 
     /* —— 两步布局：主导区（目标+沙箱）｜右侧栏（步骤+预期证据） —— */
@@ -1962,19 +2448,27 @@
     page.appendChild(layout);
 
     notebookRoot.appendChild(page);
+    /* 滑块落位（DOM 挂载后才有有效几何）：首次构建即时就位；
+       复用同一节点时只做幂等校准，不加 is-instant，避免把还在进行中的滑动动画掐断 */
+    syncPracticeChapterThumb(chapterNav, !reused);
     /* 窄屏时把当前实验滚进视野：只滚动 tabs 自身，不改变页面滚动位置
        （DOM 挂载后才有有效几何，因此放在 append 之后执行） */
     scrollActiveTabIntoView();
   }
 
   function scrollActiveTabIntoView() {
-    var tabsEl = notebookRoot.querySelector(".practice-tabs");
-    if (!tabsEl) return;
-    var active = tabsEl.querySelector(".practice-tab.is-active");
-    if (!active || tabsEl.scrollWidth <= tabsEl.clientWidth) return;
-    var a = active.getBoundingClientRect();
-    var t = tabsEl.getBoundingClientRect();
-    tabsEl.scrollLeft += a.left - t.left - t.width / 2 + a.width / 2;
+    var strips = [
+      notebookRoot.querySelector(".practice-tabs"),
+      notebookRoot.querySelector(".practice-chapters")
+    ];
+    strips.forEach(function (tabsEl) {
+      if (!tabsEl) return;
+      var active = tabsEl.querySelector(".is-active");
+      if (!active || tabsEl.scrollWidth <= tabsEl.clientWidth) return;
+      var a = active.getBoundingClientRect();
+      var t = tabsEl.getBoundingClientRect();
+      tabsEl.scrollLeft += a.left - t.left - t.width / 2 + a.width / 2;
+    });
   }
 
   function openNotebookExperiment(experiment, chapter) {
@@ -1989,8 +2483,12 @@
   /* ===== 信号沙箱（零依赖 canvas，预置演示）：实验 id → 渲染器注册表 ===== */
   var SIGNAL_DEMOS = {
     "signals-intro-notebook": renderSignalObserveDemo,
+    "signals-ch1-waveform-transform": renderSignalWaveformDemo,
     "signals-ch1-convolution": renderSignalConvolutionDemo,
+    "signals-ch1-fourier-synthesis": renderSignalFourierDemo,
     "signals-ch2-aliasing": renderSignalAliasingDemo,
+    "signals-ch2-spectral-leakage": renderSignalLeakageDemo,
+    "signals-ch2-circular-convolution": renderSignalCircularDemo,
     "signals-ch3-first-order-lti": renderSignalLtiDemo,
     "signals-ch4-moving-average": renderSignalFirDemo,
     "signals-ch5-random-average": renderSignalVarianceDemo
@@ -2204,45 +2702,50 @@
       });
       resizeObserver.observe(canvas);
     }
-    setTimeout(draw, 400);
+    var firstDrawTimer = setTimeout(draw, 400);
     window.addEventListener("resize", draw);
+    /* 卸载时注销：监听的画布会被下一次渲染丢弃，留着会多份重绘 */
+    demo.__cleanup = function () {
+      clearTimeout(firstDrawTimer);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener("resize", draw);
+    };
   }
 
-  /* 演练 2：采样率改变与混叠——7 Hz 连续参考 + 10 Hz（混叠 3 Hz）与 20 Hz（正确 7 Hz）样点对比。
-     测量：两组样点的等效频率（混叠→fs/2 以下的理论频率）。 */
+  /* 演练 4：采样、混叠与重建——同一组样点可以对应不同连续信号。
+     上视口：连续参考、离散样点、选定算法重建出的曲线；
+     下视口：基带谱与 ±f_in + k·fs 的周期副本，并标出理想低通的砖墙通带。 */
   function renderSignalAliasingDemo(container, experiment) {
     var demo = document.createElement("section");
     demo.className = "notebook-demo";
 
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { fin: 7, fs: 20, mode: "sinc" });
+
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { frequency: 7, rateLow: 10, rateHigh: 20, duration: 1, amplitude: 1 });
-    var fields = [
-      ["frequency", "信号频率 f / Hz", 0.5, 50, 0.5],
-      ["rateLow", "低采样率 fs₁ / Hz", 4, 200, 1],
-      ["rateHigh", "高采样率 fs₂ / Hz", 4, 200, 1],
-      ["duration", "时长 T / s", 0.2, 2, 0.1],
-      ["amplitude", "信号幅值 A / V", 0.5, 2, 0.1]
-    ];
-    fields.forEach(function (field) {
-      var label = document.createElement("label");
-      label.className = "demo-field";
-      label.appendChild(document.createTextNode(field[1]));
-      var input = document.createElement("input");
-      input.type = "number";
-      input.min = String(field[2]);
-      input.max = String(field[3]);
-      input.step = String(field[4]);
-      input.value = String(state[field[0]]);
-      input.addEventListener("input", function () {
-        var value = Number(input.value);
-        if (!Number.isFinite(value)) return;
-        state[field[0]] = Math.min(field[3], Math.max(field[2], value));
-        draw();
+
+    appendNumberField("信号频率 f_in / Hz", "fin", 1, 15, 1);
+    appendNumberField("采样率 f_s / Hz", "fs", 2, 30, 1);
+
+    var modeLabel = document.createElement("label");
+    modeLabel.className = "demo-field";
+    modeLabel.appendChild(document.createTextNode("重建滤波器模式"));
+    var modeSelect = document.createElement("select");
+    [["sinc", "理想低通（sinc 插值）"], ["zoh", "零阶保持（ZOH 阶梯）"], ["linear", "线性插值（折线）"]]
+      .forEach(function (pair) {
+        var option = document.createElement("option");
+        option.value = pair[0];
+        option.textContent = pair[1];
+        if (state.mode === pair[0]) option.selected = true;
+        modeSelect.appendChild(option);
       });
-      label.appendChild(input);
-      controls.appendChild(label);
+    modeSelect.addEventListener("change", function () {
+      state.mode = modeSelect.value;
+      draw();
     });
+    modeLabel.appendChild(modeSelect);
+    controls.appendChild(modeLabel);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas demo-canvas-tall";
@@ -2252,29 +2755,67 @@
     var legend = document.createElement("div");
     legend.className = "demo-legend";
     legend.appendChild(textElement("span", "─ 连续参考", "demo-legend-line"));
-    legend.appendChild(textElement("span", "│ 样点（低/高采样率）", "demo-legend-stem"));
-    legend.appendChild(textElement("span", "○ 等效频率曲线", "demo-legend-peak"));
+    legend.appendChild(textElement("span", "│ 采样样点", "demo-legend-stem"));
+    legend.appendChild(textElement("span", "┄ 重建输出", "demo-legend-dash"));
+    legend.appendChild(textElement("span", "▨ 理想低通通带", "demo-legend-fill"));
     wrap.appendChild(legend);
 
     var metrics = document.createElement("div");
     metrics.className = "demo-metrics";
 
-    function formatNumber(value) {
+    function formatNumber(value, digits) {
       if (!Number.isFinite(value)) return "—";
-      return String(Math.round(value * 1000) / 1000);
+      var scale = Math.pow(10, digits === undefined ? 3 : digits);
+      return String(Math.round(value * scale) / scale);
     }
 
-    /* 理论等效频率：f_alias = |f - k·fs| 折到 [0, fs/2] */
-    function aliasFrequency(f, fs) {
-      var folded = Math.abs(f - Math.round(f / fs) * fs);
-      return Math.min(folded, fs - folded);
+    function appendNumberField(labelText, key, min, max, step) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                       /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        state[key] = Math.round(Math.min(max, Math.max(min, value)));
+        range.value = String(state[key]);
+        number.value = String(state[key]);
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
     }
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
 
     function draw() {
       var ctx = canvas.getContext("2d");
       var dpr = window.devicePixelRatio || 1;
-      var rect = canvas.getBoundingClientRect();
-      var width = Math.max(rect.width, 100);
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
       var height = 340;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
@@ -2283,114 +2824,159 @@
 
       var accent = canvasColor("--accent");
       var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
       var gridSoft = "rgba(128, 133, 141, 0.14)";
-      var gridMid = "rgba(128, 133, 141, 0.32)";
-      var gridText = "rgba(128, 133, 141, 0.72)";
-      var margin = { left: 40, right: 14, top: 8, bottom: 8 };
-      var rows = 2;
-      var T = state.duration;
-      var f = state.frequency;
-      var rates = [state.rateLow, state.rateHigh];
-      var rowH = (height - margin.top - margin.bottom) / rows;
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 44, right: 16, top: 18, bottom: 22 };
       var plotW = width - margin.left - margin.right;
-      var vScale = (rowH / 2) * 0.85;
-      var A = state.amplitude;
 
-      rates.forEach(function (fs, rowIndex) {
-        var rowTop = margin.top + rowIndex * rowH;
-        var midY = rowTop + rowH / 2;
+      var fin = state.fin;
+      var fs = state.fs;
+      var t0 = -0.5;
+      var t1 = 0.5;
+      var toX = function (t) { return margin.left + ((t - t0) / (t1 - t0)) * plotW; };
 
-        /* 行标题 */
-        ctx.fillStyle = gridText;
-        ctx.font = "11px system-ui, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("fs = " + formatNumber(fs) + " Hz" + (rowIndex === 1 ? "（满足采样定理）" : "（低于 2f，发生混叠）"), margin.left, rowTop + 10);
+      var topTop = margin.top;
+      var topH = 120;
+      var topBase = topTop + topH;
+      var botTop = 178;
+      var botH = 116;
+      var botBase = botTop + botH;
 
-        /* 网格 */
-        ctx.strokeStyle = gridSoft;
-        ctx.lineWidth = 1;
-        for (var gx = 0; gx <= 5; gx += 1) {
-          var x = margin.left + (plotW * gx) / 5;
-          ctx.beginPath(); ctx.moveTo(x, rowTop); ctx.lineTo(x, rowTop + rowH); ctx.stroke();
-        }
-        ctx.strokeStyle = gridMid;
-        ctx.beginPath(); ctx.moveTo(margin.left, midY); ctx.lineTo(margin.left + plotW, midY); ctx.stroke();
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.strokeStyle = gridSoft;
+      ctx.lineWidth = 1;
+      for (var gx = 0; gx <= 5; gx += 1) {
+        var gxp = margin.left + (plotW * gx) / 5;
+        ctx.beginPath(); ctx.moveTo(gxp, topTop); ctx.lineTo(gxp, topBase); ctx.stroke();
+      }
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath(); ctx.moveTo(margin.left, topBase); ctx.lineTo(margin.left + plotW, topBase); ctx.stroke();
 
-        /* 连续参考（淡） */
-        ctx.save();
+      /* 上视口：连续参考 + 重建 + 样点 */
+      var yScale = (topH - 16) / 2;
+      ctx.strokeStyle = accentInk;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (var i = 0; i <= 400; i += 1) {
+        var t = t0 + ((t1 - t0) * i) / 400;
+        var y = Math.cos(2 * Math.PI * fin * t);
+        var px = toX(t);
+        var py = topBase - y * yScale;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (var j = 0; j <= 400; j += 1) {
+        var tr = t0 + ((t1 - t0) * j) / 400;
+        var yr = practiceCalc.reconstruct(state.mode, fin, fs, tr);
+        var pxr = toX(tr);
+        var pyr = topBase - yr * yScale;
+        if (j === 0) ctx.moveTo(pxr, pyr); else ctx.lineTo(pxr, pyr);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.strokeStyle = warm;
+      ctx.lineWidth = 1.2;
+      var nFrom = Math.ceil(t0 * fs);
+      var nTo = Math.floor(t1 * fs);
+      for (var n = nFrom; n <= nTo; n += 1) {
+        var tn = n / fs;
+        if (tn < t0 || tn > t1) continue;
+        var yn = Math.cos(2 * Math.PI * fin * tn);
         ctx.beginPath();
-        ctx.rect(margin.left, rowTop, plotW, rowH);
-        ctx.clip();
-        ctx.strokeStyle = gridText;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (var i = 0; i <= 400; i += 1) {
-          var t = (T * i) / 400;
-          var px = margin.left + (t / T) * plotW;
-          var py = midY - Math.cos(2 * Math.PI * f * t) * vScale * A;
-          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        }
+        ctx.moveTo(toX(tn), topBase);
+        ctx.lineTo(toX(tn), topBase - yn * yScale);
         ctx.stroke();
-
-        /* 等效频率曲线（虚线圆点） */
-        var fAlias = aliasFrequency(f, fs);
-        ctx.fillStyle = accent;
+        ctx.fillStyle = warm;
         ctx.beginPath();
-        for (var j = 0; j <= 400; j += 8) {
-          var tj = (T * j) / 400;
-          var pxj = margin.left + (tj / T) * plotW;
-          var pyj = midY - Math.cos(2 * Math.PI * fAlias * tj) * vScale * A;
-          ctx.moveTo(pxj + 1.5, pyj);
-          ctx.arc(pxj, pyj, 1.6, 0, Math.PI * 2);
-        }
+        ctx.arc(toX(tn), topBase - yn * yScale, 2.2, 0, Math.PI * 2);
         ctx.fill();
+      }
 
-        /* 样点 stem */
-        ctx.strokeStyle = accentInk;
-        ctx.lineWidth = 1.4;
-        var n = Math.floor(T * fs);
-        for (var k = 0; k <= n; k += 1) {
-          var tk = k / fs;
-          var sx = margin.left + (tk / T) * plotW;
-          var sy = midY - Math.cos(2 * Math.PI * f * tk) * vScale * A;
-          ctx.beginPath(); ctx.moveTo(sx, midY); ctx.lineTo(sx, sy); ctx.stroke();
-          ctx.beginPath(); ctx.arc(sx, sy, 2.6, 0, Math.PI * 2);
-          ctx.fillStyle = accentInk; ctx.fill();
-        }
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("t / s", margin.left, topTop - 5);
+      ctx.textAlign = "right";
+      ctx.fillText("+1", margin.left - 6, topTop + 10);
+      ctx.fillText("0", margin.left - 6, topBase + 3);
+      ctx.fillText("−1", margin.left - 6, topBase - yScale * 2 + 4);
 
-        /* Y 轴刻度 */
-        ctx.fillStyle = gridText;
-        ctx.textAlign = "right";
-        ctx.fillText("1", margin.left - 6, rowTop + 14);
-        ctx.fillText("0", margin.left - 6, midY + 3);
-        ctx.fillText("-1", margin.left - 6, rowTop + rowH - 4);
-        ctx.restore();
+      /* 下视口：基带 ±f_in 与副本 ±f_in + k·fs；砖墙通带 [−fs/2, fs/2] */
+      var fMax = Math.max(2 * fs, 2 * fin);
+      var toFx = function (f) { return margin.left + ((f + fMax) / (2 * fMax)) * plotW; };
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath(); ctx.moveTo(margin.left, botBase); ctx.lineTo(margin.left + plotW, botBase); ctx.stroke();
+
+      ctx.save();
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.14;
+      ctx.fillRect(toFx(-fs / 2), botTop, toFx(fs / 2) - toFx(-fs / 2), botH);
+      ctx.restore();
+      ctx.strokeStyle = gridMid;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(toFx(-fs / 2), botTop); ctx.lineTo(toFx(-fs / 2), botBase); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(toFx(fs / 2), botTop); ctx.lineTo(toFx(fs / 2), botBase); ctx.stroke();
+      ctx.setLineDash([]);
+
+      var peaks = {};
+      var kRange = Math.ceil(fMax / fs) + 1;
+      for (var k = -kRange; k <= kRange; k += 1) {
+        [fin, -fin].forEach(function (base) {
+          var f = base + k * fs;
+          if (Math.abs(f) > fMax) return;
+          var key = f.toFixed(6);
+          peaks[key] = (peaks[key] || 0) + 1;             /* 重合位置合并 */
+        });
+      }
+      Object.keys(peaks).forEach(function (key) {
+        var f = Number(key);
+        var inside = Math.abs(f) <= fs / 2 + 1e-9;
+        ctx.strokeStyle = inside ? warm : accentInk;
+        ctx.lineWidth = inside ? 2.4 : 1.4;
+        var h = botH * (inside ? 0.82 : 0.5);
+        ctx.beginPath();
+        ctx.moveTo(toFx(f), botBase);
+        ctx.lineTo(toFx(f), botBase - h);
+        ctx.stroke();
       });
 
-      /* X 轴刻度（共用最后一行）：按绘图区宽度自适应，末端让位给单位标签，避免重叠 */
       ctx.fillStyle = gridText;
-      ctx.textAlign = "center";
-      var labelEvery = plotW < 480 ? 2 : 1;
-      for (var gxt = 0; gxt < 5; gxt += labelEvery) {
-        var tx = margin.left + (plotW * gxt) / 5;
-        ctx.fillText(formatNumber((T * gxt) / 5), tx, height - 4);
-      }
+      ctx.textAlign = "left";
+      ctx.fillText("f / Hz（砖墙通带 = 理想低通 [−f_s/2, f_s/2]）", margin.left, botTop - 6);
       ctx.textAlign = "right";
-      ctx.fillText("t / s", width - margin.right, height - 4);
+      ctx.fillText("0", toFx(0) - 4, botBase + 12);
 
-      /* 测量 */
-      metrics.textContent = "";
+      updateMetrics();
+    }
+
+    function updateMetrics() {
+      var fin = state.fin;
+      var fs = state.fs;
+      var observed = practiceCalc.aliasObserved(fin, fs);
+      var status = practiceCalc.aliasStatus(fin, fs);
+      var aliased = fs < 2 * fin;
       var rows = [
-        ["低采样 fs₁ 等效频率", formatNumber(aliasFrequency(f, state.rateLow)) + " Hz"],
-        ["高采样 fs₂ 等效频率", formatNumber(aliasFrequency(f, state.rateHigh)) + " Hz"],
-        ["奈奎斯特频率 fs/2", formatNumber(state.rateLow / 2) + " / " + formatNumber(state.rateHigh / 2) + " Hz"]
+        ["所需采样率临界值 2f_in", formatNumber(2 * fin, 0) + " Hz"],
+        ["奈奎斯特频率 f_s/2", formatNumber(fs / 2, 1) + " Hz"],
+        ["折叠后观测频率", formatNumber(observed) + " Hz" + (aliased ? "（混叠）" : "")],
+        ["混叠状态", status],
+        ["重建 RMSE（" + state.mode + "）", formatNumber(practiceCalc.rmse(state.mode, fin, fs), 4)],
       ];
+      metrics.textContent = "";
       rows.forEach(function (row) {
-        var item = document.createElement("div");
-        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
-        item.appendChild(textElement("span", row[0], "demo-metric-label"));
-        item.appendChild(textElement("strong", row[1], "demo-metric-value"));
-        metrics.appendChild(item);
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (row[0] === "混叠状态" ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
       });
     }
 
@@ -2398,62 +2984,1155 @@
     demo.appendChild(wrap);
     demo.appendChild(metrics);
     container.appendChild(demo);
-
-    var resizeObserver = null;
-    if (typeof window.ResizeObserver !== "undefined") {
-      resizeObserver = new window.ResizeObserver(function () {
-        draw();
-      });
-      resizeObserver.observe(canvas);
-    }
-    setTimeout(draw, 400);
-    window.addEventListener("resize", draw);
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
   }
 
-  /* 演练 3：数值卷积验证三角脉冲——两个宽度 w 的单位矩形脉冲卷积。
-     解析式：支撑 [0, 2w]，t=w 处峰值 w；数值卷积（步长 dt）叠加对比 + 最大误差。 */
-  function renderSignalConvolutionDemo(container, experiment) {
+
+  /* 演练 1：波形变换——x(at+b) 读成「新时刻 t 到旧波形上取值」。
+     上下两个视口共用同一横坐标比例与同一 toX：上轴看旧时刻 τ 的 x(τ)，
+     下轴看新时刻 t 的 y(t)=x(a·t+b)，并用竖直虚线连接四个对应特征点。 */
+  function renderSignalWaveformDemo(container, experiment) {
     var demo = document.createElement("section");
     demo.className = "notebook-demo";
 
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { a: 1, b: 0 });
+
     var controls = document.createElement("div");
     controls.className = "demo-controls";
-    var state = practiceDemoStates[experiment.id] || (practiceDemoStates[experiment.id] = { width1: 1, width2: 1, dt: 0.02 });
-    var fields = [
-      ["width1", "脉冲 1 宽度 w₁ / s", 0.2, 3, 0.1],
-      ["width2", "脉冲 2 宽度 w₂ / s", 0.2, 3, 0.1],
-      ["dt", "数值步长 dt / s", 0.005, 0.1, 0.005]
-    ];
-    fields.forEach(function (field) {
-      var label = document.createElement("label");
-      label.className = "demo-field";
-      label.appendChild(document.createTextNode(field[1]));
-      var input = document.createElement("input");
-      input.type = "number";
-      input.min = String(field[2]);
-      input.max = String(field[3]);
-      input.step = String(field[4]);
-      input.value = String(state[field[0]]);
-      input.addEventListener("input", function () {
-        var value = Number(input.value);
-        if (!Number.isFinite(value)) return;
-        state[field[0]] = Math.min(field[3], Math.max(field[2], value));
-        draw();
-      });
-      label.appendChild(input);
-      controls.appendChild(label);
-    });
 
     var canvas = document.createElement("canvas");
-    canvas.className = "demo-canvas";
+    canvas.className = "demo-canvas demo-canvas-tall";
     var wrap = document.createElement("div");
     wrap.className = "demo-canvas-wrap";
     wrap.appendChild(canvas);
     var legend = document.createElement("div");
     legend.className = "demo-legend";
-    legend.appendChild(textElement("span", "─ 解析卷积", "demo-legend-line"));
-    legend.appendChild(textElement("span", "○ 数值卷积", "demo-legend-peak"));
+    legend.appendChild(textElement("span", "原波形 x(τ)", "demo-legend-line"));
+    legend.appendChild(textElement("span", "变换后 y(t)", "demo-legend-stem"));
+    legend.appendChild(textElement("span", "对应特征点", "demo-legend-peak"));
     wrap.appendChild(legend);
+
+    var metrics = document.createElement("div");
+    metrics.className = "demo-metrics";
+
+    function formatNumber(value, digits) {
+      if (!Number.isFinite(value)) return "—";
+      var scale = Math.pow(10, digits === undefined ? 3 : digits);
+      return String(Math.round(value * scale) / scale);
+    }
+
+    /* 滑块与数字框共用状态；按合法步长吸附；a=0 使映射退化，拒绝并保留上一个有效值 */
+    function appendNumberField(labelText, key, min, max, step, reject) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                        /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        var snapped = Number((Math.round(value / step) * step).toFixed(6));
+        var clamped = Math.min(max, Math.max(min, snapped));
+        if (reject && reject(clamped)) {                      /* 退化取值：保留上一个有效值 */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        state[key] = clamped;
+        range.value = String(state[key]);
+        number.value = String(state[key]);
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
+    }
+
+    appendNumberField("尺度 a", "a", -3, 3, 0.1, function (value) { return value === 0; });
+    appendNumberField("平移 b", "b", -4, 4, 0.2);
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
+
+    function draw() {
+      var ctx = canvas.getContext("2d");
+      var dpr = window.devicePixelRatio || 1;
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
+      var height = 340;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      var accent = canvasColor("--accent");
+      var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
+      var gridSoft = "rgba(128, 133, 141, 0.14)";
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 40, right: 16, top: 18, bottom: 22 };
+      var plotW = Math.max(width - margin.left - margin.right, 40);
+      var view = practiceCalc.viewRange(state.a, state.b);
+      /* 上下轴共用同一个 toX：横坐标比例相同，两幅图可以直接上下对照 */
+      var toX = function (t) { return margin.left + ((t - view[0]) / (view[1] - view[0])) * plotW; };
+      var upper = { top: margin.top, h: 128 };
+      upper.base = upper.top + upper.h;
+      var lower = { top: upper.base + 42, h: 104 };
+      lower.base = lower.top + lower.h;
+      var scale = 46;                                          /* 幅度 2 对应 46px */
+
+      /* 网格与基线 */
+      ctx.strokeStyle = gridSoft;
+      ctx.lineWidth = 1;
+      for (var gt = Math.ceil(view[0]); gt <= Math.floor(view[1]); gt += 1) {
+        ctx.beginPath();
+        ctx.moveTo(toX(gt), upper.top);
+        ctx.lineTo(toX(gt), upper.base);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(toX(gt), lower.top);
+        ctx.lineTo(toX(gt), lower.base);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = gridMid;
+      [upper.base, lower.base].forEach(function (base) {
+        ctx.beginPath();
+        ctx.moveTo(margin.left, base);
+        ctx.lineTo(margin.left + plotW, base);
+        ctx.stroke();
+      });
+
+      /* 原支撑 [0,3] 的底色，表明「取值来源」在旧轴上的位置 */
+      ctx.save();
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(toX(0), upper.top, toX(3) - toX(0), upper.h);
+      ctx.fillRect(toX(0), lower.top, toX(3) - toX(0), lower.h);
+      ctx.restore();
+
+      /* 上轴：旧波形 x(τ) */
+      var samples = Math.max(Math.round(plotW), 60);
+      var trace = function (fn, base) {
+        ctx.beginPath();
+        for (var i = 0; i <= samples; i += 1) {
+          var t = view[0] + ((view[1] - view[0]) * i) / samples;
+          var px = toX(t);
+          var py = base - fn(t) * scale;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      };
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.8;
+      trace(function (t) { return practiceCalc.waveformValue(t); }, upper.base);
+      ctx.strokeStyle = accentInk;
+      trace(function (t) { return practiceCalc.transformValue(t, state.a, state.b); }, lower.base);
+      ctx.lineWidth = 1;
+
+      /* 四个对应特征点与连接虚线 */
+      var features = practiceCalc.waveformFeatures;
+      ctx.strokeStyle = warm;
+      ctx.setLineDash([3, 3]);
+      features.forEach(function (pair) {
+        var tau = pair[0];
+        var value = pair[1];
+        var newT = practiceCalc.transformTime(tau, state.a, state.b);
+        ctx.beginPath();
+        ctx.moveTo(toX(tau), upper.base - value * scale);
+        ctx.lineTo(toX(newT), lower.base - value * scale);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      features.forEach(function (pair) {
+        var tau = pair[0];
+        var newT = practiceCalc.transformTime(tau, state.a, state.b);
+        ctx.fillStyle = warm;
+        ctx.beginPath();
+        ctx.arc(toX(tau), upper.base - pair[1] * scale, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(toX(newT), lower.base - pair[1] * scale, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("旧时刻轴 τ", margin.left, upper.top - 5);
+      ctx.fillText("新时刻轴 t", margin.left, lower.top - 5);
+      ctx.textAlign = "right";
+      ctx.fillText("2", margin.left - 6, upper.base - 2 * scale + 4);
+      ctx.fillText("0", margin.left - 6, upper.base + 3);
+      ctx.fillText("0", margin.left - 6, lower.base + 3);
+      ctx.textAlign = "left";
+      ctx.fillText("旧支撑 [0, 3]", toX(0) + 4, upper.base + 13);
+      ctx.fillText("视野与原/新支撑对齐", margin.left, lower.base + 13);
+
+      updateMetrics();
+    }
+
+    function updateMetrics() {
+      var support = practiceCalc.transformSupport(state.a, state.b);
+      var rows = [
+        ["支撑区间", "[" + formatNumber(support[0], 3) + ", " + formatNumber(support[1], 3) + "]"],
+        ["支撑宽度 3/|a|", formatNumber(practiceCalc.compressionWidth(state.a), 3) + " s"],
+        ["等价延迟 t₀ = −b/a", formatNumber(practiceCalc.timeShift(state.a, state.b), 3) + " s"],
+        ["反折状态", practiceCalc.reflectionState(state.a)],
+      ];
+      metrics.textContent = "";
+      rows.forEach(function (row) {
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (row[0] === "支撑区间" ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
+      });
+    }
+
+    demo.appendChild(controls);
+    demo.appendChild(wrap);
+    demo.appendChild(metrics);
+    container.appendChild(demo);
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
+  }
+
+  /* 演练 3：傅里叶表示——「增加谐波阶数 N」与「加长周期 T」是两件事。
+     上图：目标周期矩形、x_N(t) 部分和与 1.08949 渐近参考线；
+     下图：|k/T|≤4 Hz 的谱点（纵轴 T·c_k，保留符号）与连续包络 τ·sinc(τf)。 */
+  function renderSignalFourierDemo(container, experiment) {
+    var demo = document.createElement("section");
+    demo.className = "notebook-demo";
+
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { T: 2, N: 5 });
+
+    var controls = document.createElement("div");
+    controls.className = "demo-controls";
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "demo-canvas demo-canvas-tall";
+    var wrap = document.createElement("div");
+    wrap.className = "demo-canvas-wrap";
+    wrap.appendChild(canvas);
+    var legend = document.createElement("div");
+    legend.className = "demo-legend";
+    legend.appendChild(textElement("span", "目标方波", "demo-legend-stem"));
+    legend.appendChild(textElement("span", "部分和 x_N(t)", "demo-legend-line"));
+    legend.appendChild(textElement("span", "谱点 T·c_k", "demo-legend-peak"));
+    wrap.appendChild(legend);
+
+    var metrics = document.createElement("div");
+    metrics.className = "demo-metrics";
+
+    function formatNumber(value, digits) {
+      if (!Number.isFinite(value)) return "—";
+      var scale = Math.pow(10, digits === undefined ? 3 : digits);
+      return String(Math.round(value * scale) / scale);
+    }
+
+    function appendNumberField(labelText, key, min, max, step) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                        /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        var snapped = Number((Math.round(value / step) * step).toFixed(6));
+        state[key] = Math.min(max, Math.max(min, snapped));
+        range.value = String(state[key]);
+        number.value = String(state[key]);
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
+    }
+
+    appendNumberField("周期 T / s", "T", 2, 10, 0.5);
+    appendNumberField("最高谐波阶数 N", "N", 1, 101, 1);
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
+
+    function draw() {
+      var ctx = canvas.getContext("2d");
+      var dpr = window.devicePixelRatio || 1;
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
+      var height = 340;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      var accent = canvasColor("--accent");
+      var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
+      var gridSoft = "rgba(128, 133, 141, 0.14)";
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 42, right: 16, top: 18, bottom: 22 };
+      var plotW = Math.max(width - margin.left - margin.right, 40);
+      var T = state.T;
+      var N = state.N;
+
+      /* —— 上视口：一个周期内的目标与部分和 —— */
+      var topH = 150;
+      var topTop = margin.top;
+      var topBase = topTop + topH;
+      var tView = [-T / 2, T / 2];
+      var toTx = function (t) { return margin.left + ((t - tView[0]) / T) * plotW; };
+      var ampMax = 1.25;
+      var toTy = function (v) { return topBase - (Math.max(-0.25, Math.min(ampMax, v)) / ampMax) * topH; };
+
+      ctx.strokeStyle = gridSoft;
+      ctx.lineWidth = 1;
+      for (var gv = 0; gv <= 1; gv += 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(margin.left, toTy(gv));
+        ctx.lineTo(margin.left + plotW, toTy(gv));
+        ctx.stroke();
+      }
+
+      /* 渐近参考线：只是极限值，不声称任意有限 N 的峰值都低于它 */
+      ctx.strokeStyle = gridMid;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(margin.left, toTy(practiceCalc.gibbsPeakValue));
+      ctx.lineTo(margin.left + plotW, toTy(practiceCalc.gibbsPeakValue));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "right";
+      ctx.fillText("1.08949", margin.left - 4, toTy(practiceCalc.gibbsPeakValue) + 3);
+      ctx.textAlign = "left";
+
+      /* 目标方波 */
+      var steps = Math.max(Math.round(plotW), 60);
+      ctx.strokeStyle = accentInk;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (var i = 0; i <= steps; i += 1) {
+        var t = tView[0] + (T * i) / steps;
+        var px = toTx(t);
+        var py = toTy(practiceCalc.fourierTarget(t, T));
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      /* 部分和 */
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (var j = 0; j <= steps; j += 1) {
+        var t2 = tView[0] + (T * j) / steps;
+        var px2 = toTx(t2);
+        var py2 = toTy(practiceCalc.fourierPartialSum(t2, T, N));
+        if (j === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("一个周期内的目标方波与部分和 x_N(t)（t / s）", margin.left, topTop - 5);
+      ctx.textAlign = "right";
+      ctx.fillText("1", margin.left - 6, toTy(1) + 3);
+      ctx.fillText("0", margin.left - 6, toTy(0) + 3);
+
+      /* —— 下视口：谱点与连续包络（固定 [−4,4] Hz） —— */
+      var botTop = topBase + 34;
+      var botH = Math.max(340 - margin.bottom - botTop, 40);
+      var botBase = botTop + botH;
+      var fMax = 4;
+      var toFx = function (f) { return margin.left + ((f + fMax) / (2 * fMax)) * plotW; };
+      var envMax = 1.1;
+      var toFy = function (v) { return botBase - ((v + 0.35) / (envMax + 0.35)) * botH; };
+
+      ctx.strokeStyle = gridSoft;
+      for (var gf = -4; gf <= 4; gf += 2) {
+        ctx.beginPath();
+        ctx.moveTo(toFx(gf), botTop);
+        ctx.lineTo(toFx(gf), botBase);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, toFy(0));
+      ctx.lineTo(margin.left + plotW, toFy(0));
+      ctx.stroke();
+
+      /* 连续包络 τ·sinc(τf) */
+      ctx.strokeStyle = warm;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      var envSteps = Math.max(Math.round(plotW), 60);
+      for (var m = 0; m <= envSteps; m += 1) {
+        var fv = -fMax + (2 * fMax * m) / envSteps;
+        var ex = toFx(fv);
+        var ey = toFy(practiceCalc.envelopeValue(fv));
+        if (m === 0) ctx.moveTo(ex, ey); else ctx.lineTo(ex, ey);
+      }
+      ctx.stroke();
+
+      /* 谱点：保留符号（负值向下画），与包络同尺度 */
+      var points = practiceCalc.spectrumPoints(T, fMax);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.6;
+      points.forEach(function (point) {
+        ctx.beginPath();
+        ctx.moveTo(toFx(point.f), toFy(0));
+        ctx.lineTo(toFx(point.f), toFy(point.value));
+        ctx.stroke();
+      });
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("谱点 T·c_k 与连续包络 τ·sinc(τf)，f / Hz（范围由 T 决定，与 N 无关）", margin.left, botTop - 5);
+      ctx.textAlign = "right";
+      ctx.fillText("0", toFx(0) - 4, botBase + 12);
+
+      updateMetrics(points);
+    }
+
+    function updateMetrics(points) {
+      var rows = [
+        ["周期 T", formatNumber(state.T, 2) + " s"],
+        ["基频 f₀ = 1/T", formatNumber(1 / state.T, 4) + " Hz"],
+        ["谐波阶数 N", String(state.N)],
+        ["谱点数（|f| ≤ 4 Hz，含零系数）", String(points.length) + " 个（与 N 无关）"],
+        ["RMSE（一个周期 4096 中点）", formatNumber(practiceCalc.fourierMse(state.T, state.N), 4)],
+      ];
+      metrics.textContent = "";
+      rows.forEach(function (row) {
+        var wide = row[0].indexOf("谱点数") === 0;
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (wide ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
+      });
+    }
+
+    demo.appendChild(controls);
+    demo.appendChild(wrap);
+    demo.appendChild(metrics);
+    container.appendChild(demo);
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
+  }
+
+  /* 演练 5：频谱分析——观察长度 L、窗形与补零 M 各自改变什么（f_s 固定 64 Hz）。
+     上图：稠密 DTFT 曲线与 N_fft 点 DFT 谱线，统一归一化（不作单边翻倍）；
+     下图：窗自身归一化频谱（dB），标出首次局部极小（主瓣边界）与其后首个局部极大（第一旁瓣）。 */
+  function renderSignalLeakageDemo(container, experiment) {
+    var demo = document.createElement("section");
+    demo.className = "notebook-demo";
+
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { scene: "dual", win: "rect", L: 32, M: 0 });
+
+    var controls = document.createElement("div");
+    controls.className = "demo-controls";
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "demo-canvas demo-canvas-tall";
+    var wrap = document.createElement("div");
+    wrap.className = "demo-canvas-wrap";
+    wrap.appendChild(canvas);
+    var legend = document.createElement("div");
+    legend.className = "demo-legend";
+    legend.appendChild(textElement("span", "稠密 DTFT", "demo-legend-line"));
+    legend.appendChild(textElement("span", "DFT 谱线", "demo-legend-stem"));
+    legend.appendChild(textElement("span", "第一旁瓣", "demo-legend-peak"));
+    wrap.appendChild(legend);
+
+    var metrics = document.createElement("div");
+    metrics.className = "demo-metrics";
+
+    function formatNumber(value, digits) {
+      if (!Number.isFinite(value)) return "—";
+      var scale = Math.pow(10, digits === undefined ? 3 : digits);
+      return String(Math.round(value * scale) / scale);
+    }
+
+    function appendSelectField(labelText, key, pairs) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var select = document.createElement("select");
+      pairs.forEach(function (pair) {
+        var option = document.createElement("option");
+        option.value = pair[0];
+        option.textContent = pair[1];
+        if (state[key] === pair[0]) option.selected = true;
+        select.appendChild(option);
+      });
+      select.addEventListener("change", function () {
+        state[key] = select.value;
+        draw();
+      });
+      label.appendChild(select);
+      controls.appendChild(label);
+    }
+
+    function appendNumberField(labelText, key, min, max, step) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                        /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        state[key] = Math.round(Math.min(max, Math.max(min, value)));
+        range.value = String(state[key]);
+        number.value = String(state[key]);
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
+    }
+
+    appendSelectField("信号场景", "scene", [
+      ["dual", "10 + 12 Hz 等幅双音"],
+      ["single10", "10 Hz 单音"],
+      ["single10.5", "10.5 Hz 单音"]
+    ]);
+    appendSelectField("窗类型", "win", [["rect", "矩形窗"], ["hann", "对称 Hann 窗"]]);
+    appendNumberField("观察长度 L / 样点", "L", 16, 128, 8);
+    appendNumberField("补零 M / 样点", "M", 0, 224, 16);
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
+
+    function draw() {
+      var ctx = canvas.getContext("2d");
+      var dpr = window.devicePixelRatio || 1;
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
+      var height = 340;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      var accent = canvasColor("--accent");
+      var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
+      var gridSoft = "rgba(128, 133, 141, 0.14)";
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 44, right: 16, top: 16, bottom: 22 };
+      var plotW = Math.max(width - margin.left - margin.right, 40);
+      var fs = practiceCalc.analysisFs;
+      var L = state.L;
+      var Nfft = L + state.M;
+      var scene = state.scene;
+      var win = state.win;
+      var fMax = fs / 2;
+      var toX = function (f) { return margin.left + (f / fMax) * plotW; };
+
+      /* —— 上视口：幅度谱 0…f_s/2 —— */
+      var topH = 132;
+      var topTop = margin.top;
+      var topBase = topTop + topH;
+      var yMax = 0.8;
+      var toY = function (v) { return topBase - (Math.min(v, yMax) / yMax) * topH; };
+
+      ctx.strokeStyle = gridSoft;
+      ctx.lineWidth = 1;
+      for (var gf = 0; gf <= fMax; gf += 8) {
+        ctx.beginPath();
+        ctx.moveTo(toX(gf), topTop);
+        ctx.lineTo(toX(gf), topBase);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, topBase);
+      ctx.lineTo(margin.left + plotW, topBase);
+      ctx.stroke();
+
+      /* DFT 谱线（0…f_s/2 的谱点）：与稠密曲线同一归一化尺度 */
+      var bins = Math.floor(Nfft / 2);
+      ctx.strokeStyle = accentInk;
+      ctx.lineWidth = 1;
+      for (var k = 0; k <= bins; k += 1) {
+        var fk = (k * fs) / Nfft;
+        ctx.beginPath();
+        ctx.moveTo(toX(fk), topBase);
+        ctx.lineTo(toX(fk), toY(practiceCalc.dftMagnitude(scene, L, win, k, Nfft)));
+        ctx.stroke();
+      }
+
+      /* 稠密 DTFT 曲线 */
+      var denseStep = 0.05;
+      var denseCount = Math.round(fMax / denseStep);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (var i = 0; i <= denseCount; i += 1) {
+        var fq = i * denseStep;
+        var px = toX(fq);
+        var py = toY(practiceCalc.spectrumMagnitude(scene, L, win, fq));
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("|X(f)| 归一化（f_s/2 = 32 Hz）", margin.left, topTop - 5);
+      ctx.textAlign = "right";
+      ctx.fillText(String(yMax), margin.left - 6, topTop + 9);
+      ctx.fillText("0", margin.left - 6, topBase + 3);
+
+      /* —— 下视口：窗自身归一化频谱（dB） —— */
+      var botTop = topBase + 34;
+      var botH = Math.max(340 - margin.bottom - botTop, 40);
+      var botBase = botTop + botH;
+      var fwMax = 8;
+      var dbMin = -40;
+      var toWx = function (f) { return margin.left + (f / fwMax) * plotW; };
+      var toWy = function (db) {
+        var clamped = Math.max(dbMin, Math.min(0, db));
+        return botBase - ((clamped - dbMin) / (0 - dbMin)) * botH;
+      };
+
+      ctx.strokeStyle = gridSoft;
+      for (var gdb = dbMin; gdb <= 0; gdb += 10) {
+        ctx.beginPath();
+        ctx.moveTo(margin.left, toWy(gdb));
+        ctx.lineTo(margin.left + plotW, toWy(gdb));
+        ctx.stroke();
+      }
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, botBase);
+      ctx.lineTo(margin.left + plotW, botBase);
+      ctx.stroke();
+
+      var dbAt = function (f) {
+        return 20 * Math.log10(Math.max(practiceCalc.spectrumMagnitude("flat", L, win, f), 1e-6));
+      };
+      var wStep = 0.02;
+      var wCount = Math.round(fwMax / wStep);
+      ctx.strokeStyle = warm;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (var j = 0; j <= wCount; j += 1) {
+        var fw = j * wStep;
+        var wx = toWx(fw);
+        var wy = toWy(dbAt(fw));
+        if (j === 0) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
+      }
+      ctx.stroke();
+
+      var lobe = practiceCalc.windowLobe(win, L, 0.01);
+      var peaks = practiceCalc.localPeaks(scene, L, win, 9, 13, 0.01);
+
+      if (lobe.mainLobeEdge !== null) {
+        ctx.strokeStyle = gridMid;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(toWx(lobe.mainLobeEdge), botTop);
+        ctx.lineTo(toWx(lobe.mainLobeEdge), botBase);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (lobe.firstSidelobe !== null) {
+        ctx.fillStyle = warm;
+        ctx.beginPath();
+        ctx.arc(toWx(lobe.firstSidelobe), toWy(dbAt(lobe.firstSidelobe)), 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("窗自身频谱 / dB（0…8 Hz）", margin.left, botTop - 5);
+      ctx.textAlign = "right";
+      ctx.fillText("−40", margin.left - 6, botBase + 3);
+      ctx.fillText("0", margin.left - 6, botTop + 9);
+
+      updateMetrics(peaks, lobe);
+    }
+
+    function updateMetrics(peaks, lobe) {
+      var fs = practiceCalc.analysisFs;
+      var Nfft = state.L + state.M;
+      var sideDb = lobe.firstSidelobe === null
+        ? "—"
+        : formatNumber(20 * Math.log10(Math.max(practiceCalc.spectrumMagnitude("flat", state.L, state.win, lobe.firstSidelobe), 1e-6)), 1) + " dB";
+      var rows = [
+        ["观察时间 L/f_s", formatNumber(state.L / fs, 3) + " s"],
+        ["频率尺度 f_s/L", formatNumber(fs / state.L, 2) + " Hz"],
+        ["补零后网格 f_s/N_fft", formatNumber(fs / Nfft, 4) + " Hz（N_fft=" + Nfft + "）"],
+        ["谱峰位置（[9,13] Hz）", peaks.length
+          ? peaks.map(function (p) { return formatNumber(p[0], 2); }).join(" / ") + " Hz"
+          : "无局部峰"],
+        ["窗主瓣边界 / 第一旁瓣",
+          (lobe.mainLobeEdge === null ? "—" : formatNumber(lobe.mainLobeEdge, 2) + " Hz") + " / " + sideDb],
+      ];
+      metrics.textContent = "";
+      rows.forEach(function (row) {
+        var wide = row[0] === "谱峰位置（[9,13] Hz）" || row[0] === "窗主瓣边界 / 第一旁瓣";
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (wide ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
+      });
+    }
+
+    demo.appendChild(controls);
+    demo.appendChild(wrap);
+    demo.appendChild(metrics);
+    container.appendChild(demo);
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
+  }
+
+  /* 演练 6：循环卷积——线性卷积结果按 n mod N 折回叠加。
+     左：线性结果 y_lin 与折回箭头；右：N 刻度上的 x_N[k]·h_N[(m−k) mod N] 及贡献和。
+     宽屏左右并排，窄屏纵排（不把整块内容缩小）。 */
+  function renderSignalCircularDemo(container, experiment) {
+    var demo = document.createElement("section");
+    demo.className = "notebook-demo";
+
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { n1: 4, n2: 4, n: 4, m: 0 });
+
+    var controls = document.createElement("div");
+    controls.className = "demo-controls";
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "demo-canvas demo-canvas-tall";
+    var wrap = document.createElement("div");
+    wrap.className = "demo-canvas-wrap";
+    wrap.appendChild(canvas);
+    var legend = document.createElement("div");
+    legend.className = "demo-legend";
+    legend.appendChild(textElement("span", "线性结果 y_lin", "demo-legend-stem"));
+    legend.appendChild(textElement("span", "折回 n mod N", "demo-legend-peak"));
+    legend.appendChild(textElement("span", "循环结果 y_circ", "demo-legend-line"));
+    wrap.appendChild(legend);
+
+    var metrics = document.createElement("div");
+    metrics.className = "demo-metrics";
+
+    var mRange = null;
+    var mNumber = null;
+
+    function formatNumber(value, digits) {
+      if (!Number.isFinite(value)) return "—";
+      var scale = Math.pow(10, digits === undefined ? 3 : digits);
+      return String(Math.round(value * scale) / scale);
+    }
+
+    function syncM() {
+      if (!mRange) return;
+      mRange.max = String(state.n - 1);
+      mNumber.max = String(state.n - 1);
+      mRange.value = String(state.m);
+      mNumber.value = String(state.m);
+    }
+
+    function appendNumberField(labelText, key, min, max, step) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                        /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[key]);
+          number.value = String(state[key]);
+          return;
+        }
+        state[key] = Math.round(Math.min(max, Math.max(min, value)));
+        if (key === "n") state.m = Math.min(state.m, state.n - 1);   /* 改 N 后夹紧 m */
+        range.value = String(state[key]);
+        number.value = String(state[key]);
+        if (key === "n") syncM();
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
+      if (key === "m") { mRange = range; mNumber = number; }
+    }
+
+    appendNumberField("N₁ / 样点", "n1", 2, 8, 1);
+    appendNumberField("N₂ / 样点", "n2", 2, 8, 1);
+    appendNumberField("循环长度 N / 点", "n", 2, 16, 1);
+    appendNumberField("观察 m（0…N−1）", "m", 0, 15, 1);
+
+    var stepGroup = document.createElement("div");
+    stepGroup.className = "demo-field";
+    stepGroup.appendChild(document.createTextNode("观察步进"));
+    var stepRow = document.createElement("div");
+    stepRow.className = "demo-button-row";
+    var stepButton = document.createElement("button");
+    stepButton.type = "button";
+    stepButton.textContent = "▶ 单步";
+    stepButton.addEventListener("click", function () {
+      if (state.m < state.n - 1) state.m += 1;                 /* 到 N−1 停住，不回绕 */
+      syncM();
+      draw();
+    });
+    var resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.textContent = "↺ 复位";
+    resetButton.addEventListener("click", function () {
+      state.m = 0;
+      syncM();
+      draw();
+    });
+    stepRow.appendChild(stepButton);
+    stepRow.appendChild(resetButton);
+    stepGroup.appendChild(stepRow);
+    controls.appendChild(stepGroup);
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
+
+    function draw() {
+      var ctx = canvas.getContext("2d");
+      var dpr = window.devicePixelRatio || 1;
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
+      var height = 340;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      var accent = canvasColor("--accent");
+      var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
+      var gridSoft = "rgba(128, 133, 141, 0.14)";
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 40, right: 16, top: 20, bottom: 24 };
+      var plotW = Math.max(width - margin.left - margin.right, 40);
+      var viewH = 340 - margin.top - margin.bottom;
+      var gap = 20;
+
+      var lin = practiceCalc.linearConv(state.n1, state.n2);
+      var circ = practiceCalc.circularConv(state.n1, state.n2, state.n);
+      var maxV = Math.max.apply(null, lin.concat(circ, [1]));
+
+      /* 宽屏左右并排（文档「左图/右图」）；窄屏纵排，不缩小内容 */
+      var sideBySide = width >= 620;
+      var boxW = sideBySide ? (plotW - gap) / 2 : plotW;
+      var boxH = sideBySide ? viewH : (viewH - gap) / 2;
+      var leftBox = { x: margin.left, y: margin.top, w: boxW, h: boxH };
+      var rightBox = sideBySide
+        ? { x: margin.left + boxW + gap, y: margin.top, w: boxW, h: boxH }
+        : { x: margin.left, y: margin.top + boxH + gap, w: boxW, h: boxH };
+
+      /* —— 左：线性结果与折回箭头 —— */
+      var lStep = leftBox.w / Math.max(lin.length, 1);
+      var lBase = leftBox.y + leftBox.h - 16;
+      var lScale = (leftBox.h - 34) / maxV;
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath();
+      ctx.moveTo(leftBox.x, lBase);
+      ctx.lineTo(leftBox.x + leftBox.w, lBase);
+      ctx.stroke();
+
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.75;
+      lin.forEach(function (value, n) {
+        var bx = leftBox.x + n * lStep + lStep * 0.18;
+        var bw = Math.max(lStep * 0.64, 2);
+        ctx.fillRect(bx, lBase - value * lScale, bw, value * lScale);
+      });
+      ctx.globalAlpha = 1;
+
+      /* 折回箭头：n ≥ N 的样本回到 n mod N */
+      ctx.strokeStyle = warm;
+      ctx.lineWidth = 1.2;
+      for (var n2 = state.n; n2 < lin.length; n2 += 1) {
+        var fromX = leftBox.x + n2 * lStep + lStep / 2;
+        var toX2 = leftBox.x + (n2 % state.n) * lStep + lStep / 2;
+        var arcY = lBase - lin[n2] * lScale - 10;
+        ctx.beginPath();
+        ctx.moveTo(fromX, arcY);
+        ctx.quadraticCurveTo((fromX + toX2) / 2, arcY - 26, toX2, lBase - lin[n2 % state.n] * lScale - 6);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("线性结果 y_lin（N−1 之后折回）", leftBox.x, leftBox.y - 6);
+      ctx.textAlign = "center";
+      for (var t = 0; t < lin.length; t += 1) {
+        if (lStep < 16 && t % 2 === 1) continue;
+        ctx.fillText(String(t), leftBox.x + t * lStep + lStep / 2, lBase + 13);
+      }
+      ctx.textAlign = "right";
+      ctx.fillText("n", leftBox.x - 6, lBase + 3);
+
+      /* —— 右：x_N[k]·h_N[(m−k) mod N] 与贡献和 —— */
+      var a = practiceCalc.foldedRect(state.n1, state.n);
+      var b = practiceCalc.foldedRect(state.n2, state.n);
+      var products = [];
+      for (var k2 = 0; k2 < state.n; k2 += 1) {
+        products.push(a[k2] * b[((state.m - k2) % state.n + state.n) % state.n]);
+      }
+      var sum = products.reduce(function (acc, v) { return acc + v; }, 0);
+      var rStep = rightBox.w / state.n;
+      var rBase = rightBox.y + rightBox.h - 16;
+      var rScale = (rightBox.h - 34) / maxV;
+
+      ctx.strokeStyle = gridMid;
+      ctx.beginPath();
+      ctx.moveTo(rightBox.x, rBase);
+      ctx.lineTo(rightBox.x + rightBox.w, rBase);
+      ctx.stroke();
+
+      ctx.fillStyle = accentInk;
+      ctx.globalAlpha = 0.7;
+      products.forEach(function (value, k) {
+        var bx = rightBox.x + k * rStep + rStep * 0.18;
+        var bw = Math.max(rStep * 0.64, 2);
+        ctx.fillRect(bx, rBase - value * rScale, bw, value * rScale);
+      });
+      ctx.globalAlpha = 1;
+
+      /* 循环结果（虚线参考）：与贡献和逐点对应 */
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      circ.forEach(function (value, k) {
+        var px = rightBox.x + k * rStep + rStep / 2;
+        var py = rBase - value * rScale;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("x_N[k]·h_N[(m−k) mod N]，Σ = " + formatNumber(sum, 3), rightBox.x, rightBox.y - 6);
+      ctx.textAlign = "center";
+      for (var k3 = 0; k3 < state.n; k3 += 1) {
+        if (rStep < 16 && k3 % 2 === 1) continue;
+        ctx.fillText(String(k3), rightBox.x + k3 * rStep + rStep / 2, rBase + 13);
+      }
+      ctx.textAlign = "right";
+      ctx.fillText("k", rightBox.x - 6, rBase + 3);
+      if (rStep >= 16) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = warm;
+        ctx.fillText("m=" + state.m, rightBox.x + state.m * rStep + rStep / 2, rightBox.y + 12);
+      }
+
+      updateMetrics(circ);
+    }
+
+    function updateMetrics(circ) {
+      var folded = practiceCalc.foldedSamples(state.n1, state.n2, state.n);
+      var affected = practiceCalc.affectedBins(state.n1, state.n2, state.n);
+      var dft = practiceCalc.circularByDft(state.n1, state.n2, state.n);
+      var agree = dft.every(function (value, i) { return Math.abs(value - circ[i]) < 1e-9; });
+      var rows = [
+        ["线性卷积长度 L", String(state.n1 + state.n2 - 1) + " 点"],
+        ["循环结果 y_circ[" + state.m + "]", formatNumber(circ[state.m], 3)],
+        ["首 N 点误差 E", formatNumber(practiceCalc.circError(state.n1, state.n2, state.n), 3)],
+        ["折回样本 max(0, L−N)", String(folded)],
+        ["受影响桶 min(N, max(0, L−N))", String(affected)],
+        ["DFT 核对（按模 N 折叠）", agree ? "与直接路线一致" : "不一致"],
+      ];
+      metrics.textContent = "";
+      rows.forEach(function (row) {
+        var wide = row[0].indexOf("受影响桶") === 0 || row[0].indexOf("DFT 核对") === 0;
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (wide ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
+      });
+    }
+
+    demo.appendChild(controls);
+    demo.appendChild(wrap);
+    demo.appendChild(metrics);
+    container.appendChild(demo);
+    syncM();
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
+  }
+
+  /* 演练 2：动态卷积——单位高度矩形 x、h，支撑分别 [0,w₁]、[0,w₂]。
+     上图（τ 积分轴）：x(τ)、翻转平移后的 h(t−τ)、两者乘积的重叠阴影；
+     下图（t 结果轴）：完整 y(t) 与当前时刻游标。
+     历史贡献的解释以 LTI 零状态响应为前提：y(t)=∫x(τ)h(t−τ)dτ。 */
+  function renderSignalConvolutionDemo(container, experiment) {
+    var demo = document.createElement("section");
+    demo.className = "notebook-demo";
+
+    var state = practiceDemoStates[experiment.id] ||
+      (practiceDemoStates[experiment.id] = { preset: "1,1", width1: 1, width2: 1, timeT: -1, playing: false });
+
+    var controls = document.createElement("div");
+    controls.className = "demo-controls";
+
+    /* 信号对预设：仅两类单位高度矩形（指数与冲激按规划留在范围外） */
+    var presetLabel = document.createElement("label");
+    presetLabel.className = "demo-field";
+    presetLabel.appendChild(document.createTextNode("信号对预设"));
+    var presetSelect = document.createElement("select");
+    [["1,1", "等宽矩形 (1, 1)"], ["1,2", "不等宽矩形 (1, 2)"]].forEach(function (pair) {
+      var option = document.createElement("option");
+      option.value = pair[0];
+      option.textContent = pair[1];
+      if (state.preset === pair[0]) option.selected = true;
+      presetSelect.appendChild(option);
+    });
+    presetSelect.addEventListener("change", function () {
+      state.preset = presetSelect.value;
+      var parts = state.preset.split(",");
+      state.width1 = Number(parts[0]);
+      state.width2 = Number(parts[1]);
+      clampTime();
+      syncTimeInputs();
+      draw();
+    });
+    presetLabel.appendChild(presetSelect);
+    controls.appendChild(presetLabel);
+
+    /* 宽度与观察时刻：滑块与数字框共用同一状态 */
+    var w1Range = appendRangeField("脉冲 1 宽度 w₁ / s", "width1", 0.5, 3, 0.1);
+    var w2Range = appendRangeField("脉冲 2 宽度 w₂ / s", "width2", 0.5, 3, 0.1);
+    var tRange = appendRangeField("观察时刻 t / s", "timeT", -1, 4, 0.02);
+
+    /* 播放 / 暂停 / 复位（复位只回到 t=-1 并暂停） */
+    var playGroup = document.createElement("div");
+    playGroup.className = "demo-field";
+    playGroup.appendChild(document.createTextNode("播放控制"));
+    var playRow = document.createElement("div");
+    playRow.className = "demo-button-row";
+    var playButton = document.createElement("button");
+    playButton.type = "button";
+    playButton.textContent = "▶ 播放";
+    var resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.textContent = "↺ 复位";
+    playRow.appendChild(playButton);
+    playRow.appendChild(resetButton);
+    playGroup.appendChild(playRow);
+    controls.appendChild(playGroup);
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "demo-canvas demo-canvas-tall";
+    var wrap = document.createElement("div");
+    wrap.className = "demo-canvas-wrap";
+    wrap.appendChild(canvas);
+    var legend = document.createElement("div");
+    legend.className = "demo-legend";
+    legend.appendChild(textElement("span", "─ 输入 x(τ)", "demo-legend-line"));
+    legend.appendChild(textElement("span", "┄ 翻转平移 h(t−τ)", "demo-legend-dash"));
+    legend.appendChild(textElement("span", "▨ 乘积（重叠面积）", "demo-legend-fill"));
+    legend.appendChild(textElement("span", "─ 输出 y(t)", "demo-legend-line"));
+    wrap.appendChild(legend);
+
+    var history = document.createElement("p");
+    history.className = "demo-history";
+    wrap.appendChild(history);
 
     var metrics = document.createElement("div");
     metrics.className = "demo-metrics";
@@ -2463,27 +4142,127 @@
       return String(Math.round(value * 1000) / 1000);
     }
 
-    /* 单位矩形脉冲：x(t)=1, 0≤t≤w */
-    function rect(t, w) { return (t >= 0 && t <= w) ? 1 : 0; }
-
-    /* 解析卷积：两矩形 [0,w₁]、[0,w₂] 卷积 → 分段梯形
-       （等宽时退化为三角）：t≤min 线性上升、中间持平 min(w₁,w₂)、
-       t>max 线性下降，支撑 [0, w₁+w₂]，峰值 min(w₁,w₂) */
-    function analyticConvolution(t, w1, w2) {
-      if (t <= 0 || t >= w1 + w2) return 0;
-      var lo = Math.min(w1, w2);
-      var hi = Math.max(w1, w2);
-      if (t <= lo) return t;
-      if (t <= hi) return lo;
-      return w1 + w2 - t;
+    function appendRangeField(labelText, key, min, max, step) {
+      var label = document.createElement("label");
+      label.className = "demo-field";
+      label.appendChild(document.createTextNode(labelText));
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(min);
+      range.max = String(max);
+      range.step = String(step);
+      range.value = String(state[key]);
+      var number = document.createElement("input");
+      number.type = "number";
+      number.min = String(min);
+      number.max = String(max);
+      number.step = String(step);
+      number.value = String(state[key]);
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) { syncTimeInputs(); return; }   /* 拒绝非有限值，不传播 NaN */
+        state[key] = Math.min(max, Math.max(min, value));
+        if (key === "width1" || key === "width2") clampTime();
+        syncTimeInputs();
+        draw();
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      number.addEventListener("input", function () { commit(number.value); });
+      row.appendChild(range);
+      row.appendChild(number);
+      label.appendChild(row);
+      controls.appendChild(label);
+      if (key === "width1") w1Range = range;
+      if (key === "width2") w2Range = range;
+      if (key === "timeT") tRange = range;
+      return range;
     }
+
+    /* 改宽度后把 t 夹紧到 [-1, w₁+w₂+1] */
+    function clampTime() {
+      var maxT = state.width1 + state.width2 + 1;
+      state.timeT = Math.min(maxT, Math.max(-1, state.timeT));
+    }
+
+    function syncTimeInputs() {
+      tRange.max = String(state.width1 + state.width2 + 1);
+      tRange.value = String(state.timeT);
+      if (tRange.nextSibling && tRange.nextSibling.tagName === "INPUT") tRange.nextSibling.value = String(state.timeT);
+      w1Range.value = String(state.width1);
+      w2Range.value = String(state.width2);
+    }
+
+    var frameHandle = 0;
+    var lastStamp = 0;
+
+    function stopPlayback() {
+      state.playing = false;
+      if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
+      playButton.textContent = "▶ 播放";
+    }
+
+    function tick(stamp) {
+      if (!state.playing) return;
+      var maxT = state.width1 + state.width2 + 1;
+      var dtSeconds = lastStamp ? Math.min((stamp - lastStamp) / 1000, 0.1) : 0.016;
+      lastStamp = stamp;
+      state.timeT += dtSeconds * (maxT + 1) / 4;      /* 约 4 秒扫完一遍 */
+      if (state.timeT >= maxT) { state.timeT = maxT; stopPlayback(); }
+      syncTimeInputs();
+      draw();
+      if (state.playing) frameHandle = requestAnimationFrame(tick);
+    }
+
+    playButton.addEventListener("click", function () {
+      if (state.playing) { stopPlayback(); return; }
+      if (state.timeT >= state.width1 + state.width2 + 1) state.timeT = -1;
+      state.playing = true;
+      lastStamp = 0;
+      playButton.textContent = "⏸ 暂停";
+      frameHandle = requestAnimationFrame(tick);
+    });
+
+    resetButton.addEventListener("click", function () {
+      stopPlayback();
+      state.timeT = -1;
+      syncTimeInputs();
+      draw();
+    });
+
+    /* 点击上图选取历史位置：显示 τ 与它已经历的时间 t−τ */
+    canvas.addEventListener("click", function (event) {
+      var rect = canvas.getBoundingClientRect();
+      var x = event.clientX - rect.left;
+      var y = event.clientY - rect.top;
+      if (y > 170) return;                              /* 只在上视口（τ 轴）有效 */
+      var span = state.width1 + Math.max(state.width2, state.width1) + 2;
+      var plotW = Math.max(rect.width, 100) - 44 - 16;
+      var tau = ((x - 44) / plotW) * span - 1;          /* 与 toX 的 baseline=−1 对应 */
+      if (tau < 0 || tau > state.width1) {
+        history.textContent = "τ=" + formatNumber(tau) + " s 不在输入支撑 [0, " + formatNumber(state.width1) + "] 内。";
+      } else {
+        history.textContent = "历史位置 τ=" + formatNumber(tau) + " s：已历经 " + formatNumber(state.timeT - tau) +
+          " s，h(t−τ)=" + formatNumber(practiceCalc.hValue(state.timeT - tau, state.width2)) +
+          "，该点按 x(τ)·h(t−τ)·dτ 计入当前输出。";
+      }
+      draw();
+    });
+
+    var resizeHandler = function () { draw(); };
+    window.addEventListener("resize", resizeHandler);
+    demo.__cleanup = function () {
+      stopPlayback();
+      window.removeEventListener("resize", resizeHandler);
+    };
 
     function draw() {
       var ctx = canvas.getContext("2d");
       var dpr = window.devicePixelRatio || 1;
-      var rect_ = canvas.getBoundingClientRect();
-      var width = Math.max(rect_.width, 100);
-      var height = 240;
+      var box = canvas.getBoundingClientRect();
+      var width = Math.max(box.width, 100);
+      var height = 340;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2491,117 +4270,147 @@
 
       var accent = canvasColor("--accent");
       var accentInk = canvasColor("--accent-ink");
+      var warm = canvasColor("--warm");
       var gridSoft = "rgba(128, 133, 141, 0.14)";
-      var gridMid = "rgba(128, 133, 141, 0.32)";
-      var gridText = "rgba(128, 133, 141, 0.72)";
-      var margin = { left: 40, right: 14, top: 10, bottom: 24 };
+      var gridMid = "rgba(128, 133, 141, 0.34)";
+      var gridText = "rgba(128, 133, 141, 0.78)";
+      var margin = { left: 44, right: 16, top: 16, bottom: 22 };
       var plotW = width - margin.left - margin.right;
-      var plotH = height - margin.top - margin.bottom;
       var w1 = state.width1;
       var w2 = state.width2;
-      var dt = state.dt;
-      var maxY = Math.min(w1, w2);      /* 峰值 = min(w₁, w₂) */
-      var scaleY = (plotH / 2) * 0.92 / maxY;
-      var zeroY = margin.top + plotH / 2;
-      var T = w1 + w2;                  /* 显示到支撑终点 */
+      var t = state.timeT;
+      var span = w1 + Math.max(w2, w1) + 2;
+      var baseline = -1;
+      var toX = function (tau) { return margin.left + ((tau - baseline) / span) * plotW; };
 
-      /* 网格 + 零轴 */
+      var topTop = margin.top;
+      var topH = 128;
+      var topBase = topTop + topH;
+      var botTop = 186;
+      var botH = 108;
+      var botBase = botTop + botH;
+
+      ctx.font = "11px system-ui, sans-serif";
       ctx.strokeStyle = gridSoft;
       ctx.lineWidth = 1;
-      for (var gx = 0; gx <= 5; gx += 1) {
-        var x = margin.left + (plotW * gx) / 5;
-        ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + plotH); ctx.stroke();
+      for (var gx = 0; gx <= 6; gx += 1) {
+        var gxp = margin.left + (plotW * gx) / 6;
+        ctx.beginPath(); ctx.moveTo(gxp, topTop); ctx.lineTo(gxp, topBase); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(gxp, botTop); ctx.lineTo(gxp, botBase); ctx.stroke();
       }
       ctx.strokeStyle = gridMid;
-      ctx.beginPath(); ctx.moveTo(margin.left, zeroY); ctx.lineTo(margin.left + plotW, zeroY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(margin.left, topBase); ctx.lineTo(margin.left + plotW, topBase); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(margin.left, botBase); ctx.lineTo(margin.left + plotW, botBase); ctx.stroke();
 
-      /* Y 轴刻度 */
-      ctx.fillStyle = gridText;
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(formatNumber(maxY), margin.left - 6, margin.top + 4);
-      ctx.fillText("0", margin.left - 6, zeroY + 3);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(margin.left, margin.top, plotW, plotH);
-      ctx.clip();
-
-      /* 数值卷积：离散矩形序列，y[n] = dt · Σ x₁[k]·x₂[n−k] */
-      ctx.fillStyle = accentInk;
-      var N = Math.ceil((w1 + w2) / dt);
-      var y = [];
-      var maxAbsError = 0;
-      for (var n = 0; n <= N; n += 1) {
-        var t = n * dt;
-        var sum = 0;
-        for (var k = 0; k <= N; k += 1) {
-          var tk = k * dt;
-          sum += rect(tk, w1) * rect(t - tk, w2) * dt;
-        }
-        y.push(sum);
-        var analytic = analyticConvolution(t, w1, w2);
-        var err = Math.abs(sum - analytic);
-        if (err > maxAbsError) maxAbsError = err;
-        var px = margin.left + (t / T) * plotW;
-        var py = zeroY - sum * scaleY;
-        ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      /* 解析卷积曲线 */
-      ctx.strokeStyle = accent;
+      /* 上图：x(τ) 与 h(t−τ)，重叠区填充 */
+      var peak = Math.min(w1, w2);
+      var yUnit = (topH - 18) / Math.max(peak, 1e-6);
+      ctx.strokeStyle = accentInk;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      for (var i = 0; i <= 600; i += 1) {
-        var ti = (T * i) / 600;
-        var px2 = margin.left + (ti / T) * plotW;
-        var py2 = zeroY - analyticConvolution(ti, w1, w2) * scaleY;
-        if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      ctx.moveTo(toX(0), topBase);
+      ctx.lineTo(toX(0), topBase - yUnit);
+      ctx.lineTo(toX(w1), topBase - yUnit);
+      ctx.lineTo(toX(w1), topBase);
+      ctx.stroke();
+
+      var lo = Math.max(0, t - w2);
+      var hi = Math.min(w1, t);
+      if (hi > lo) {
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.rect(toX(lo), topBase - yUnit, toX(hi) - toX(lo), yUnit);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(toX(t - w2), topBase);
+      ctx.lineTo(toX(t - w2), topBase - yUnit);
+      ctx.lineTo(toX(t), topBase - yUnit);
+      ctx.lineTo(toX(t), topBase);
+      ctx.stroke();
+      ctx.restore();
+
+      /* 下图：y(t) 全曲线 + 游标 */
+      var yScale = (botH - 16) / Math.max(peak, 1e-6);
+      var end = w1 + w2;
+      ctx.strokeStyle = accentInk;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (var i = 0; i <= 240; i += 1) {
+        var tv = (i / 240) * end;
+        var yv = practiceCalc.convolutionAnalytic(tv, w1, w2);
+        var px = toX(tv);
+        var py = botBase - yv * yScale;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.stroke();
 
-      /* 支撑区间标记 [0, w₁+w₂] */
-      ctx.fillStyle = gridText;
-      ctx.textAlign = "center";
-      ctx.fillText("0", margin.left, height - 8);
-      ctx.fillText(formatNumber(w1 + w2), margin.left + plotW, height - 8);
-      ctx.fillText(formatNumber(Math.min(w1, w2)), margin.left + Math.min(w1, w2) / T * plotW, height - 8);
-      ctx.restore();
+      var cursorY = botBase - practiceCalc.convolutionAnalytic(t, w1, w2) * yScale;
+      ctx.strokeStyle = warm;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(toX(t), botTop);
+      ctx.lineTo(toX(t), botBase);
+      ctx.stroke();
+      ctx.fillStyle = warm;
+      ctx.beginPath();
+      ctx.arc(toX(t), cursorY, 3.5, 0, Math.PI * 2);
+      ctx.fill();
 
-      /* 测量：标注支撑区间与两脉冲宽度 */
-      metrics.textContent = "";
+      /* 轴标签 */
+      ctx.fillStyle = gridText;
+      ctx.textAlign = "left";
+      ctx.fillText("τ / s（积分变量）", margin.left, topTop - 4);
+      ctx.fillText("t / s（观察时刻）  阴影宽度 = 重叠区间", margin.left, botTop - 6);
+      ctx.textAlign = "right";
+      ctx.fillText(formatNumber(peak), margin.left - 6, topTop + 10);
+      ctx.fillText("0", margin.left - 6, topBase + 3);
+      ctx.fillText(formatNumber(peak), margin.left - 6, botTop + 10);
+
+      updateMetrics();
+    }
+
+    function updateMetrics() {
+      var w1 = state.width1;
+      var w2 = state.width2;
+      var t = state.timeT;
+      var lo = Math.max(0, t - w2);
+      var hi = Math.min(w1, t);
       var rows = [
-        ["解析峰值 t=min(w₁,w₂)", formatNumber(maxY)],
-        ["数值峰值", formatNumber(y[Math.round(Math.min(w1, w2) / dt)] || 0)],
-        ["最大绝对误差", formatNumber(maxAbsError)],
-        ["支撑区间", "[0, " + formatNumber(w1 + w2) + "] s", "wide"],
-        ["脉冲宽度", formatNumber(w1) + " / " + formatNumber(w2) + " s"]
+        ["当前观察时刻 t", formatNumber(t) + " s", false],
+        ["瞬时重叠区间", hi > lo ? "[" + formatNumber(lo) + ", " + formatNumber(hi) + "] s" : "无交集", false],
+        ["瞬时输出 y(t)", formatNumber(practiceCalc.convolutionAnalytic(t, w1, w2)), false],
+        ["输出支撑区间", "[0, " + formatNumber(w1 + w2) + "] s", true],
+        ["理论峰值 min(w₁,w₂)", formatNumber(Math.min(w1, w2)), false],
       ];
+      metrics.textContent = "";
       rows.forEach(function (row) {
-        var item = document.createElement("div");
-        item.className = row[2] === "wide" ? "demo-metric is-wide" : "demo-metric";
-        item.appendChild(textElement("span", row[0], "demo-metric-label"));
-        item.appendChild(textElement("strong", row[1], "demo-metric-value"));
-        metrics.appendChild(item);
+        var card = document.createElement("div");
+        card.className = "demo-metric" + (row[2] ? " is-wide" : "");
+        card.appendChild(textElement("span", row[0], "demo-metric-label"));
+        card.appendChild(textElement("strong", row[1], "demo-metric-value"));
+        metrics.appendChild(card);
       });
     }
 
+    syncTimeInputs();
     demo.appendChild(controls);
     demo.appendChild(wrap);
     demo.appendChild(metrics);
     container.appendChild(demo);
-
-    var resizeObserver = null;
-    if (typeof window.ResizeObserver !== "undefined") {
-      resizeObserver = new window.ResizeObserver(function () {
-        draw();
-      });
-      resizeObserver.observe(canvas);
-    }
-    setTimeout(draw, 400);
-    window.addEventListener("resize", draw);
+    draw();
+    /* 首帧可能在布局完成前执行：下一帧再画一次，保证 backing store = CSS 尺寸 × DPR */
+    requestAnimationFrame(draw);
   }
+
 
   /* 演练 4：一阶 LTI 系统递推与卷积核对——y[n]=x[n]+a·y[n−1]，
      与 h[n]=a^n·u[n] 卷积 x[n]（单位阶跃）比较两种算法输出。 */
@@ -2818,8 +4627,14 @@
       resizeObserver = new window.ResizeObserver(function () { draw(); });
       resizeObserver.observe(canvas);
     }
-    setTimeout(draw, 400);
+    var firstDrawTimer = setTimeout(draw, 400);
     window.addEventListener("resize", draw);
+    /* 卸载时注销：监听的画布会被下一次渲染丢弃，留着会多份重绘 */
+    demo.__cleanup = function () {
+      clearTimeout(firstDrawTimer);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener("resize", draw);
+    };
   }
 
   /* 演练 5：移动平均 FIR 降噪——x[n]=低频+高频正弦，M 点平均 bₖ=1/M，
@@ -3031,8 +4846,14 @@
       resizeObserver = new window.ResizeObserver(function () { draw(); });
       resizeObserver.observe(canvas);
     }
-    setTimeout(draw, 400);
+    var firstDrawTimer = setTimeout(draw, 400);
     window.addEventListener("resize", draw);
+    /* 卸载时注销：监听的画布会被下一次渲染丢弃，留着会多份重绘 */
+    demo.__cleanup = function () {
+      clearTimeout(firstDrawTimer);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener("resize", draw);
+    };
   }
 
   /* 演练 6：固定随机种子的方差验证——均值 0、方差 σ² 的高斯白噪声，
@@ -3252,8 +5073,14 @@
       resizeObserver = new window.ResizeObserver(function () { draw(); });
       resizeObserver.observe(canvas);
     }
-    setTimeout(draw, 400);
+    var firstDrawTimer = setTimeout(draw, 400);
     window.addEventListener("resize", draw);
+    /* 卸载时注销：监听的画布会被下一次渲染丢弃，留着会多份重绘 */
+    demo.__cleanup = function () {
+      clearTimeout(firstDrawTimer);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener("resize", draw);
+    };
   }
 
   /* 通知浮层：对齐原站 .toast（位置/配色/自动消失 3.6s） */

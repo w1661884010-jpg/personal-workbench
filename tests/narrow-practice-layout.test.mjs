@@ -48,9 +48,32 @@ async function openPractice(page) {
   await page.waitForTimeout(500);
 }
 
-async function openTab(page, index) {
-  await page.locator(".practice-tab").nth(index).click();
-  await page.waitForTimeout(350);
+/* 全部演练实验，按课程顺序（两级导航下章节气泡按此顺序归类） */
+const PRACTICE_IDS = [
+  "signals-intro-notebook",
+  "signals-ch1-waveform-transform",
+  "signals-ch1-convolution",
+  "signals-ch1-fourier-synthesis",
+  "signals-ch2-aliasing",
+  "signals-ch2-spectral-leakage",
+  "signals-ch2-circular-convolution",
+  "signals-ch3-first-order-lti",
+  "signals-ch4-moving-average",
+  "signals-ch5-random-average",
+];
+
+/* 按实验 ID 打开（规划文档第一节：按 ID 路由，不能依赖数组下标）。
+   两级导航下必须先点开所属章节气泡，实验芯片才会在大气泡里渲染出来。 */
+async function openTab(page, id) {
+  await page.click(`.practice-chapter[data-experiment-ids~="${id}"]`);
+  await page.waitForTimeout(200);
+  await page.click(`.practice-tab[data-experiment-id="${id}"]`);
+  /* 等内容真正换成目标实验（切换带 150ms 淡出），再让挂载后的首帧重绘跑完 */
+  await page.waitForFunction((want) => {
+    const active = document.querySelector(".practice-tab.is-active");
+    return Boolean(active) && active.getAttribute("data-experiment-id") === want;
+  }, id, { timeout: 8000 });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 const rects = (sel) => `(() => {
@@ -63,10 +86,10 @@ test("参数区：390px 两列网格、输入高度 40–44、标签完整不截
   const page = await (await browser.newContext({ viewport: { width: 390, height: 900 } })).newPage();
   try {
     await openPractice(page);
-    for (const tab of [0, 1, 2]) {
-      await openTab(page, tab);
+    for (let i = 0; i < 3; i += 1) {
+      await openTab(page, PRACTICE_IDS[i]);
       const fields = await page.evaluate(rects(".demo-controls"));
-      assert.ok(fields.length >= 2, `演练 ${tab + 1} 参数数量 ${fields.length}`);
+      assert.ok(fields.length >= 2, `演练 ${i + 1} 参数数量 ${fields.length}`);
       const rowCount = new Set(fields.map((f) => f.y)).size;
       assert.ok(rowCount < fields.length, `参数应转为多列（fields=${fields.length} rows=${rowCount}）`);
       for (const f of fields) {
@@ -113,7 +136,7 @@ test("结果区：390px 两列并排、长结果（is-wide）独占整行、无�
     const demo = await page.evaluate(`(() => { const m = document.querySelector('.demo-metrics'); const r = m.getBoundingClientRect(); return r.width; })()`);
     assert.ok(wide.w >= demo - 2, `长结果应独占整行（宽 ${wide.w} vs 结果区 ${demo}）`);
     /* 演练2（卷积验证）：5 个结果，短结果并排 + 「支撑区间」公式满行 */
-    await openTab(page, 1);
+    await openTab(page, "signals-ch1-convolution");
     const metrics2 = await page.evaluate(rects(".demo-metrics"));
     assert.equal(metrics2.length, 5, "卷积验证 5 个结果");
     assert.equal(metrics2[3].cls, "demo-metric is-wide", "支撑区间（公式）应为 is-wide 满行");
@@ -133,8 +156,8 @@ test("参数修改 → 缩放 → 切换演练：数值与结果不回滚", asyn
     await page.setViewportSize({ width: 390, height: 900 });
     await page.waitForTimeout(300);
     /* 切换演练再回来 */
-    await openTab(page, 1);
-    await openTab(page, 0);
+    await openTab(page, "signals-ch1-convolution");
+    await openTab(page, "signals-intro-notebook");
     const v = await page.locator(".demo-controls input").nth(0).inputValue();
     assert.equal(v, "3", "参数值应保留");
     /* 默认值对照：数学逻辑不变（频率 2 → T₀ = 0.5 s） */
@@ -144,14 +167,14 @@ test("参数修改 → 缩放 → 切换演练：数值与结果不回滚", asyn
   } finally { await page.context().close(); }
 });
 
-test("全视口（360/390/560/620/621/760/1040/1440）× 六演练：无横向溢出（tab 条自身滚动除外）", async () => {
+test("全视口（360/390/560/620/621/760/1040/1440）× 十演练：无横向溢出（导航条自身滚动除外）", async () => {
   const page = await (await browser.newContext({ viewport: { width: 390, height: 900 } })).newPage();
   try {
     for (const width of [360, 390, 560, 620, 621, 760, 1040, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await openPractice(page);
-      for (let t = 0; t < 6; t += 1) {
-        await openTab(page, t);
+      for (let t = 0; t < PRACTICE_IDS.length; t += 1) {
+        await openTab(page, PRACTICE_IDS[t]);
         const s = await page.evaluate(`({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })`);
         assert.equal(s.sw, s.cw, `${width}px 演练${t + 1} 无横向溢出（scrollWidth=${s.sw} clientWidth=${s.cw}）`);
       }

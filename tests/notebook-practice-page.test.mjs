@@ -16,14 +16,29 @@ async function loadCourses() {
   return context.CoursesData.courses;
 }
 
-test("all six signal experiments contain enough evidence for a notebook practice page", async () => {
+test("all ten signal experiments contain enough evidence for a notebook practice page", async () => {
   const courses = await loadCourses();
   const signals = courses.find((course) => course.id === "signals");
   const experiments = signals.chapters.flatMap((chapter) => chapter.experiments);
 
-  assert.equal(experiments.length, 6);
+  assert.equal(experiments.length, 10);
   assert.ok(experiments.every((experiment) => experiment.workbench === "notebook"));
   assert.ok(experiments.every((experiment) => experiment.goal && experiment.steps.length && experiment.expected));
+  /* 本轮补齐：7 字段中的 id/title 也必须非空（文档第一节与第五节要求） */
+  assert.ok(experiments.every((experiment) => typeof experiment.id === "string" && experiment.id.length > 0),
+    "每个实验都必须有非空字符串 id");
+  assert.ok(experiments.every((experiment) => typeof experiment.title === "string" && experiment.title.length > 0),
+    "每个实验都必须有非空字符串 title");
+  assert.ok(experiments.every((experiment) => typeof experiment.limitation === "string" && experiment.limitation.length > 0),
+    "每个实验都必须有非空字符串 limitation");
+  /* 实验 ID 全局唯一：该文件没有 index()，在此另建 Set 遍历全部课程（文档第五节明确） */
+  const allExperiments = courses.flatMap((course) => course.chapters.flatMap((chapter) => chapter.experiments));
+  const experimentIds = new Set();
+  for (const experiment of allExperiments) {
+    assert.ok(!experimentIds.has(experiment.id), `实验 ID 重复：${experiment.id}`);
+    experimentIds.add(experiment.id);
+  }
+  assert.equal(experimentIds.size, allExperiments.length, "实验 ID 数量应与条目数一致");
 });
 
 test("notebook experiment cards open a dedicated practice view instead of a toast", async () => {

@@ -481,6 +481,24 @@
   color: var(--ink-soft);
 }
 
+/* 滑块 + 数字框双向绑定同一状态：并排一行，高度与既有输入一致（40px） */
+.demo-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.6rem;
+  gap: 6px;
+  align-items: center;
+}
+.demo-range-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  height: 40px;
+  background: transparent;
+}
+.demo-range-row input[type="number"] {
+  width: 100%;
+  min-width: 0;
+}
 .demo-field input,
 .demo-field select {
   width: 100%;
@@ -549,6 +567,77 @@
 .practice-tab-title { font-size: .82rem; }
 
 .practice-tab-done { color: var(--accent-ink); font-weight: 750; }
+
+/* —— 演练顶部两级导航 ——
+   ① 章节气泡行：选中胶囊由 .practice-chapter-thumb 提供，分层与科目切换一致
+      （按钮填充 z0 < 滑块 z1 < 文字 z2），因此滑块横穿时经过的章节名始终可读；
+   ② 大气泡 .practice-bubble：只装当前章节的实验标签。 */
+.practice-chapters {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.practice-chapter-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  height: 36px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  pointer-events: none;
+  will-change: transform, width;
+  transition: transform var(--seg-duration) var(--seg-ease), width var(--seg-duration) var(--seg-ease);
+}
+
+/* 初始化 / 断点变化 / 字体替换后重新落位：滑块即时就位，不做横穿动画 */
+.practice-chapters.is-instant .practice-chapter-thumb { transition: none; }
+
+.practice-chapter {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 5px 13px 7px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--ink-soft);
+  font-weight: 750;
+  white-space: nowrap;
+  transition: color 140ms ease-out;
+}
+
+.practice-chapter > span { position: relative; z-index: 2; }
+.practice-chapter:hover { color: var(--ink); }
+
+/* 选中章节 = 描边胶囊（由滑块提供，按钮自身不再画底色/描边，避免两套指示器） */
+.practice-chapters .practice-chapter.is-active {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.practice-chapter-title { font-size: .82rem; }
+
+.practice-bubble {
+  display: flex;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+/* 减少动效：章节滑块不滑动，只保留文字色变化（与科目滑块一致） */
+@media (prefers-reduced-motion: reduce) {
+  .practice-chapter-thumb { transition: none; }
+}
 
 .practice-layout {
   display: grid;

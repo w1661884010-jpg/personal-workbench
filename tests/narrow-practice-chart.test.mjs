@@ -47,9 +47,32 @@ async function openPractice(page) {
   await page.waitForTimeout(500);
 }
 
-async function openTab(page, index) {
-  await page.locator(".practice-tab").nth(index).click();
-  await page.waitForTimeout(350);
+/* 全部演练实验，按课程顺序（两级导航下章节气泡按此顺序归类） */
+const PRACTICE_IDS = [
+  "signals-intro-notebook",
+  "signals-ch1-waveform-transform",
+  "signals-ch1-convolution",
+  "signals-ch1-fourier-synthesis",
+  "signals-ch2-aliasing",
+  "signals-ch2-spectral-leakage",
+  "signals-ch2-circular-convolution",
+  "signals-ch3-first-order-lti",
+  "signals-ch4-moving-average",
+  "signals-ch5-random-average",
+];
+
+/* 按实验 ID 打开：两级导航下必须先点开所属章节气泡，实验芯片才会渲染出来 */
+async function openTab(page, id) {
+  await page.click(`.practice-chapter[data-experiment-ids~="${id}"]`);
+  await page.waitForTimeout(200);
+  await page.click(`.practice-tab[data-experiment-id="${id}"]`);
+  /* 等内容真正换成目标实验（切换带 150ms 淡出），再让挂载后的首帧重绘跑完：
+     演练在挂载时先按 100px 兜底画一次，随后用 rAF 修正为 CSS 尺寸 × DPR。 */
+  await page.waitForFunction((want) => {
+    const active = document.querySelector(".practice-tab.is-active");
+    return Boolean(active) && active.getAttribute("data-experiment-id") === want;
+  }, id, { timeout: 8000 });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 /* 在页面里挂 fillText 记录器，清空后触发一次窗口 resize 让当前宽度上的 draw() 重绘 */
@@ -94,9 +117,9 @@ test("390px：X 刻度与单位不重叠（刻度数量按绘图区宽度收敛�
     /* 窄图应减少显示刻度：单位行内的数字刻度 ≤ 4（含 Y 轴同行标签不算） */
     const unitRowTicks = tickLabels.filter((t) => unit.some((u) => Math.abs(t.y - u.y) <= 2));
     assert.ok(unitRowTicks.length <= 4, `窄图刻度应减少（单位行实际 ${unitRowTicks.length} 个：${JSON.stringify(unitRowTicks)}）`);
-    /* 六演练逐一重测（每个演练独立 canvas） */
-    for (let t = 1; t < 6; t += 1) {
-      await openTab(page, t);
+    /* 其余演练逐一重测（每个演练独立 canvas） */
+    for (let t = 1; t < PRACTICE_IDS.length; t += 1) {
+      await openTab(page, PRACTICE_IDS[t]);
       const texts2 = (await captureTexts(page)).filter((tt) => tt.cw >= 200);
       const u2 = texts2.filter((tt) => UNIT_PATTERN.test(tt.text));
       const ticks2 = texts2.filter((tt) => /^[-\d]/.test(tt.text));
@@ -129,14 +152,14 @@ test("1440px：宽图刻度完整且与单位不重叠", async () => {
   } finally { await page.context().close(); }
 });
 
-test("Canvas 属性尺寸与 CSS 尺寸 × DPR 一致（390/760/1440 × 六演练），CSS 高度保持", async () => {
+test("Canvas 属性尺寸与 CSS 尺寸 × DPR 一致（390/760/1440 × 十演练），CSS 高度保持", async () => {
   const page = await (await browser.newContext({ viewport: { width: 390, height: 900 } })).newPage();
   try {
     for (const width of [390, 760, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await openPractice(page);
-      for (let t = 0; t < 6; t += 1) {
-        await openTab(page, t);
+      for (let t = 0; t < PRACTICE_IDS.length; t += 1) {
+        await openTab(page, PRACTICE_IDS[t]);
         const s = await page.evaluate(`(() => {
           const c = document.querySelector('.demo-canvas');
           const r = c.getBoundingClientRect();
