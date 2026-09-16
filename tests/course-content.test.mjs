@@ -16,7 +16,7 @@ const root = new URL("../", import.meta.url);
  */
 
 /** 已按《课程内容充实规划》扩写的章节（doc: docs/course-content-plan.md） */
-const ENRICHED_CHAPTER_IDS = ["signals-ch1", "signals-ch2"];
+const ENRICHED_CHAPTER_IDS = ["signals-ch1", "signals-ch2", "signals-ch3", "signals-ch4", "signals-ch5"];
 
 /** 每小节正文（content + detail）最低字数 */
 const MIN_SECTION_CHARS = 260;

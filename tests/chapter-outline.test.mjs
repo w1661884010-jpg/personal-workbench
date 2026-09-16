@@ -396,6 +396,7 @@ test("各章节的节目录：按教材目录列出，节名不带「第几节�
       "随机信号通过线性系统的分析",
       "最优线性滤波",
       "非平稳随机信号的分析",
+      "应用MATLAB的随机信号分析、处理",
     ],
   };
 
@@ -416,7 +417,19 @@ test("各章节的节目录：按教材目录列出，节名不带「第几节�
   await page.locator('.chapter-item[data-chapter="signals-ch3"] .chapter-toggle').click();
   await page.waitForTimeout(200);
   await page.locator('.chapter-item[data-chapter="signals-ch3"] .chapter-part').nth(3).click();
-  await page.waitForTimeout(1000);
+  /* 第 3 章扩写到 15 个小节后滚动距离明显变长：等"目标小节标题到达视口上部"这个
+     可观察状态，而不是固定延时。几何断言保持不变——标题没到位就超时失败。 */
+  await page.waitForFunction(
+    (expected) => {
+      const node = Array.from(document.querySelectorAll(".learning-section h2"))
+        .find((item) => item.textContent.trim() === expected);
+      if (!node) return false;
+      const rect = node.getBoundingClientRect();
+      return rect.top >= -10 && rect.top < window.innerHeight * 0.5;
+    },
+    "数字信号处理的特点",
+    { timeout: 6000 },
+  );
   const landed = await page.evaluate(() => {
     const heading = Array.from(document.querySelectorAll(".learning-section h2")).find((node) => {
       const rect = node.getBoundingClientRect();
@@ -424,7 +437,7 @@ test("各章节的节目录：按教材目录列出，节名不带「第几节�
     });
     return heading ? heading.textContent.trim() : null;
   });
-  assert.match(landed ?? "", /数字信号处理的实现与有限字长/, `应停在第 3 章第 4 节，实际是「${landed}」`);
+  assert.match(landed ?? "", /数字信号处理的特点/, `应停在第 3 章第 4 节，实际是「${landed}」`);
 
   await page.close();
 });
