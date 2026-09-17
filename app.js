@@ -1975,7 +1975,7 @@
       var prev = at(0);
       var cur = at(df);
       var edge = null, side = null;
-      var steps = Math.round(8 / df);
+      var steps = Math.round((practiceCalc.analysisFs / 2) / df);
       for (var i = 2; i <= steps; i += 1) {
         var f = i * df;
         var next = at(f);
@@ -3661,7 +3661,8 @@
       var botTop = topBase + 34;
       var botH = Math.max(340 - margin.bottom - botTop, 40);
       var botBase = botTop + botH;
-      var fwMax = 8;
+      var lobe = practiceCalc.windowLobe(win, L, 0.01);
+      var fwMax = Math.min(fs / 2, Math.max(8, (lobe.firstSidelobe || 0) * 1.25));
       var dbMin = -40;
       var toWx = function (f) { return margin.left + (f / fwMax) * plotW; };
       var toWy = function (db) {
@@ -3698,7 +3699,6 @@
       }
       ctx.stroke();
 
-      var lobe = practiceCalc.windowLobe(win, L, 0.01);
       var peaks = practiceCalc.localPeaks(scene, L, win, 9, 13, 0.01);
 
       if (lobe.mainLobeEdge !== null) {
@@ -3719,7 +3719,7 @@
 
       ctx.fillStyle = gridText;
       ctx.textAlign = "left";
-      ctx.fillText("窗自身频谱 / dB（0…8 Hz）", margin.left, botTop - 5);
+      ctx.fillText("窗自身频谱 / dB（0…" + formatNumber(fwMax, 1) + " Hz）", margin.left, botTop - 5);
       ctx.textAlign = "right";
       ctx.fillText("−40", margin.left - 6, botBase + 3);
       ctx.fillText("0", margin.left - 6, botTop + 9);
@@ -4163,7 +4163,8 @@
       function commit(raw) {
         var value = Number(raw);
         if (!Number.isFinite(value)) { syncTimeInputs(); return; }   /* 拒绝非有限值，不传播 NaN */
-        state[key] = Math.min(max, Math.max(min, value));
+        var upper = key === "timeT" ? state.width1 + state.width2 + 1 : max;
+        state[key] = Math.min(upper, Math.max(min, value));
         if (key === "width1" || key === "width2") clampTime();
         syncTimeInputs();
         draw();
@@ -4188,10 +4189,15 @@
 
     function syncTimeInputs() {
       tRange.max = String(state.width1 + state.width2 + 1);
-      tRange.value = String(state.timeT);
-      if (tRange.nextSibling && tRange.nextSibling.tagName === "INPUT") tRange.nextSibling.value = String(state.timeT);
-      w1Range.value = String(state.width1);
-      w2Range.value = String(state.width2);
+      [[tRange, state.timeT], [w1Range, state.width1], [w2Range, state.width2]].forEach(function (pair) {
+        var range = pair[0];
+        range.value = String(pair[1]);
+        var number = range.nextSibling;
+        if (number && number.tagName === "INPUT") {
+          number.value = String(pair[1]);
+          number.max = range.max;
+        }
+      });
     }
 
     var frameHandle = 0;
@@ -4304,7 +4310,7 @@
 
       /* 上图：x(τ) 与 h(t−τ)，重叠区填充 */
       var peak = Math.min(w1, w2);
-      var yUnit = (topH - 18) / Math.max(peak, 1e-6);
+      var yUnit = topH - 18;    /* 输入脉冲恒为单位高度，与输出峰值无关 */
       ctx.strokeStyle = accentInk;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -4371,7 +4377,7 @@
       ctx.fillText("τ / s（积分变量）", margin.left, topTop - 4);
       ctx.fillText("t / s（观察时刻）  阴影宽度 = 重叠区间", margin.left, botTop - 6);
       ctx.textAlign = "right";
-      ctx.fillText(formatNumber(peak), margin.left - 6, topTop + 10);
+      ctx.fillText("1", margin.left - 6, topTop + 10);
       ctx.fillText("0", margin.left - 6, topBase + 3);
       ctx.fillText(formatNumber(peak), margin.left - 6, botTop + 10);
 
@@ -5118,6 +5124,10 @@
     }
     var prev = activeWorkbench;
     if (prev === wbKind) return;
+    if (prev === "notebook") {
+      var outgoingDemo = notebookRoot.querySelector(".notebook-demo");
+      if (outgoingDemo && typeof outgoingDemo.__cleanup === "function") outgoingDemo.__cleanup();
+    }
     if (isCircuitWorkbench(prev) && isCircuitWorkbench(wbKind)) {
       switchWorkbenchKind(wbKind, false);
       return;

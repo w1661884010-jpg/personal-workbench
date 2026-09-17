@@ -213,6 +213,60 @@ test("模块2：播放可暂停，重新进入后不自动播放（无旧回调�
   await page.waitForTimeout(300);
   const t2 = await page.evaluate(() => window.__practiceState("signals-ch1-convolution").timeT);
   assert.equal(t1, t2, "暂停后观察时刻不应继续推进");
+  await playButton.click();
+  await page.click("#mistakeToggle");
+  await page.waitForFunction(() => document.querySelector("#notebookRoot").hidden);
+  const left = await page.evaluate(() => ({ ...window.__practiceState("signals-ch1-convolution") }));
+  assert.equal(left.playing, false, "播放中离开演练必须停止，而不只是隐藏画布");
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => window.__practiceState("signals-ch1-convolution").timeT), left.timeT);
+  await page.click("#practiceToggle");
+  await page.waitForFunction(() => !document.querySelector("#notebookRoot").hidden);
+  assert.equal(await page.evaluate(() => window.__practiceState("signals-ch1-convolution").playing), false);
+  await page.close();
+});
+
+test("模块2：预设、滑块和数字框同步，观察时刻使用动态上限", async () => {
+  const page = await browser.newPage();
+  await openDemo(page);
+  await page.locator(".notebook-demo select").selectOption("1,2");
+  const w2 = page.locator(".demo-field").filter({ hasText: "宽度 w₂" });
+  assert.equal(await w2.locator('input[type="number"]').inputValue(), "2");
+  const w1 = page.locator(".demo-field").filter({ hasText: "宽度 w₁" });
+  await w1.locator('input[type="range"]').fill("3");
+  assert.equal(await w1.locator('input[type="number"]').inputValue(), "3");
+  await w2.locator('input[type="number"]').fill("3");
+  assert.equal(await w2.locator('input[type="range"]').inputValue(), "3");
+  const time = page.locator(".demo-field").filter({ hasText: "观察时刻" });
+  assert.equal(await time.locator('input[type="number"]').getAttribute("max"), "7");
+  await time.locator('input[type="number"]').fill("6");
+  assert.equal(await page.evaluate(() => window.__practiceState("signals-ch1-convolution").timeT), 6);
+  await w1.locator('input[type="range"]').fill("0.5");
+  assert.equal(await time.locator('input[type="number"]').inputValue(), "4.5");
+  assert.equal(await time.locator('input[type="number"]').getAttribute("max"), "4.5");
+  await page.close();
+});
+
+test("模块2：短脉冲仍为单位高度，波形纵坐标不越出画布", async () => {
+  const page = await browser.newPage();
+  await openDemo(page, 390, 844);
+  const result = await page.evaluate(() => {
+    const ctx = document.querySelector(".notebook-demo canvas").getContext("2d");
+    const ys = [], labels = [];
+    const lineTo = ctx.lineTo, fillText = ctx.fillText;
+    ctx.lineTo = function (x, y) { ys.push(y); return lineTo.call(this, x, y); };
+    ctx.fillText = function (text, x, y) { labels.push([String(text), y]); return fillText.call(this, text, x, y); };
+    try {
+      const input = [...document.querySelectorAll(".demo-field")]
+        .find((f) => f.textContent.includes("宽度 w₁")).querySelector('input[type="range"]');
+      input.value = "0.5";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    } finally { ctx.lineTo = lineTo; ctx.fillText = fillText; }
+    return { ys, labels };
+  });
+  assert.ok(result.ys.length > 0);
+  assert.ok(result.ys.every((y) => y >= 0 && y <= 340), "单位高度波形不能因脉宽缩短而被裁切");
+  assert.ok(result.labels.some(([text, y]) => text === "1" && y < 100), "上图幅度标尺应是1，不是卷积峰值0.5");
   await page.close();
 });
 

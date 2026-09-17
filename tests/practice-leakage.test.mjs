@@ -215,6 +215,28 @@ test("模块5：控件驱动指标卡——L/f_s、f_s/L、f_s/N_fft 随 L 与 M
   await page.close();
 });
 
+test("模块5：最短记录Hann窗也能找到并显示主瓣和旁瓣", async () => {
+  const page = await browser.newPage();
+  await openDemo(page);
+  const result = await page.evaluate(() => {
+    const field = [...document.querySelectorAll(".demo-field")].find((f) => /观察长度/.test(f.textContent));
+    const input = field.querySelector('input[type="number"]');
+    input.value = "16";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    const win = [...document.querySelectorAll(".notebook-demo select")].find((s) => [...s.options].some((o) => o.value === "hann"));
+    win.value = "hann";
+    win.dispatchEvent(new Event("change", { bubbles: true }));
+    return {
+      lobe: window.__practiceCalc.windowLobe("hann", 16, .001),
+      metric: [...document.querySelectorAll(".demo-metric")].find((c) => /窗主瓣/.test(c.textContent)).textContent,
+    };
+  });
+  assert.ok(result.lobe.mainLobeEdge > 8.5 && result.lobe.mainLobeEdge < 8.6, "L16 Hann的第一零点约为2fs/(L-1)=8.533Hz");
+  assert.ok(result.lobe.firstSidelobe > result.lobe.mainLobeEdge && result.lobe.firstSidelobe < 13);
+  assert.ok(!result.metric.includes("—"), "短记录的有效窗指标不能显示为空");
+  await page.close();
+});
+
 test("模块5：课程条目含预测问题、≥2 组反例对照与「用自己的话解释」步骤", async () => {
   const page = await browser.newPage();
   await openDemo(page);
