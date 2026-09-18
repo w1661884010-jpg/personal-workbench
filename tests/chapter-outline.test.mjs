@@ -138,7 +138,11 @@ test("展开第 1 章：只列 5 个节，不标注「第几节」，节以下�
 
   /* 点"连续信号的频域分析" → 滚到该节的第一个小节 */
   await page.locator('.chapter-item[data-chapter="signals-ch1"] .chapter-part').nth(1).click();
-  await page.waitForTimeout(900);
+  // 正文排版变长后滚动距离增加；验收实际到达，不把900ms当作滚动完成。
+  await page.waitForFunction(() => {
+    const rect = document.querySelector("#section-signals-ch1-frequency h2").getBoundingClientRect();
+    return rect.top >= -10 && rect.top < innerHeight * 0.5;
+  });
   const landed = await page.evaluate(() => {
     const heading = Array.from(document.querySelectorAll(".learning-section h2")).find((node) => {
       const rect = node.getBoundingClientRect();

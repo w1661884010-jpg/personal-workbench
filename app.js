@@ -831,6 +831,7 @@
         formulaCard.className = "formula-block";
         var math = document.createElement("div");
         math.className = "math-formula";
+        math.tabIndex = 0;
         math.setAttribute("aria-label", "公式：" + section.formula);
         if (typeof window.KaTeX !== "undefined") {
           math.innerHTML = window.KaTeX.renderToString(section.formula, {

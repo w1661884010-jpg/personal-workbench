@@ -1404,10 +1404,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* 正文 */
 .content {
+  min-width: 0;
   padding: 14px 14px 80px;   /* 顶部与面板保持同一节奏：分隔线下 14px（面板=sticky 86px，正文=72+14） */
 }
 
 .lesson {
+  min-width: 0;
   max-width: 100%;
   background: var(--panel);
   border-radius: 12px;
@@ -1454,8 +1456,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   margin-top: 22px;
 }
 
-/* 阅读边界：正文铺满卡片（宽屏不再留大片空白） */
-.lesson-body p, .lesson-resources p { max-width: none; }
+/* 阅读边界：正文铺满卡片（行宽与 3010 一致，宽屏不再限制阅读列） */
+.lesson-body, .lesson-resources, .lesson-guide, .lesson-heading {
+  min-width: 0;
+}
+.lesson-body p, .lesson-resources p { max-width: none; line-height: 1.95; }
+.lesson-body li, .lesson-resources li { line-height: 1.85; }
+.lesson-body li + li, .lesson-resources li + li { margin-top: .5em; }
+.lesson .math-inline { color: var(--ink); text-indent: 0; }
+.lesson .math-inline > .katex { font-size: 1.05em; }
+.lesson .math-display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: .55em .25em;
+  margin: .65em 0;
+  text-indent: 0;
+  color: var(--ink);
+}
+.lesson .math-display .katex-display { margin: 0; text-align: left; }
+.lesson code {
+  font: .87em/1.7 var(--mono);
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: .12em .3em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
 
 .boundary-note {
   font-size: .82rem;
@@ -1473,8 +1500,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-weight: 800;
 }
 
-/* 小节正文：首行缩进两字符（中文出版物样式）——与标题形成层次区分 */
-.learning-section > p { text-indent: 2em; }
+/* 用段间距分隔解释，避免独立公式继承首行缩进。 */
+.learning-section > p { text-indent: 0; margin: 1em 0; }
 
 /* 板块标题：次一级灰字 + 底部细分隔线（层级 3） */
 .lesson-content-group h2 {
@@ -1521,14 +1548,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-size: .82rem;
 }
 
-/* 公式卡（与原站 .formula-block 同构）：左公式（KaTeX 渲染）+ 右变量说明 */
+/* 公式在上、符号说明在下，长积分不与解释争抢宽度。
+   气泡单独限制在约 86ch（与正文原来的阅读列同宽）：正文已恢复满宽，
+   气泡仍保持窄栏并居中，避免长公式在超宽行里被拉散。 */
 .formula-block {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
-  margin: 12px 0 0;
-  padding: 12px 14px;
+  max-width: 86ch;
+  margin: 12px auto 0;
+  padding: 18px 20px;
   border-radius: 8px;
   background: var(--panel-2);
 }
@@ -1543,11 +1573,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .math-formula .katex-display { margin: 0.3rem 0; text-align: left; }
 
 .math-formula .katex-display > .katex { white-space: normal; }
+.math-formula:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.formula-block ul { margin: 0; padding-left: 18px; color: var(--ink-soft); }
+.formula-block ul {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0 0 18px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: .9rem;
+}
 
 @media (max-width: 760px) {
   .formula-block { grid-template-columns: 1fr; }
+  .formula-block { padding: 14px 12px; }
   /* 窄屏下公式卡里的行更宽：整体缩到 0.92em，避免 display 公式被卡片裁切（内部横向滚动看不全） */
   .math-formula .katex { font-size: .92em; }
 }
@@ -2430,7 +2469,7 @@ body.is-canvas-panning .workbench-root .cw-canvas { cursor: grabbing; }
    数据来自 courses.js 的 section.detail / points / pitfalls / links 与 chapter.connections；
    未写这些字段的旧章节不渲染任何新块，因此可以逐章灰度推进。 */
 
-.learning-section > p.section-detail { text-indent: 2em; margin-top: 8px; }
+.learning-section > p.section-detail { text-indent: 0; margin-top: 1em; }
 
 /* 节分组条（第一节 / 第二节 …）：数据来自 section.group，一个组只出现一次且同组连续 */
 .lesson-group {
