@@ -349,6 +349,32 @@
     return list;
   }
 
+  /* 演练通用「重置」：丢掉这一份演练的内存状态后重渲染，
+     控件、画布与数值卡一起回到默认值。默认值只写在各自的 state 初始化里，
+     所以这里不需要再抄一份参数表。 */
+  function appendResetControl(controls, experiment) {
+    var group = document.createElement("div");
+    group.className = "demo-field";
+    group.appendChild(document.createTextNode("参数重置"));
+    var row = document.createElement("div");
+    row.className = "demo-button-row";
+    var button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "↺ 重置";
+    button.addEventListener("click", function () {
+      delete practiceDemoStates[experiment.id];
+      for (var i = 0; i < practiceExperiments.length; i += 1) {
+        if (practiceExperiments[i].experiment.id === experiment.id) {
+          openNotebookExperiment(practiceExperiments[i].experiment, practiceExperiments[i].chapter);
+          return;
+        }
+      }
+    });
+    row.appendChild(button);
+    group.appendChild(row);
+    controls.appendChild(group);
+  }
+
   function appendContentGroup(parent, title) {
     var group = document.createElement("section");
     group.className = "lesson-content-group";
@@ -2558,24 +2584,45 @@
       var label = document.createElement("label");
       label.className = "demo-field";
       label.appendChild(document.createTextNode(field[1]));
+      /* 滑块与数字框共用同一状态（与其它演练一致） */
+      var row = document.createElement("div");
+      row.className = "demo-range-row";
+      var range = document.createElement("input");
+      range.type = "range";
+      range.min = String(field[2]);
+      range.max = String(field[3]);
+      range.step = String(field[4]);
+      range.value = String(state[field[0]]);
       var input = document.createElement("input");
       input.type = "number";
       input.min = String(field[2]);
       input.max = String(field[3]);
       input.step = String(field[4]);
       input.value = String(state[field[0]]);
-      input.addEventListener("input", function () {
-        var value = Number(input.value);
-        if (!Number.isFinite(value)) return;
+      function commit(raw) {
+        var value = Number(raw);
+        if (!Number.isFinite(value)) {                 /* 拒绝非有限值，不传播 NaN */
+          range.value = String(state[field[0]]);
+          input.value = String(state[field[0]]);
+          return;
+        }
         state[field[0]] = Math.min(field[3], Math.max(field[2], value));
+        range.value = String(state[field[0]]);
+        input.value = String(state[field[0]]);
         draw();
-      });
+      }
+      range.addEventListener("input", function () { commit(range.value); });
+      input.addEventListener("input", function () { commit(input.value); });
       inputs[field[0]] = input;
-      label.appendChild(input);
+      row.appendChild(range);
+      row.appendChild(input);
+      label.appendChild(row);
       controls.appendChild(label);
     });
 
     /* 画布 */
+    appendResetControl(controls, experiment);
+
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
     var wrap = document.createElement("div");
@@ -2773,6 +2820,8 @@
     });
     modeLabel.appendChild(modeSelect);
     controls.appendChild(modeLabel);
+
+    appendResetControl(controls, experiment);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas demo-canvas-tall";
@@ -3100,6 +3149,8 @@
     appendNumberField("尺度 a", "a", -3, 3, 0.1, function (value) { return value === 0; });
     appendNumberField("平移 b", "b", -4, 4, 0.2);
 
+    appendResetControl(controls, experiment);
+
     var resizeHandler = function () { draw(); };
     window.addEventListener("resize", resizeHandler);
     demo.__cleanup = function () { window.removeEventListener("resize", resizeHandler); };
@@ -3323,6 +3374,8 @@
 
     appendNumberField("周期 T / s", "T", 2, 10, 0.5);
     appendNumberField("最高谐波阶数 N", "N", 1, 101, 1);
+
+    appendResetControl(controls, experiment);
 
     var resizeHandler = function () { draw(); };
     window.addEventListener("resize", resizeHandler);
@@ -3598,6 +3651,8 @@
     appendSelectField("窗类型", "win", [["rect", "矩形窗"], ["hann", "对称 Hann 窗"]]);
     appendNumberField("观察长度 L / 样点", "L", 16, 128, 8);
     appendNumberField("补零 M / 样点", "M", 0, 224, 16);
+
+    appendResetControl(controls, experiment);
 
     var resizeHandler = function () { draw(); };
     window.addEventListener("resize", resizeHandler);
@@ -4494,6 +4549,8 @@
     kindLabel.appendChild(kindSelect);
     controls.appendChild(kindLabel);
 
+    appendResetControl(controls, experiment);
+
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
     var wrap = document.createElement("div");
@@ -4720,6 +4777,8 @@
     winLabel.appendChild(winSelect);
     controls.appendChild(winLabel);
 
+    appendResetControl(controls, experiment);
+
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";
     var wrap = document.createElement("div");
@@ -4937,6 +4996,8 @@
     });
     distLabel.appendChild(distSelect);
     controls.appendChild(distLabel);
+
+    appendResetControl(controls, experiment);
 
     var canvas = document.createElement("canvas");
     canvas.className = "demo-canvas";

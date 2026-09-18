@@ -50,6 +50,17 @@ async function openChapterOne(page, width = 1360, height = 950) {
   await page.waitForTimeout(550);
 }
 
+/** 等窗口滚动停稳（连续两次采样一致），用于判断"滚到了哪一节"。 */
+async function settleScroll(page) {
+  let last = -1;
+  for (let i = 0; i < 40; i += 1) {
+    const y = await page.evaluate(() => window.scrollY);
+    if (y === last) return;
+    last = y;
+    await page.waitForTimeout(60);
+  }
+}
+
 test("信号第 1 章：小节有展开段/要点/易混点，章末有分组章节联系", async () => {
   const page = await browser.newPage();
   await openChapterOne(page);
@@ -184,7 +195,10 @@ test("小节相关链接滚到锚点，跨课程联系切到另一门课的目�
   const sectionLink = page.locator(".section-link").first();
   const sectionLabel = (await sectionLink.locator("strong").textContent()).trim();
   await sectionLink.click();
-  await page.waitForTimeout(900);
+  /* 等滚动真正停稳再判断落点：固定 sleep 在负载下会在滚动途中取样，
+     视口上半可能还没有目标小节（实测偶发停在 null）。 */
+  await page.waitForTimeout(150);
+  await settleScroll(page);
   const landed = await page.evaluate(() => {
     const heading = Array.from(document.querySelectorAll(".learning-section h2")).find((node) => {
       const rect = node.getBoundingClientRect();
@@ -204,7 +218,10 @@ test("小节相关链接滚到锚点，跨课程联系切到另一门课的目�
   const crossItem = page.locator(".connection-group").last().locator(".connection-item").first();
   const crossLabel = (await crossItem.locator("strong").textContent()).trim();
   await crossItem.click();
-  await page.waitForTimeout(1000);
+  /* 等到真的切走科目，而不是等一个固定时长 */
+  await page.waitForFunction(
+    () => document.querySelector(".subject-tab.is-active")?.dataset.subject !== "signals",
+    null, { timeout: 8000 });
   const after = await page.evaluate(() => ({
     subject: document.querySelector(".subject-tab.is-active")?.dataset.subject,
     title: (document.querySelector(".lesson-title") || document.querySelector(".lesson h1"))?.textContent.trim(),

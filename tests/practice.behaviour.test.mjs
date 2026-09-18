@@ -165,7 +165,9 @@ test("parameter edits update the chart metrics for the same defaults", async () 
   assert.equal(before[1], "10 个样点", "default 10 samples per period at fs=20/f=2");
 
   await page.evaluate(() => {
-    const input = Array.from(document.querySelectorAll(".demo-field input"))[1]; // frequency
+    /* 按标签定位而不是按下标：参数区改成"滑块 + 数字框"后下标会移位 */
+    const label = Array.from(document.querySelectorAll(".demo-field")).find((l) => /频率/.test(l.textContent));
+    const input = label.querySelector('input[type="number"]');   // frequency
     input.value = "3";
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
