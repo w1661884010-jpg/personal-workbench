@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { plainMath } from "./math-plain.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -26,11 +27,12 @@ function chapterOf(courses, id) {
 function sectionText(chapter, id) {
   const section = chapter.sections.find((item) => item.id === id);
   assert.ok(section, `找不到小节 ${id}`);
-  return [
+  return plainMath([
     section.title, section.content, ...(section.detail ?? []),
     ...(section.points ?? []), ...(section.pitfalls ?? []),
-    section.formula ?? "", ...(section.variables ?? []),
-  ].join("\n");
+    ].join("\n"))
+    + "\n" + (section.formula ?? "")
+    + "\n" + (section.variables ?? []).join("\n");
 }
 
 /* ---------- 确定性伪随机（mulberry32 + Box-Muller，可复现且质量足够） ---------- */
@@ -84,7 +86,7 @@ test("白噪声通过 M 点移动平均：输出方差 = σ²Σb²（3 点→3�
       y.push(acc);
     }
     const sumB2 = b.reduce((sum, value) => sum + value * value, 0);
-    assert.ok(Math.abs(sumB2 - 1 / M) < 1e-12, `${M} 点移动平均的 Σb² 应为 1/M`);
+    assert.ok(Math.abs(sumB2 - 1 / M) < 1e-12, `${M} 点移动平均的 Σb\^2 应为 1/M`);
     const measured = varianceOf(y);
     assert.ok(Math.abs(measured - expected) < 0.12,
       `${M} 点移动平均输出方差应为 ${expected}（=9×${sumB2.toFixed(4)}），实测 ${measured.toFixed(4)}`);
@@ -183,7 +185,7 @@ test("正文一致：R_x(0) 必须写成平均功率，方差要减直流功率"
 
   assert.match(text, /R_x\(0\)/, "必须给出 R_x(0)");
   assert.match(text, /平均功率/, "R_x(0) 必须解释为平均功率");
-  assert.match(text, /σ_x²=R_x\(0\)−μ_x²/, "必须给出方差与平均功率、均值的关系");
+  assert.match(text, /σ_x\^2=R_x\(0\)−μ_x\^2/, "必须给出方差与平均功率、均值的关系");
   assert.match(probability, /只依赖时间差|只依赖 τ/, "宽平稳的第二个条件必须写清");
   assert.match(probability, /均值为常数|均值.{0,6}常数/, "宽平稳的第一个条件必须写清");
   assert.doesNotMatch(text, /R_x\(0\)（?就是方差/, "不得把 R_x(0) 直接说成方差");
@@ -347,12 +349,12 @@ test("正文一致：LTI 三条结论与白噪声方差公式", async () => {
   const chapter = chapterOf(await loadCourses(), "signals-ch5");
   const cont = sectionText(chapter, "signals-ch5-lti-continuous");
   const disc = sectionText(chapter, "signals-ch5-lti-discrete");
-  assert.match(cont, /S_y\(ω\)=\|H\(jω\)\|²S_x\(ω\)/, "连续系统必须给出输出功率谱");
+  assert.match(cont, /S_y\(ω\)=\|H\(jω\)\|\^2S_x\(ω\)/, "连续系统必须给出输出功率谱");
   assert.match(cont, /H\(0\)/, "必须给出均值乘直流增益的结论");
   assert.match(cont, /S_xy\(ω\)=H\*\(jω\)S_x\(ω\)/, "互谱必须写成 H*·S_x（与本站互相关定义一致）");
   assert.doesNotMatch(cont, /S_xy\(ω\)=H\(jω\)S_x\(ω\)/, "不得写成不带共轭的 H·S_x");
   assert.match(cont, /共轭|约定/, "必须说明该式依赖互相关的定义约定");
-  assert.match(disc, /Σ_k\|h\[k\]\|²|Σ\|h\[k\]\|²/, "离散系统必须给出方差用系数平方和的公式");
+  assert.match(disc, /Σ_k\|h\[k\]\|\^2|Σ\|h\[k\]\|\^2/, "离散系统必须给出方差用系数平方和的公式");
   assert.match(disc, /3\.0053|1\.8/, "必须给出移动平均算例的数值");
 });
 
@@ -360,7 +362,7 @@ test("正文一致：过渡过程必须说明要丢弃预热样本", async () =>
   const chapter = chapterOf(await loadCourses(), "signals-ch5");
   const text = sectionText(chapter, "signals-ch5-transient");
   assert.match(text, /预热/, "必须提到预热样本");
-  assert.match(text, /σ_y²\[n\]=σ_x²Σ/, "必须给出过渡期方差的累积式");
+  assert.match(text, /σ_y\^2\[n\]=σ_x\^2Σ/, "必须给出过渡期方差的累积式");
 });
 
 test("正文一致：三种最优滤波的定位与前提", async () => {

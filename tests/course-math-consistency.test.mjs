@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { plainMath } from "./math-plain.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -31,18 +32,20 @@ function sectionOf(chapter, id) {
   return section;
 }
 
-/** 小节的全部文字（正文 + 展开段 + 要点 + 易混点 + 公式 + 变量） */
+/** 小节的全部文字（正文 + 展开段 + 要点 + 易混点 + 公式 + 变量）
+ *  只归一化散文类字段；section.formula / variables 是作者手写的原始 LaTeX，
+ *  原样保留（对它们做 LaTeX→纯文本的还原会误伤嵌套花括号，例如 \frac{1}{3-j\omega}）。 */
 function sectionText(section) {
-  return [
+  return plainMath([
     section.title,
     section.content,
     ...(section.detail ?? []),
     ...(section.points ?? []),
     ...(section.pitfalls ?? []),
-    section.formula ?? "",
-    ...(section.variables ?? []),
     ...(section.links ?? []).map((link) => link.why),
-  ].join("\n");
+  ].join("\n"))
+    + "\n" + (section.formula ?? "")
+    + "\n" + (section.variables ?? []).join("\n");
 }
 
 /* ---------- 数值工具 ---------- */
@@ -202,7 +205,7 @@ test("正文一致：拉普拉斯例题必须说“收敛域含虚轴、傅里�
 
   assert.match(text, /包含虚轴|含虚轴/, "必须点明收敛域包含虚轴");
   assert.match(text, /傅里叶变换存在/, "必须给出“傅里叶变换存在”的结论");
-  assert.match(text, /1\/\(3−jω\)|1\/\(3-jω\)/, "必须给出 X(jω)=1/(3−jω)");
+  assert.match(text, /1\/\(3−jω\)|1\/\(3-jω\)|\\frac\{1\}\{3-j\\omega\}/, "必须给出 X(jω)=1/(3−jω)");
   assert.doesNotMatch(text, /不包含虚轴/, "不得再说“不包含虚轴”");
   assert.doesNotMatch(text, /傅里叶变换不存在/, "不得再说“傅里叶变换不存在”");
   assert.doesNotMatch(text, /指数增长/, "不得再说信号沿 −∞ 方向指数增长");
@@ -212,7 +215,7 @@ test("正文一致：卷积小节必须给出 min(w₁,w₂) 规则，不得把�
   const chapter = chapterOf(await loadCourses(), "signals-ch1");
   const text = sectionText(sectionOf(chapter, "signals-ch1-time-convolution"));
 
-  assert.match(text, /min\(w₁,w₂\)|min\(w1,w2\)/, "必须写明峰值 = min(w₁,w₂)");
+  assert.match(text, /min\(w_1,w_2\)|min\(w1,w2\)/, "必须写明峰值 = min(w_1,w_2)");
   assert.match(text, /总面积/, "必须区分“总面积”");
   assert.doesNotMatch(text, /峰值等于两个脉冲面积之积/, "不得把峰值写成两个脉冲面积之积");
 });
@@ -229,7 +232,7 @@ test("正文一致：阶跃响应不得与“h=u(t) 的系统对任意输入的�
   assert.doesNotMatch(text, /∫（/, "积分表达式必须写明上下限，不用“∫（从…到…）”的中文写法");
 
   const decomposition = sectionText(sectionOf(chapter, "signals-ch1-time-decomposition"));
-  assert.match(decomposition, /g\(t\)=∫_\{−∞\}\^\{t\}h\(τ\)dτ/, "阶跃响应表达式必须带积分限");
+  assert.match(decomposition, /g\(t\)=∫_\{?−∞\}?\^\{?t\}?h\(τ\)dτ/, "阶跃响应表达式必须带积分限");
 });
 
 test("正文一致：x(2−t) 在正文 / 例题 / 检验三处都必须是“先翻转再右移”", async () => {
@@ -240,7 +243,7 @@ test("正文一致：x(2−t) 在正文 / 例题 / 检验三处都必须是“�
 
   const example = chapter.examples.find((item) => item.title.includes("镜像"));
   assert.ok(example, "找不到镜像变换例题");
-  const exampleText = [example.prompt, ...example.steps, example.answer].join("\n");
+  const exampleText = plainMath([example.prompt, ...example.steps, example.answer].join("\n"));
   assert.match(exampleText, /先翻转/, "例题步骤必须写“先翻转”");
   assert.match(exampleText, /0≤2−t≤1/, "例题必须给出交叉验证");
 

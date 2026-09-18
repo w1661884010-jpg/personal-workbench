@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { plainMath } from "./math-plain.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -26,11 +27,12 @@ function chapterOf(courses, id) {
 function sectionText(chapter, id) {
   const section = chapter.sections.find((item) => item.id === id);
   assert.ok(section, `找不到小节 ${id}`);
-  return [
+  return plainMath([
     section.title, section.content, ...(section.detail ?? []),
     ...(section.points ?? []), ...(section.pitfalls ?? []),
-    section.formula ?? "", ...(section.variables ?? []),
-  ].join("\n");
+    ].join("\n"))
+    + "\n" + (section.formula ?? "")
+    + "\n" + (section.variables ?? []).join("\n");
 }
 
 /* ---------- 独立数值工具 ---------- */
@@ -105,7 +107,7 @@ test("切比雪夫：ε=√(10^{Ap/10}−1)，Ωc 处恰为 −Ap dB，通带内
     min = Math.min(min, mag);
   }
   assert.ok(closeTo(max, 1, 1e-9), `通带峰值应为 1，实测 ${max.toFixed(6)}`);
-  assert.ok(closeTo(min, 1 / Math.sqrt(1 + eps * eps), 1e-3), `通带谷值应为 1/√(1+ε²)=0.8913，实测 ${min.toFixed(4)}`);
+  assert.ok(closeTo(min, 1 / Math.sqrt(1 + eps * eps), 1e-3), `通带谷值应为 1/√(1+ε^2)=0.8913，实测 ${min.toFixed(4)}`);
 
   /* 等波纹：通带内 |H| 必须非单调。T_5 在 [0,1] 上有 3 个零点
      （arccos x = 0.1π/0.3π/0.5π），对应 3 个 |H|=1 的峰，峰间有 2 次起伏。 */
@@ -175,7 +177,7 @@ test("FIR：线性相位群延迟为 M/2；5 点移动平均群延迟 2 样点�
 
   /* 5 点移动平均 */
   const mag = (omega) => Math.abs(Math.sin((5 * omega) / 2) / (5 * Math.sin(omega / 2)));
-  assert.ok(closeTo(mag(Math.PI / 4), 0.4828, 1e-4), `|H(e^{jπ/4})| 应为 0.4828，实测 ${mag(Math.PI / 4).toFixed(4)}`);
+  assert.ok(closeTo(mag(Math.PI / 4), 0.4828, 1e-4), `|H(e\^{jπ/4})| 应为 0.4828，实测 ${mag(Math.PI / 4).toFixed(4)}`);
   assert.ok(closeTo(mag(1e-9), 1, 1e-6), "DC 增益应为 1");
   assert.equal((5 - 1) / 2, 2, "长度 5 的对称 FIR 群延迟为 2 个样点");
 });
@@ -216,7 +218,7 @@ test("正文一致：双线性变换需预畸变、冲激响应不变法有混�
   assert.match(text, /预畸变/, "必须提到预畸变");
   assert.match(text, /1453\.085/, "必须给出预畸变算例 1453.085 rad/s");
   assert.match(text, /混叠/, "必须说明冲激响应不变法的混叠");
-  assert.match(text, /1−z\^\{−1\}/, "必须给出双线性变换式");
+  assert.match(text, /1−z\^\{?−1\}?/, "必须给出双线性变换式");
 });
 
 test("正文一致：FIR 线性相位条件与窗函数取舍", async () => {

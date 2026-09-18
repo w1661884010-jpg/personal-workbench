@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { plainMath } from "./math-plain.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -26,22 +27,22 @@ function chapterOf(courses, id) {
 function sectionText(chapter, id) {
   const section = chapter.sections.find((item) => item.id === id);
   assert.ok(section, `找不到小节 ${id}`);
-  return [
+  return plainMath([
     section.title,
     section.content,
     ...(section.detail ?? []),
     ...(section.points ?? []),
     ...(section.pitfalls ?? []),
-    section.formula ?? "",
-    ...(section.variables ?? []),
-  ].join("\n");
+    ].join("\n"))
+    + "\n" + (section.formula ?? "")
+    + "\n" + (section.variables ?? []).join("\n");
 }
 
-const chapterText = (chapter) => [
+const chapterText = (chapter) => plainMath([
   chapter.sections.map((section) => sectionText(chapter, section.id)).join("\n"),
   chapter.examples.map((item) => [item.prompt, ...item.steps, item.answer].join("\n")).join("\n"),
   chapter.check.map((item) => [item.prompt, ...item.options, item.explanation].join("\n")).join("\n"),
-].join("\n");
+].join("\n"));
 
 /* ---------- 独立数值工具（不复用正文里的任何实现） ---------- */
 
@@ -160,7 +161,7 @@ test("单边幅度谱：偶数 N 的直流与奈奎斯特不翻倍，奇数 N �
   assert.ok(ones8.slice(1).every((value) => closeTo(value, 0)), "全 1 其余分量为 0");
 
   const alt8 = mag(Array.from({ length: 8 }, (_, n) => (n % 2 === 0 ? 1 : -1)));
-  assert.ok(closeTo(alt8[4], 1), "(-1)^n 的奈奎斯特分量应为 1（不翻倍）");
+  assert.ok(closeTo(alt8[4], 1), "(-1)\^n 的奈奎斯特分量应为 1（不翻倍）");
   assert.ok(alt8.slice(0, 4).every((value) => closeTo(value, 0)));
 
   const ones7 = mag(new Array(7).fill(1));
@@ -197,7 +198,7 @@ test("正文一致：采样定理必须写成严格不等式，并给出等号�
   const text = sectionText(chapter, "signals-ch2-sampling-time");
 
   assert.match(text, /f_s>2f_\{?\\?max\}?/, "公式必须是严格不等式 f_s>2f_max");
-  assert.match(text, /sin\(2πf_max t\)/, "必须给出等号处的反例信号");
+  assert.match(text, /sin\(2πf_\{?\\?\{?max\}?\}?\s*t\)/, "必须给出等号处的反例信号");
   assert.match(text, /sin\(πn\)/, "必须写出反例的样点形式 sin(πn)");
   assert.match(text, /符号相反/, "必须说明 99/101 Hz 的正弦样点符号相反（余弦相同）");
   assert.doesNotMatch(text, /f_s[≥>=]+2f_max[，。；]?\s*时.*唯一重建/, "不得写成 fs≥2fmax 即可唯一恢复");
@@ -271,8 +272,8 @@ test("正文一致：z 与 s 的关系不得写成原连续变换的变量替换
   const chapter = chapterOf(await loadCourses(), "signals-ch2");
   const text = sectionText(chapter, "signals-ch2-z-relations");
 
-  assert.match(text, /采样冲激串/, "必须说明 z=e^{sT} 联系的是采样冲激串的拉普拉斯变换");
-  assert.match(text, /1\/\(1−e\^\{−T\}z\^\{−1\}\)/, "应给出反例中的 Z 变换");
+  assert.match(text, /采样冲激串/, "必须说明 z=e\^{sT} 联系的是采样冲激串的拉普拉斯变换");
+  assert.match(text, /1\/\(1−e\^\{?−T\}?z\^\{?−1\}?\)/, "应给出反例中的 Z 变换");
   assert.match(text, /不能由任何有限的 s 到达|不取 z=0/, "必须说明 z=0 不由有限 s 到达");
   assert.doesNotMatch(text, /讨论稳定性时要指明落在哪条横带/, "稳定性判断不依赖选择横带");
   assert.doesNotMatch(text, /DTFT 存在 ⟺/, "ROC 含单位圆只是充分条件");

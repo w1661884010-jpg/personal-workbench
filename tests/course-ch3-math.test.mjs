@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { plainMath } from "./math-plain.mjs";
 
 const root = new URL("../", import.meta.url);
 
@@ -26,11 +27,12 @@ function chapterOf(courses, id) {
 function sectionText(chapter, id) {
   const section = chapter.sections.find((item) => item.id === id);
   assert.ok(section, `找不到小节 ${id}`);
-  return [
+  return plainMath([
     section.title, section.content, ...(section.detail ?? []),
     ...(section.points ?? []), ...(section.pitfalls ?? []),
-    section.formula ?? "", ...(section.variables ?? []),
-  ].join("\n");
+    ].join("\n"))
+    + "\n" + (section.formula ?? "")
+    + "\n" + (section.variables ?? []).join("\n");
 }
 
 /* ---------- 独立数值工具 ---------- */
@@ -95,7 +97,7 @@ test("非零初值分解：零输入 0.5^(n+1)，全响应 = 零状态 + 零输�
   }
   /* 解析式：全响应 = 2(1−0.5^(n+1)) + 0.5^(n+1) = 2 − 0.5^(n+1) */
   for (let n = 0; n < N; n += 1) {
-    assert.ok(closeTo(withInitial[n], 2 - Math.pow(0.5, n + 1)), `n=${n} 全响应解析式应为 2−0.5^(n+1)，实测 ${withInitial[n]}`);
+    assert.ok(closeTo(withInitial[n], 2 - Math.pow(0.5, n + 1)), `n=${n} 全响应解析式应为 2−0.5\^(n+1)，实测 ${withInitial[n]}`);
   }
   /* 零输入递推：不加输入、仅靠初值，输出按 0.5^(n+1) 衰减 */
   const pure = recurse(new Array(N).fill(0), 1);
@@ -111,7 +113,7 @@ test("逆系统反例：H(z)=1−2z^{−1} 的因果逆按 2^n 发散", () => {
   let value = 0;
   for (let n = 0; n < 40; n += 1) value = 1 + 2 * value;
   assert.ok(value > 1e11, `因果逆在第 40 点应已发散，实测 ${value}`);
-  assert.ok(closeTo(value, Math.pow(2, 40) - 1, 1), "递推结果应等于 2^40−1");
+  assert.ok(closeTo(value, Math.pow(2, 40) - 1, 1), "递推结果应等于 2\^40−1");
 });
 
 test("量化误差界：无溢出时 |Q(x)−x| ≤ Δ/2（确定性界，逐点成立）", () => {
@@ -145,8 +147,8 @@ test("正文一致：两个反例必须齐全，且不得由线性推出稳定",
   assert.match(text, /y\[n\]=n·x\[n\]/, "必须给出 y=n·x 反例");
   assert.match(text, /时变/, "y=n·x 必须指出时变");
   assert.match(text, /无界/, "y=n·x 的不稳定必须用“无界”说明");
-  assert.match(text, /\(x\[n\]\)²/, "必须给出 y=x² 反例");
-  assert.match(text, /非线性/, "y=x² 必须指出非线性");
+  assert.match(text, /\(x\[n\]\)\^2/, "必须给出 y=x\^2 反例");
+  assert.match(text, /非线性/, "y=x\^2 必须指出非线性");
   assert.doesNotMatch(text, /线性[^。；]{0,12}(所以|因此|故)[^。；]{0,12}稳定/, "不得由线性推出稳定");
   assert.match(text, /彼此不能互推|逐项检验/, "必须点明性质之间不能互推");
   assert.match(text, /Σ\|h\[n\]\|<∞|Σ\|h\[n\]\|/, "必须给出 LTI 的 BIBO 判据");
@@ -168,7 +170,7 @@ test("正文一致：逆滤波反例与“能除不等于可实现”", async ()
   const chapter = chapterOf(await loadCourses(), "signals-ch3");
   const text = sectionText(chapter, "signals-ch3-inverse");
 
-  assert.match(text, /1−2z\^\{−1\}/, "必须给出 H=1−2z^{−1}");
+  assert.match(text, /1−2z\^\{−1\}/, "必须给出 H=1−2z\^{−1}");
   assert.match(text, /z=2/, "必须指出极点在 z=2");
   assert.match(text, /不稳定/, "必须指出因果逆不稳定");
   assert.match(text, /不代表逆系统可实现|不保证逆系统可稳定实现/, "必须点明“处处非零”不等于可实现");
@@ -180,8 +182,8 @@ test("正文一致：有限字长的界与 Δ²/12 的条件", async () => {
 
   assert.match(text, /Q\(x\)=Δ·round\(x\/Δ\)|Δ·round/, "必须给出舍入量化模型");
   assert.match(text, /Δ\/2/, "必须给出 |Q−x|≤Δ/2");
-  assert.match(text, /Δ²\/12/, "必须提到 Δ²/12");
-  assert.match(text, /额外前提|假设/, "Δ²/12 必须写明成立假设");
+  assert.match(text, /Δ\^2\/12/, "必须提到 Δ\^2/12");
+  assert.match(text, /额外前提|假设/, "Δ\^2/12 必须写明成立假设");
   assert.match(text, /不相关/, "必须列出误差不相关这一条假设");
   /* 正文的警示语本身会提到错误说法，因此这里禁止的是“把它当结论断言”的写法 */
   assert.doesNotMatch(text, /量化噪声功率恒为|噪声功率就是 Δ²\/12/, "不得把 Δ²/12 写成无条件的结论");
@@ -241,17 +243,17 @@ test("正文一致：例题 4 的相位与代入必须写对", async () => {
   const chapter = chapterOf(await loadCourses(), "signals-ch3");
   const example = chapter.examples.find((item) => item.title.includes("频率响应"));
   assert.ok(example, "找不到频率响应例题");
-  const text = [example.prompt, ...example.steps, example.answer].join("\n");
+  const text = plainMath([example.prompt, ...example.steps, example.answer].join("\n"));
   assert.match(text, /−0\.4636/, "相位必须写成 −0.4636");
   assert.doesNotMatch(text, /\+0\.4636/, "不得写成 +0.4636");
-  assert.match(text, /1\+0\.5j/, "代入必须写成 1/(1+0.5j)（因为 z^{−1}=−j）");
+  assert.match(text, /1\+0\.5j/, "代入必须写成 1/(1+0.5j)（因为 z\^{−1}=−j）");
 });
 
 test("正文一致：稳定系统的零输入分量不得被说成造成稳态偏差", async () => {
   const chapter = chapterOf(await loadCourses(), "signals-ch3");
   const example = chapter.examples.find((item) => item.title.includes("直流增益"));
   assert.ok(example, "找不到直流增益校验例题");
-  const text = [example.prompt, ...example.steps, example.answer].join("\n");
+  const text = plainMath([example.prompt, ...example.steps, example.answer].join("\n"));
   assert.doesNotMatch(text, /零输入分量[^。]{0,20}抬高/, "不得把稳态偏差归因于零输入分量");
   assert.match(text, /衰减到 0|未到稳态/, "应说明零输入分量衰减到 0、问题在记录未到稳态");
 });
