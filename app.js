@@ -407,15 +407,18 @@
           syncSubmitState();
         });
         label.appendChild(radio);
-        label.appendChild(document.createTextNode(option));
+        /* 选项也要走数学解析：直接放文本节点会把 \(...\) 显示成源码 */
+        label.appendChild(textElement("span", option, "check-option"));
         fieldset.appendChild(label);
       });
       /* 提交后回显对错与解析（对齐原站 check-correct / check-wrong） */
       if (result) {
-        var feedback = textElement("p", "", result.answers[questionIndex] === question.answer ? "check-correct" : "check-wrong");
-        feedback.textContent = result.answers[questionIndex] === question.answer
+        var answeredRight = result.answers[questionIndex] === question.answer;
+        /* 整条信息一次性交给 textElement：先建空节点再赋 textContent 会覆盖掉解析结果 */
+        var feedbackText = answeredRight
           ? "回答正确。" + question.explanation
           : "正确答案：" + question.options[question.answer] + "。" + question.explanation;
+        var feedback = textElement("p", feedbackText, answeredRight ? "check-correct" : "check-wrong");
         fieldset.appendChild(feedback);
       }
       list.appendChild(fieldset);
