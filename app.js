@@ -314,7 +314,30 @@
 
   function textElement(tag, text, className) {
     var element = document.createElement(tag);
-    element.textContent = text;
+    /* 只解析课程作者显式写出的数学/代码标记；普通文字始终走文本节点。
+       不猜测公式，不把正文当 HTML，也不解释代码里的数学标记。 */
+    var source = String(text == null ? "" : text);
+    var tokens = /\\\(([\s\S]+?)\\\)|\\\[([\s\S]+?)\\\]|`([^`]+)`/g;
+    var cursor = 0, token;
+    while ((token = tokens.exec(source))) {
+      element.appendChild(document.createTextNode(source.slice(cursor, token.index)));
+      var part = document.createElement(token[3] !== undefined ? "code" : "span");
+      if (token[3] !== undefined) {
+        part.textContent = token[3];
+      } else {
+        part.className = token[2] !== undefined ? "math-display" : "math-inline";
+        if (window.KaTeX) {
+          part.innerHTML = window.KaTeX.renderToString(token[1] || token[2], {
+            displayMode: token[2] !== undefined, throwOnError: false, strict: false, trust: false
+          });
+        } else {
+          part.textContent = token[1] || token[2];
+        }
+      }
+      element.appendChild(part);
+      cursor = tokens.lastIndex;
+    }
+    element.appendChild(document.createTextNode(source.slice(cursor)));
     if (className) element.className = className;
     return element;
   }
